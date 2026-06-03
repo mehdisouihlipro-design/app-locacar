@@ -1,260 +1,218 @@
-# LocaCar - Setup & Déploiement Guide
+# E-Drive — Guide de Déploiement
 
-## 🎯 Architecture
+## Architecture réelle (juin 2026)
 
-L'application LocaCar est maintenant structurée en deux couches :
-
-### Frontend (Mini-App HTML)
-- **Localisation** : `/worksheet-mini-app/index.html`
-- **Type** : Single Page Application (SPA)
-- **Stockage** : localStorage (local) ou API PostgreSQL (production)
-- **Fonctionnalité** : Gestion complète de locations de voitures
-
-### Backend (API Express + PostgreSQL)
-- **Localisation** : `/src/backend/`
-- **Base de données** : PostgreSQL 15+
-- **Cache** : Redis
-- **API** : REST HTTP/JSON sur port 3001
-
-## 📋 Entités Managées
-
-La système gère les entités suivantes :
-- **Véhicules** (Cars) - Flotte de location
-- **Clients** (Customers) - Fichier client
-- **Contrats** (Contracts) - Contrats de location
-- **Réservations** (Reservations) - Planning
-- **Factures** (Invoices) - Facturation
-- **Paiements** (Payments) - Suivi des paiements
-- **Maintenance** - Coûts de maintenance
-- **Inspections** - États des lieux (check-in/check-out)
-- **Assurances** (Insurances) - Couverture assurance
-- **Leasing** - Contrats de leasing
-- **Vignettes** - Taxes annuelles
-- **GPS** - Suivi de localisation
-- **Settings** - Configuration globale
-
-## 🚀 Déploiement Local (Développement)
-
-### Option 1 : Mini-App + localStorage (SUR CE PC)
-
-La mini-app fonctionne déjà en local :
-
-```bash
-# Ouvrir simplement le fichier dans le navigateur
-file:///c:/Applications/App_locaCar/worksheet-mini-app/index.html
+```
+┌─────────────────────────────────────────────────┐
+│               CLOUD (Railway)                   │
+│                                                 │
+│  serve.js (Node.js)          PORT=auto          │
+│  ├── GET /                → worksheet-mini-app/ │
+│  ├── GET /html2pdf.bundle.min.js  (statique)    │
+│  ├── GET /1000095084.jpg          (statique)    │
+│  ├── POST /api/proxy/auth         (Supabase)    │
+│  ├── POST /api/proxy/snapshot/*   (Supabase)    │
+│  └── POST /api/analyze-damages    (Anthropic)   │
+│                                                 │
+│  Backend API Express (src/backend/)   port 3001 │
+│  └── JWT auth + 13 modules REST                 │
+└─────────────────────────────────────────────────┘
+         │                         │
+         ▼                         ▼
+   Supabase Cloud            Anthropic API
+   (PostgreSQL)              (analyse dommages IA)
 ```
 
-**Avantages** :
-- ✅ Fonctionne immédiatement
-- ✅ Aucune dépendance système
-- ✅ Données stockées localement dans le navigateur
+**Deux serveurs distincts :**
+- `serve.js` — sert la mini-app HTML worksheet (port 3000/prod)
+- `src/backend/index.ts` — API REST Express + JWT (port 3001)
 
-**Limitations** :
-- ❌ Données non persistantes entre navigateurs
-- ❌ Pas de multi-utilisateurs
-- ❌ Pas de synchronisation
+---
 
-### Option 2 : Avec Backend API (Quand Docker/Node.js disponibles)
+## Déploiement local (développement)
 
-#### Prérequis
-- Node.js 18+
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose (recommandé)
-
-#### Installation
+### Mini-app worksheet (serve.js)
 
 ```bash
-# 1. Cloner/accéder au projet
-cd c:\Applications\App_locaCar
-
-# 2. Installer les dépendances
+# Installer les dépendances (une seule fois)
 npm install
 
-# 3. Initialiser les services avec Docker
-docker-compose up -d
-
-# 4. L'API démarrera sur http://localhost:3001
-# 5. La mini-app se connectera automatiquement
+# Démarrer le serveur
+node serve.js
+# → http://localhost:3000
 ```
 
-#### Variables d'environnement (.env)
+### Backend API (Express + Supabase)
+
+```bash
+# Démarrer le backend
+npm run backend:dev
+# → http://localhost:3001
+
+# Vérifier la santé de l'API
+curl http://localhost:3001/api/v1/health
+```
+
+### Variables d'environnement (.env)
 
 ```env
 NODE_ENV=development
 PORT=3001
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_USER=locacar_user
-POSTGRES_PASSWORD=locacar_password
-POSTGRES_DB=locacar_db
-REDIS_URL=redis://redis:6379
+
+# Supabase
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+
+# JWT (backend API)
+JWT_SECRET=change_me_in_production
+
+# Optionnel — analyse de dommages IA
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Inscription libre
+ALLOW_REGISTRATION=true
 ```
 
-## 🔌 Architecture API
+---
 
-### Endpoints disponibles
+## Déploiement cloud — Railway
 
-```
-GET    /api/v1/health                 # Health check
-GET    /api/v1/cars                   # Lister tous les véhicules
-POST   /api/v1/cars                   # Créer un véhicule
-GET    /api/v1/cars/:id               # Détails d'un véhicule
-PUT    /api/v1/cars/:id               # Modifier un véhicule
-DELETE /api/v1/cars/:id               # Supprimer un véhicule
+### Prérequis accomplis (juin 2026)
 
-# Même pattern pour:
-/api/v1/customers
-/api/v1/contracts
-/api/v1/invoices
-/api/v1/payments
-/api/v1/reservations
-/api/v1/maintenance
-/api/v1/inspections
-/api/v1/insurances
-/api/v1/leasing
-/api/v1/vignettes
-/api/v1/settings
-```
+- [x] `serve.js` adapté pour le cloud :
+  - `PORT` utilise `process.env.PORT` (injecté par Railway)
+  - Serveur écoute sur `0.0.0.0` (plus `localhost` uniquement)
+  - Fichiers statiques servis : `html2pdf.bundle.min.js` et `1000095084.jpg`
+- [x] `Procfile` créé : `web: node serve.js`
+- [x] `railway.toml` créé
+- [x] `package.json` : script `"start": "node serve.js"` ajouté
+- [x] Repo GitHub créé : https://github.com/mehdisouihlipro-design/app-locacar
 
-## 🔄 Utilisation de l'API depuis la Mini-App
+### Étapes de déploiement Railway
 
-### Code Client JavaScript
+**1. Créer un compte / se connecter**
+- Aller sur [railway.app](https://railway.app)
+- Se connecter avec GitHub
 
-```javascript
-// Utiliser le StorageAdapter pour abstraire la source de données
-const API_ENABLED = true;
+**2. Créer un nouveau projet**
+- Cliquer **New Project**
+- Choisir **Deploy from GitHub repo**
+- Sélectionner `mehdisouihlipro-design/app-locacar`
 
-// Récupérer toutes les voitures
-if (API_ENABLED) {
-  const response = await fetch('http://localhost:3001/api/v1/cars');
-  const { data: cars } = await response.json();
-} else {
-  const cars = JSON.parse(localStorage.getItem('cars') || '[]');
-}
+**3. Railway détecte automatiquement**
+- Le `Procfile` → commande de démarrage : `node serve.js`
+- Node.js → pas de build command nécessaire
 
-// Créer une voiture
-const newCar = await fetch('http://localhost:3001/api/v1/cars', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ id: 'CAR-001', plate: 'TN-123-XX', model: 'Dacia Duster' })
-});
-```
+**4. Configurer les variables d'environnement**
+- Aller dans l'onglet **Variables** du service
+- Ajouter :
 
-## 📦 Structure du Projet
+| Variable | Valeur | Obligatoire |
+|----------|--------|-------------|
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Non (seulement pour l'IA) |
 
-```
-c:\Applications\App_locaCar\
-├── worksheet-mini-app/              # Frontend SPA
-│   ├── index.html                   # Application principale
-│   ├── api-client.js                # Client API
-│   ├── storage-adapter.js           # Adaptateur localStorage/API
-│   └── html2pdf.bundle.min.js       # Export PDF
-├── src/
-│   ├── backend/                     # API Express
-│   │   ├── index.ts                 # Point d'entrée
-│   │   ├── schema.sql               # Schéma PostgreSQL
-│   │   └── routes/                  # Endpoints API
-│   │       ├── cars.routes.ts
-│   │       ├── customers.routes.ts
-│   │       ├── contracts.routes.ts
-│   │       ├── invoices.routes.ts
-│   │       ├── payments.routes.ts
-│   │       ├── reservations.routes.ts
-│   │       ├── maintenance.routes.ts
-│   │       ├── inspections.routes.ts
-│   │       ├── insurances.routes.ts
-│   │       ├── leasing.routes.ts
-│   │       ├── vignettes.routes.ts
-│   │       └── settings.routes.ts
-│   └── frontend/                    # Frontend React (futur)
-├── docker-compose.yml               # Orchestration services
-├── Dockerfile.backend               # Build image backend
-├── Dockerfile.frontend              # Build image frontend
-├── package.json                     # Dépendances
-└── docs/                            # Documentation
-```
+> `PORT` est injecté automatiquement par Railway — ne pas le définir.
 
-## ✅ Fonctionnalités Actuellement Disponibles
+**5. Générer le domaine public**
+- Onglet **Settings → Networking**
+- Cliquer **Generate Domain**
+- URL obtenue : `https://app-locacar-production.up.railway.app` (exemple)
 
-### Mini-App Worksheet
-- ✅ Gestion des véhicules avec stati GPS
-- ✅ Gestion des clients
-- ✅ Contrats de location (court & long terme)
-- ✅ Invoicing et payment tracking
-- ✅ Réservations avec calendrier
-- ✅ États des lieux (inspections) avec photos
-- ✅ Maintenance tracking
-- ✅ Assurances & Leasing
-- ✅ Vignettes (taxes)
-- ✅ Recouvrements & Collections
-- ✅ Export Excel
-- ✅ Timeline visuelle des réservations
-- ✅ Calculs automatiques (devises TND/EUR)
-
-## 🔐 Sécurité (À implémenter)
-
-Pour production :
-- [ ] Authentication JWT
-- [ ] Role-based access control (RBAC)
-- [ ] HTTPS / TLS
-- [ ] Rate limiting
-- [ ] CORS configuration
-- [ ] Input validation & sanitization
-
-## 📊 Prochaines étapes
-
-1. **À court terme** :
-   - ✅ Schéma BD complètement défini
-   - ✅ Routes API implémentées
-   - [ ] Adapter la mini-app pour utiliser l'API
-
-2. **À moyen terme** :
-   - [ ] Frontend React moderne
-   - [ ] Mobile app (React Native)
-   - [ ] Authentification & RBAC
-   - [ ] Tests unitaires & intégration
-
-3. **À long terme** :
-   - [ ] CI/CD pipeline
-   - [ ] Multi-ténant
-   - [ ] Analytics & Reporting
-   - [ ] GPS real-time tracking
-   - [ ] Mobile payment integration
-
-## 🛠️ Développement
-
-### Build Backend
+**6. Vérifier le déploiement**
 ```bash
-npm run build:backend
+curl https://votre-url.up.railway.app/
+# → Doit retourner la page HTML de l'app
 ```
 
-### Tester l'API
+### Redéploiement automatique
+
+Chaque `git push` sur la branche `master` déclenche automatiquement un nouveau déploiement Railway.
+
 ```bash
-npm run dev          # Mode développement
-npm run build        # Build production
+git add .
+git commit -m "description du changement"
+git push origin master
+# → Railway redéploie automatiquement
 ```
 
-### Logs
+---
+
+## Outils installés (juin 2026)
+
+| Outil | Version | Usage |
+|-------|---------|-------|
+| GitHub CLI (`gh`) | 2.93.0 | Créer/gérer les repos GitHub |
+| Node.js | 18+ | Runtime serve.js et backend |
+| npm | 9+ | Gestion des dépendances |
+
+### Authentification GitHub CLI
+
 ```bash
-# Backend logs
-docker logs locacar_backend
-
-# Database logs
-docker logs locacar_postgres
+# Dans un nouveau terminal (après installation gh)
+gh auth login
+# → Choisir GitHub.com → HTTPS → Login with a web browser
+# → Entrer le code affiché dans le navigateur
 ```
 
-## 📞 Support
+---
 
-En cas de problème :
-1. Vérifier les logs Docker
-2. Vérifier la connexion à la base de données
-3. Vérifier que les ports 3001 (API) et 5432 (PostgreSQL) sont libres
-4. Vérifier les credentials PostgreSQL dans .env
+## Fonctionnalités de l'app worksheet (serve.js)
 
-## 📝 Notes
+| Route | Description |
+|-------|-------------|
+| `GET /` | Charge `worksheet-mini-app/index.html` |
+| `GET /html2pdf.bundle.min.js` | Librairie export PDF |
+| `GET /1000095084.jpg` | Logo E-Drive |
+| `POST /api/proxy/auth` | Auth Supabase (login/signup) |
+| `POST /api/proxy/snapshot/load` | Charge les données de l'utilisateur |
+| `POST /api/proxy/snapshot/save` | Sauvegarde les données |
+| `POST /api/analyze-damages` | Analyse de dommages via Claude AI |
 
-- La mini-app peut fonctionner **indépendamment** en mode localStorage
-- Le backend est **optionnel** pour le développement local
-- En production, utiliser la configuration Docker Compose
-- Les données PostgreSQL sont persistantes dans des volumes Docker
+---
+
+## Tests API réussis (juin 2026)
+
+```bash
+# Register
+POST /api/v1/auth/register
+→ { success: true, data: { id, email, role: "agent" } }
+
+# Login
+POST /api/v1/auth/login
+→ { success: true, data: { token, user } }
+
+# Profil (token requis)
+GET /api/v1/auth/me
+→ { success: true, data: { id, email, role, is_active } }
+
+# Health check
+GET /api/v1/health
+→ { success: true, database: "connected" }
+```
+
+---
+
+## Structure des fichiers de déploiement
+
+```
+App_locaCar/
+├── serve.js              # Serveur mini-app (DÉPLOYÉ sur Railway)
+├── Procfile              # web: node serve.js
+├── railway.toml          # Config Railway
+├── package.json          # "start": "node serve.js"
+├── .gitignore            # node_modules, .env, .env.development exclus
+├── worksheet-mini-app/
+│   ├── index.html        # App principale (324 KB)
+│   ├── html2pdf.bundle.min.js
+│   └── supabase-schema.sql
+└── src/backend/          # API Express (déploiement séparé futur)
+```
+
+---
+
+## Prochaines étapes
+
+- [ ] Déployer le backend Express (src/backend/) sur Railway — service séparé
+- [ ] Connecter la mini-app au backend JWT au lieu de Supabase Auth direct
+- [ ] Configurer un domaine personnalisé sur Railway
+- [ ] Mettre en place des variables d'env de production séparées
