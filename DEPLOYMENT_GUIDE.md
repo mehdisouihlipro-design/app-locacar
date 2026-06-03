@@ -99,9 +99,10 @@ ALLOW_REGISTRATION=true
 - Choisir **Deploy from GitHub repo**
 - Sélectionner `mehdisouihlipro-design/app-locacar`
 
-**3. Railway détecte automatiquement**
-- Le `Procfile` → commande de démarrage : `node serve.js`
-- Node.js → pas de build command nécessaire
+**3. Railway utilise la config `railway.toml`**
+- Build : `npm install --omit=dev` (évite les devDependencies React/TypeScript/Vite)
+- Start : `node serve.js`
+- Note : `serve.js` n'utilise que des modules Node.js natifs (http, fs, path) — pas de dépendances npm nécessaires
 
 **4. Configurer les variables d'environnement**
 - Aller dans l'onglet **Variables** du service
