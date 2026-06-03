@@ -108,11 +108,15 @@ ALLOW_REGISTRATION=true
 - Aller dans l'onglet **Variables** du service
 - Ajouter :
 
-| Variable | Valeur | Obligatoire |
-|----------|--------|-------------|
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | Non (seulement pour l'IA) |
+| Variable | Description | Obligatoire |
+|----------|-------------|-------------|
+| `SUPABASE_URL` | URL du projet Supabase | Oui |
+| `SUPABASE_ANON_KEY` | Clé anonyme Supabase | Oui |
+| `ANTHROPIC_API_KEY` | Clé API Anthropic | Non (pour l'IA uniquement) |
 
 > `PORT` est injecté automatiquement par Railway — ne pas le définir.
+
+> `SUPABASE_URL` et `SUPABASE_ANON_KEY` sont injectés automatiquement dans le localStorage du navigateur par `serve.js` au chargement de la page, ce qui connecte l'app à Supabase sans configuration manuelle.
 
 **5. Domaine public**
 - Onglet **Settings → Networking**
