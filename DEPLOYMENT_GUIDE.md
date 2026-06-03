@@ -114,15 +114,14 @@ ALLOW_REGISTRATION=true
 
 > `PORT` est injecté automatiquement par Railway — ne pas le définir.
 
-**5. Générer le domaine public**
+**5. Domaine public**
 - Onglet **Settings → Networking**
-- Cliquer **Generate Domain**
-- URL obtenue : `https://app-locacar-production.up.railway.app` (exemple)
+- URL de production : `https://web-production-b4967.up.railway.app`
 
 **6. Vérifier le déploiement**
 ```bash
-curl https://votre-url.up.railway.app/
-# → Doit retourner la page HTML de l'app
+curl https://web-production-b4967.up.railway.app/
+# → 200 OK ✅ (testé et validé juin 2026)
 ```
 
 ### Redéploiement automatique
