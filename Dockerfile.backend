@@ -1,0 +1,53 @@
+# Build stage
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build backend
+RUN npm run build:backend
+
+# Runtime stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built backend from builder
+COPY --from=builder /app/dist ./dist
+
+# Create health check script
+RUN echo '#!/bin/sh' > /health.sh && \
+    echo 'curl -f http://localhost:$PORT/api/v1/health || exit 1' >> /health.sh && \
+    chmod +x /health.sh
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/api/v1/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Use dumb-init to handle signals
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start application
+CMD ["node", "dist/src/backend/index.js"]
