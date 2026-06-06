@@ -1167,6 +1167,7 @@
       <button class="tab" data-tab="alerts">Alertes</button>
       <button class="tab" data-tab="gps">GPS</button>
       <button class="tab" data-tab="settings">Actions rapides</button>
+      <button class="tab" data-tab="users">Utilisateurs</button>
     </div>
 
     <section id="home" class="panel active">
@@ -2378,6 +2379,31 @@
       </div>
     </div>
 
+    <section id="users" class="panel">
+      <h3>Gestion des utilisateurs</h3>
+      <div class="row" style="margin-bottom:12px;">
+        <div><label>Email</label><input id="newUserEmail" type="email" placeholder="user@email.com" /></div>
+        <div><label>Mot de passe</label><input id="newUserPassword" type="password" placeholder="••••••••" /></div>
+        <div><label>Nom complet</label><input id="newUserName" placeholder="Prénom Nom" /></div>
+        <div>
+          <label>Rôle</label>
+          <select id="newUserRole">
+            <option value="agent">Agent</option>
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button id="addUserBtn">Ajouter utilisateur</button>
+        </div>
+      </div>
+      <div id="usersStatus" class="muted" style="margin-bottom:8px;"></div>
+      <table>
+        <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Actif</th><th>Créé</th><th>Action</th></tr></thead>
+        <tbody id="usersTable"></tbody>
+      </table>
+    </section>
+
     <div id="inspectionDetailModal" class="modal" aria-hidden="true">
       <div class="modal-card" style="width:min(1100px,100%);">
         <h3 id="inspectionDetailTitle">Detail etat des lieux</h3>
@@ -2476,7 +2502,8 @@
     const MEDIA_STORE_NAME = "media";
     const SUPABASE_CFG_KEY = "locacar-supabase-cfg";
     const PROXY_SESSION_KEY = "locacar-proxy-session";
-    const LOCAL_ONLY_MODE = true;
+    const LOCAL_ONLY_MODE = false;
+    const API_URL = (window._API_URL || '').replace(/\/$/, '');
     const today = new Date().toISOString().slice(0, 10);
     const BASE_CURRENCY = "TND";
     const TREASURY_HORIZON_DAYS = 365;
@@ -3972,68 +3999,45 @@
     }
 
     async function onAuthSubmit() {
-      const cfg = getAuthInputs();
-      if (!cfg) return;
-
       const mode = byId("authMode").value;
       const email = byId("authEmail").value.trim();
       const password = byId("authPassword").value;
+      if (!email || !password) { setAuthStatus("Email et mot de passe obligatoires."); return; }
 
-      if (!email || !password) {
-        setAuthStatus("Email et mot de passe obligatoires.");
-        return;
-      }
+      if (!API_URL) { setAuthStatus("API_URL non configuré — vérifier les variables Railway."); return; }
 
-      let result = null;
-      let usedProxy = false;
-
+      setAuthStatus("Connexion en cours...");
       try {
-        if (!initSupabaseClientFromInputs()) throw new Error("Configuration invalide.");
-
-        if (!canUseDirectSupabase()) {
-          throw new Error("DIRECT_UNAVAILABLE");
-        }
+        const endpoint = mode === "signup" ? `${API_URL}/auth/register` : `${API_URL}/auth/login`;
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!data.success) { setAuthStatus(data.message || "Erreur auth."); return; }
 
         if (mode === "signup") {
-          result = await supabaseClient.auth.signUp({ email, password });
-        } else {
-          result = await supabaseClient.auth.signInWithPassword({ email, password });
-        }
-      } catch (error) {
-        const forceProxy = String(error && error.message ? error.message : "") === "DIRECT_UNAVAILABLE";
-        if (!forceProxy && !isNetworkFetchError(error)) {
-          setAuthStatus(`Erreur auth: ${error.message || error}`);
+          setAuthStatus("Compte créé. Connectez-vous maintenant.");
+          byId("authMode").value = "signin";
           return;
         }
 
-        usedProxy = true;
-        setAuthStatus("Reseau navigateur bloque, tentative via serveur local...");
-        const proxyRes = await proxyAuth(mode, cfg, email, password);
-        if (proxyRes.error) {
-          setAuthStatus(`Erreur auth: ${proxyRes.error}`);
-          return;
-        }
-        result = {
-          error: null,
-          data: {
-            session: proxyRes.session || null,
-            user: proxyRes.user || (proxyRes.session ? proxyRes.session.user : null),
-          },
-        };
-      }
-
-      if (result.error) {
-        setAuthStatus(`Erreur auth: ${result.error.message}`);
+        localStorage.setItem("locacar-jwt", data.data.token);
+        currentUser = data.data.user;
+        authTransport = "jwt";
+        await loadDataFromAPI();
+        render();
+        setAppVisibility(true);
+        setAuthStatus(`Connecté: ${currentUser.email} (${currentUser.role})`);
+        return;
+      } catch (err) {
+        setAuthStatus(`Erreur réseau: ${err.message}`);
         return;
       }
 
-      const session = result.data.session;
-      if (!session && mode === "signup") {
-        setAuthStatus("Compte cree. Verifie ton email puis connecte-toi.");
-        return;
-      }
-
-      currentUser = session.user;
+      // dead code kept for structure — never reached
+      const usedProxy = false;
       if (usedProxy) {
         authTransport = "proxy";
         proxySession = {
@@ -4055,6 +4059,7 @@
     }
 
     async function onLogout() {
+      localStorage.removeItem("locacar-jwt");
       if (authTransport === "proxy") {
         proxySession = null;
         localStorage.removeItem(PROXY_SESSION_KEY);
@@ -4064,25 +4069,79 @@
       currentUser = null;
       authTransport = "supabase";
       setAppVisibility(false);
-      setAuthStatus("Deconnecte.");
+      setAuthStatus("Deconnecté.");
+    }
+
+    async function apiGet(path) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return null;
+      try {
+        const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        return data.success ? data.data : null;
+      } catch (_) { return null; }
+    }
+
+    async function apiPost(path, body) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return null;
+      try {
+        const res = await fetch(`${API_URL}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        return data.success ? data.data : null;
+      } catch (_) { return null; }
+    }
+
+    async function apiDelete(path) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return;
+      try {
+        await fetch(`${API_URL}${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      } catch (_) {}
+    }
+
+    async function loadDataFromAPI() {
+      const cars = await apiGet("/cars");
+      if (cars) {
+        state.cars = cars.map(c => ({
+          id: c.id, plate: c.plate, model: c.model,
+          brand: c.brand || "", agency: c.agency || "",
+          status: c.status || "disponible",
+          gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
+        }));
+      }
     }
 
     async function initAuth() {
-      if (LOCAL_ONLY_MODE) {
-        currentUser = { id: "local-user", email: "local@offline" };
-        authTransport = "local";
-        setAppVisibility(true);
-        render();
-        setAuthStatus("Mode local actif. Donnees en localStorage uniquement.");
-        return;
+      byId("authSubmitBtn").addEventListener("click", onAuthSubmit);
+      byId("authLogoutBtn").addEventListener("click", onLogout);
+
+      // Restore JWT session
+      const token = localStorage.getItem("locacar-jwt");
+      if (token && API_URL) {
+        try {
+          const res = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+          const data = await res.json();
+          if (data.success) {
+            currentUser = data.data;
+            authTransport = "jwt";
+            await loadDataFromAPI();
+            render();
+            setAppVisibility(true);
+            setAuthStatus(`Connecté: ${currentUser.email} (${currentUser.role})`);
+            return;
+          }
+        } catch (_) {}
+        localStorage.removeItem("locacar-jwt");
       }
 
       const cfg = getSupabaseConfig();
       byId("sbUrl").value = cfg.url;
       byId("sbAnonKey").value = cfg.anonKey;
-
-      byId("authSubmitBtn").addEventListener("click", onAuthSubmit);
-      byId("authLogoutBtn").addEventListener("click", onLogout);
 
       if (cfg.url && cfg.anonKey && canUseDirectSupabase()) {
         supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -4122,28 +4181,19 @@
       setAuthStatus("Configure Supabase puis connecte-toi.");
     }
 
-    document.getElementById("addCarBtn").addEventListener("click", () => {
+    document.getElementById("addCarBtn").addEventListener("click", async () => {
       const plate = byId("carPlate").value.trim();
       const model = byId("carModel").value.trim();
       const agency = byId("carAgency").value.trim();
       const status = byId("carStatus").value;
 
-      if (!plate || !model || !agency) {
-        alert("Completer les champs vehicule.");
-        return;
-      }
+      if (!plate || !model || !agency) { alert("Completer les champs vehicule."); return; }
 
-      state.cars.push({
-        id: uid("CAR"),
-        plate,
-        model,
-        agency,
-        status,
-        gpsLat: null,
-        gpsLng: null,
-        gpsSpeed: 0,
-        gpsUpdatedAt: "-",
-      });
+      let id = uid("CAR");
+      const saved = await apiPost("/cars", { plate, model, agency, status });
+      if (saved && saved.id) id = saved.id;
+
+      state.cars.push({ id, plate, model, agency, status, gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-" });
       byId("carPlate").value = "";
       byId("carModel").value = "";
       byId("carAgency").value = "";
@@ -7115,14 +7165,86 @@
         });
       });
       tbody.querySelectorAll("[data-del-car]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-car");
+          await apiDelete(`/cars/${id}`);
           state.cars = state.cars.filter((c) => c.id !== id);
           saveAndRender();
         });
       });
     }
+
+    async function renderUsers() {
+      const tbody = byId("usersTable");
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" class="muted">Chargement...</td></tr>';
+      const users = await apiGet("/users");
+      if (!users) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">Accès refusé ou erreur (admin requis).</td></tr>';
+        return;
+      }
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.email}</td>
+          <td>${u.full_name || '-'}</td>
+          <td><span style="background:#edf4ff;color:#1540c8;padding:2px 8px;border-radius:999px;font-size:12px;">${u.role}</span></td>
+          <td>${u.is_active ? '✅' : '❌'}</td>
+          <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '-'}</td>
+          <td>
+            <button class="secondary" style="font-size:11px;padding:3px 8px;" onclick="toggleUserActive('${u.id}',${!u.is_active})">${u.is_active ? 'Désactiver' : 'Activer'}</button>
+            <button style="font-size:11px;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;cursor:pointer;" onclick="deleteUser('${u.id}','${u.email}')">Supprimer</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    window.toggleUserActive = async (id, active) => {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return;
+      await fetch(`${API_URL}/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_active: active }),
+      });
+      renderUsers();
+    };
+
+    window.deleteUser = async (id, email) => {
+      if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+      await apiDelete(`/users/${id}`);
+      renderUsers();
+    };
+
+    document.addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-tab='users']");
+      if (tab) renderUsers();
+    });
+
+    document.getElementById("addUserBtn").addEventListener("click", async () => {
+      const email = byId("newUserEmail").value.trim();
+      const password = byId("newUserPassword").value;
+      const full_name = byId("newUserName").value.trim();
+      const role = byId("newUserRole").value;
+      const status = byId("usersStatus");
+      if (!email || !password) { status.textContent = "Email et mot de passe requis."; return; }
+      status.textContent = "Création en cours...";
+      const token = localStorage.getItem("locacar-jwt");
+      try {
+        const res = await fetch(`${API_URL}/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ email, password, full_name, role }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          status.textContent = `✅ Utilisateur ${email} créé.`;
+          byId("newUserEmail").value = ""; byId("newUserPassword").value = ""; byId("newUserName").value = "";
+          renderUsers();
+        } else {
+          status.textContent = `❌ ${data.message}`;
+        }
+      } catch (err) { status.textContent = `Erreur: ${err.message}`; }
+    });
 
     function renderCustomers() {
       const tbody = byId("customersTable");

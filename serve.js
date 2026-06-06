@@ -447,14 +447,19 @@ const server = http.createServer((req, res) => {
         res.end('Error reading file');
         return;
       }
-      // Auto-inject Supabase config from env vars so the app connects to the DB automatically
+      // Auto-inject config from env vars
       const supabaseUrl = getEnv('SUPABASE_URL');
       const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
+      const apiUrl = getEnv('API_URL');
+      let inject = '';
       if (supabaseUrl && supabaseAnonKey) {
         const cfg = JSON.stringify({ url: supabaseUrl, anonKey: supabaseAnonKey });
-        const inject = `<script>localStorage.setItem('locacar-supabase-cfg',${JSON.stringify(cfg)});</script>`;
-        content = content.replace('</head>', inject + '</head>');
+        inject += `<script>localStorage.setItem('locacar-supabase-cfg',${JSON.stringify(cfg)});</script>`;
       }
+      if (apiUrl) {
+        inject += `<script>window._API_URL=${JSON.stringify(apiUrl)};</script>`;
+      }
+      if (inject) content = content.replace('</head>', inject + '</head>');
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(content);
     });
