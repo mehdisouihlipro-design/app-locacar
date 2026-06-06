@@ -1,34 +1,34 @@
 // src/backend/routes/payments.routes.ts
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { v4 as uuidv4 } from 'uuid';
+
 const router = Router();
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.query('SELECT * FROM payments ORDER BY created_at DESC');
-    res.json({ success: true, data: result.rows });
+    const result = await global.db.get('/payments?select=*&order=created_at.desc');
+    res.json({ success: true, data: result.data });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { id, invoice_id, contract_id, customer_name, payment_date, amount_original, currency, amount_tnd, method, reference, notes } = req.body;
-    const result = await global.db.query(
-      `INSERT INTO payments (id, invoice_id, contract_id, customer_name, payment_date, amount_original, currency, amount_tnd, method, reference, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [id, invoice_id, contract_id, customer_name, payment_date, amount_original, currency, amount_tnd, method, reference, notes]
-    );
-    res.status(201).json({ success: true, data: result.rows[0] });
+    const result = await global.db.post('/payments', {
+      ...req.body,
+      id: req.body.id || uuidv4()
+    }, { headers: { Prefer: 'return=representation' } });
+    res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.query('DELETE FROM payments WHERE id = $1 RETURNING id', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Payment not found' });
+    await global.db.delete(`/payments?id=eq.${req.params.id}`);
     res.json({ success: true, message: 'Payment deleted', data: { id: req.params.id } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

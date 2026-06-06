@@ -1,34 +1,35 @@
-// src/backend/routes/maintenance.routes.ts
-import { Router, Request, Response } from 'express';
+// src/backend/routes/maintenance_costs.routes.ts
+import { Router, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { v4 as uuidv4 } from 'uuid';
+
 const router = Router();
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.query('SELECT * FROM maintenance_costs ORDER BY created_at DESC');
-    res.json({ success: true, data: result.rows });
+    const result = await global.db.get('/maintenance_costs?select=*&order=created_at.desc');
+    res.json({ success: true, data: result.data });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { id, car_id, car_plate, type, date, amount_original, currency, amount_tnd, status, note } = req.body;
-    const result = await global.db.query(
-      `INSERT INTO maintenance_costs (id, car_id, car_plate, type, date, amount_original, currency, amount_tnd, status, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [id, car_id, car_plate, type, date, amount_original, currency, amount_tnd, status || 'paye', note]
-    );
-    res.status(201).json({ success: true, data: result.rows[0] });
+    const result = await global.db.post('/maintenance_costs', {
+      ...req.body,
+      id: req.body.id || uuidv4(),
+      status: req.body.status || 'paye'
+    }, { headers: { Prefer: 'return=representation' } });
+    res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.query('DELETE FROM maintenance_costs WHERE id = $1 RETURNING id', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Maintenance not found' });
+    await global.db.delete(`/maintenance_costs?id=eq.${req.params.id}`);
     res.json({ success: true, message: 'Maintenance deleted', data: { id: req.params.id } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
