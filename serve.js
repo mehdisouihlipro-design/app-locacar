@@ -158,6 +158,17 @@ try {
 const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
 
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/status') {
+    sendJson(res, 200, {
+      version: '2.0',
+      supabase_url_set: Boolean(getEnv('SUPABASE_URL')),
+      supabase_key_set: Boolean(getEnv('SUPABASE_ANON_KEY')),
+      anthropic_set: Boolean(getEnv('ANTHROPIC_API_KEY')),
+      env_keys: Object.keys(process.env).filter(k => !k.toLowerCase().includes('key') && !k.toLowerCase().includes('secret') && !k.toLowerCase().includes('password')),
+    });
+    return;
+  }
+
   if (req.method === 'POST' && parsedUrl.pathname === '/api/proxy/auth') {
     readJsonBody(req)
       .then(async (body) => {
