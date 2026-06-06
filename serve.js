@@ -6,6 +6,14 @@ const { spawnSync } = require('child_process');
 const PORT = process.env.PORT || 3000;
 const FILE_PATH = path.join(__dirname, 'worksheet-mini-app', 'index.html');
 
+// Case-insensitive env var lookup (Railway variable names may vary in casing)
+function getEnv(name) {
+  if (process.env[name]) return process.env[name];
+  const lower = name.toLowerCase();
+  const found = Object.keys(process.env).find(k => k.toLowerCase() === lower);
+  return found ? process.env[found] : '';
+}
+
 function sendJson(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(payload));
@@ -427,8 +435,8 @@ const server = http.createServer((req, res) => {
         return;
       }
       // Auto-inject Supabase config from env vars so the app connects to the DB automatically
-      const supabaseUrl = process.env.SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+      const supabaseUrl = getEnv('SUPABASE_URL');
+      const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
       if (supabaseUrl && supabaseAnonKey) {
         const cfg = JSON.stringify({ url: supabaseUrl, anonKey: supabaseAnonKey });
         const inject = `<script>localStorage.setItem('locacar-supabase-cfg',${JSON.stringify(cfg)});</script>`;
