@@ -1078,44 +1078,32 @@
 </head>
 <body>
   <div class="wrap">
-    <section id="authPanel" class="card">
-      <h3>Connexion Multi-utilisateur</h3>
-      <p class="small">Authentification email/mot de passe + stockage serveur (Supabase).</p>
-      <div class="auth-grid">
-        <div>
-          <label>Supabase URL</label>
-          <input id="sbUrl" placeholder="https://xxxx.supabase.co" />
-        </div>
-        <div>
-          <label>Supabase Anon Key</label>
-          <input id="sbAnonKey" placeholder="eyJ..." />
-        </div>
-        <div>
-          <label>Mode</label>
-          <select id="authMode">
-            <option value="signin">Connexion</option>
-            <option value="signup">Inscription</option>
-          </select>
-        </div>
+    <section id="authPanel" class="card" style="max-width:420px;margin:60px auto;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <img src="/1000095084.jpg" alt="E-Drive" style="height:70px;object-fit:contain;mix-blend-mode:multiply;" />
+        <h2 style="margin:8px 0 4px;">E-Drive</h2>
+        <p class="muted" style="margin:0;font-size:13px;">Gestion locative de parc automobile</p>
       </div>
-      <div class="auth-grid">
+      <!-- Champs Supabase cachés — conservés pour compatibilité interne -->
+      <input id="sbUrl" type="hidden" />
+      <input id="sbAnonKey" type="hidden" />
+      <select id="authMode" style="display:none;">
+        <option value="signin">Connexion</option>
+        <option value="signup">Inscription</option>
+      </select>
+      <div style="display:flex;flex-direction:column;gap:12px;">
         <div>
           <label>Email</label>
-          <input id="authEmail" type="email" placeholder="utilisateur@email.com" />
+          <input id="authEmail" type="email" placeholder="utilisateur@email.com" style="width:100%;" />
         </div>
         <div>
           <label>Mot de passe</label>
-          <input id="authPassword" type="password" placeholder="********" />
+          <input id="authPassword" type="password" placeholder="••••••••" style="width:100%;" />
         </div>
-        <div>
-          <label>&nbsp;</label>
-          <button id="authSubmitBtn">Se connecter</button>
-        </div>
+        <button id="authSubmitBtn" style="width:100%;padding:10px;">Se connecter</button>
       </div>
-      <div class="actions">
-        <button id="authLogoutBtn" class="secondary">Se deconnecter</button>
-      </div>
-      <div id="authStatus" class="auth-help">Configure Supabase puis connecte-toi.</div>
+      <div id="authStatus" style="margin-top:12px;padding:10px;border-radius:8px;font-size:13px;display:none;"></div>
+      <button id="authLogoutBtn" class="secondary" style="display:none;">Se déconnecter</button>
     </section>
 
     <div id="appShell" class="hidden">
@@ -3844,8 +3832,14 @@
       localStorage.setItem(SUPABASE_CFG_KEY, JSON.stringify({ url, anonKey }));
     }
 
-    function setAuthStatus(message) {
-      byId("authStatus").textContent = message;
+    function setAuthStatus(message, isError) {
+      const el = byId("authStatus");
+      el.textContent = message;
+      el.style.display = message ? "block" : "none";
+      const error = isError || /erreur|refusé|invalide|incorrect|obligatoire|requis|bloqué|réseau/i.test(message);
+      el.style.background = error ? "#fee2e2" : "#dcfce7";
+      el.style.color = error ? "#b91c1c" : "#166534";
+      el.style.border = `1px solid ${error ? "#fca5a5" : "#86efac"}`;
     }
 
     function canUseDirectSupabase() {
