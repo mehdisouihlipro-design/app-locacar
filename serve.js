@@ -164,7 +164,9 @@ const server = http.createServer((req, res) => {
       supabase_url_set: Boolean(getEnv('SUPABASE_URL')),
       supabase_key_set: Boolean(getEnv('SUPABASE_ANON_KEY')),
       anthropic_set: Boolean(getEnv('ANTHROPIC_API_KEY')),
-      env_keys: Object.keys(process.env).filter(k => !k.toLowerCase().includes('key') && !k.toLowerCase().includes('secret') && !k.toLowerCase().includes('password')),
+      railway_project: process.env.RAILWAY_PROJECT_NAME || 'unknown',
+      railway_service: process.env.RAILWAY_SERVICE_NAME || 'unknown',
+      railway_url: process.env.RAILWAY_PUBLIC_DOMAIN || 'unknown',
     });
     return;
   }
