@@ -5719,7 +5719,47 @@
       ];
 
       saveAndRender();
+      syncStateToAPI();
     });
+
+    async function syncStateToAPI() {
+      if (!API_URL || !localStorage.getItem("locacar-jwt")) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+      async function upsertMany(endpoint, items, mapFn) {
+        let ok = 0, fail = 0;
+        for (const item of items) {
+          try {
+            const res = await fetch(`${API_URL}${endpoint}`, {
+              method: "POST", headers, body: JSON.stringify(mapFn(item)),
+            });
+            const d = await res.json();
+            if (d.success) ok++; else fail++;
+          } catch (_) { fail++; }
+        }
+        return { ok, fail };
+      }
+
+      const carsResult = await upsertMany("/cars", state.cars, c => ({
+        id: c.id, plate: c.plate, model: c.model, agency: c.agency || "",
+        status: c.status === "dispo" ? "disponible" : (c.status || "disponible"),
+      }));
+
+      const customersResult = await upsertMany("/customers", state.customers, c => ({
+        id: c.id, name: c.name, phone: c.phone || "", email: c.email || "",
+      }));
+
+      const contractsResult = await upsertMany("/contracts", state.contracts, c => ({
+        id: c.id, customer_id: c.customerId, car_id: c.carId,
+        type: c.type, days: c.days || 0, months: c.months || 0,
+        rate: c.rate, rate_currency: c.rateCurrency,
+        total_amount_tnd: c.totalAmountTnd, status: c.status || "actif",
+        contract_date: today,
+      }));
+
+      console.log(`Sync API: voitures ${carsResult.ok}✅/${carsResult.fail}❌ — clients ${customersResult.ok}✅/${customersResult.fail}❌ — contrats ${contractsResult.ok}✅/${contractsResult.fail}❌`);
+    }
 
     document.getElementById("resetBtn").addEventListener("click", () => {
       const ok = confirm("Supprimer toutes les donnees de la mini app ?");
