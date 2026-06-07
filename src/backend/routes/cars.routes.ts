@@ -33,7 +33,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const { plate, model, brand, color, vin, status, odometer_km, agency, location, notes } = req.body;
     if (!plate || !model) return res.status(400).json({ success: false, message: 'Immatriculation et modèle requis.' });
     const id = req.body.id || uuidv4();
-    const result = await global.db.post('/cars', {
+    await global.db.post('/cars', {
       id, plate, model,
       ...(brand && { brand }),
       ...(color && { color }),
@@ -42,8 +42,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       odometer_km: odometer_km || 0,
       location: location || agency || null,
       ...(notes && { notes }),
-    }, { headers: { Prefer: 'return=representation' } });
-    res.status(201).json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
+    });
+    res.status(201).json({ success: true, data: { id, plate, model, status: status || 'disponible' } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }

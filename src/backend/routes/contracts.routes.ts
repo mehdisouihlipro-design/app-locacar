@@ -22,10 +22,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const id = req.body.id || uuidv4();
-    const result = await global.db.post('/contracts', { ...req.body, id, status: req.body.status || 'active' }, {
-      headers: { Prefer: 'return=representation' },
-    });
-    res.status(201).json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
+    await global.db.post('/contracts', { ...req.body, id, status: req.body.status || 'active' });
+    res.status(201).json({ success: true, data: { id, ...req.body } });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
@@ -33,7 +31,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const check = await global.db.get(`/contracts?id=eq.${req.params.id}&select=id`);
     if (!check.data || check.data.length === 0) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
-    const result = await global.db.patch(`/contracts?id=eq.${req.params.id}`, req.body, { headers: { Prefer: 'return=representation' } });
+    const result = await global.db.patch(`/contracts?id=eq.${req.params.id}`, req.body);
     res.json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });

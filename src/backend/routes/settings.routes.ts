@@ -21,7 +21,7 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 
 router.put('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.patch('/settings?id=eq.1', req.body, { headers: { Prefer: 'return=representation' } });
+    const result = await global.db.patch('/settings?id=eq.1', req.body);
     res.json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

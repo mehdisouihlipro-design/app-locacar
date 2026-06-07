@@ -20,7 +20,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       ...req.body,
       id: req.body.id || uuidv4(),
       status: req.body.status || 'active'
-    }, { headers: { Prefer: 'return=representation' } });
+    });
     res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

@@ -46,7 +46,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const result = await global.db.post('/inspections', {
       ...inspectionBody,
       id: inspectionId
-    }, { headers: { Prefer: 'return=representation' } });
+    });
 
     // Insert checklist details
     if (checklistDetails && typeof checklistDetails === 'object') {
@@ -61,7 +61,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
           photo_name: d.photo?.name || '',
           photo_type: d.photo?.type || '',
           media_ref: d.photo?.mediaRef || ''
-        }, { headers: { Prefer: 'return=representation' } });
+        });
       }
     }
 

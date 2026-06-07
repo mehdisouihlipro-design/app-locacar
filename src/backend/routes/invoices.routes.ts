@@ -30,7 +30,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       ...req.body,
       id: req.body.id || uuidv4(),
       status: req.body.status || 'en_attente'
-    }, { headers: { Prefer: 'return=representation' } });
+    });
     res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
@@ -39,7 +39,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.patch(`/invoices?id=eq.${req.params.id}`, req.body, { headers: { Prefer: 'return=representation' } });
+    const result = await global.db.patch(`/invoices?id=eq.${req.params.id}`, req.body);
     if (!result.data || result.data.length === 0) return res.status(404).json({ success: false, message: 'Invoice not found' });
     res.json({ success: true, data: result.data[0] });
   } catch (err) {

@@ -28,10 +28,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const { name, phone, email, address, city, postal_code, country, id_number, notes } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Le nom est requis.' });
     const id = uuidv4();
-    const result = await global.db.post('/customers', { id, name, phone, email, address, city, postal_code, country, id_number, notes }, {
-      headers: { Prefer: 'return=representation' },
-    });
-    res.status(201).json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
+    await global.db.post('/customers', { id, name, phone, email, address, city, postal_code, country, id_number, notes });
+    res.status(201).json({ success: true, data: { id, name, phone, email } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
