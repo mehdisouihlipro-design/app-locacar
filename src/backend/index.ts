@@ -24,9 +24,22 @@ import settingsRoutes from './routes/settings.routes';
 
 // Supabase REST API Client
 // Uses service role key when available (bypasses RLS for backend writes)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseAnonKey;
+function getEnvCI(name: string): string | undefined {
+  if (process.env[name]) return process.env[name];
+  const lower = name.toLowerCase();
+  const found = Object.keys(process.env).find(k => k.toLowerCase() === lower);
+  return found ? process.env[found] : undefined;
+}
+
+const supabaseUrl = getEnvCI('SUPABASE_URL');
+const supabaseAnonKey = getEnvCI('SUPABASE_ANON_KEY');
+// Accept SUPABASE_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY (both common names)
+const supabaseServiceKey =
+  getEnvCI('SUPABASE_SERVICE_KEY') ||
+  getEnvCI('SUPABASE_SERVICE_ROLE_KEY') ||
+  supabaseAnonKey;
+
+console.log(`Supabase: url=${supabaseUrl ? '✓' : '✗'} anon=${supabaseAnonKey ? '✓' : '✗'} service=${supabaseServiceKey !== supabaseAnonKey ? '✓' : '✗ (fallback to anon)'}`);
 
 const supabaseClient = axios.create({
   baseURL: `${supabaseUrl}/rest/v1`,
