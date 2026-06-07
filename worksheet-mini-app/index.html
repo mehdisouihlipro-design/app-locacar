@@ -4303,7 +4303,9 @@
 
       if (cars) state.cars = cars.map(c => ({
         id: c.id, plate: c.plate, model: c.model, brand: c.brand || "",
-        agency: c.location || c.agency || "", status: c.status || "disponible",
+        agency: c.location || c.agency || "",
+        // Normalize: "disponible" → "dispo" to match internal app values
+        status: c.status === "disponible" ? "dispo" : (c.status || "dispo"),
         gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
       }));
 
@@ -6601,17 +6603,37 @@
         const revCanvas = cjsCanvas("cjsRevenue", "revenueBars");
         if (revCanvas) cjsSave("cjsRevenue", new Chart(revCanvas, {
           type: "bar",
-          data: { labels: rev.map(s => s.label), datasets: [{ label: "Revenus TND", data: rev.map(s => Math.round(s.value)), backgroundColor: "rgba(47,107,255,.75)", borderRadius: 8, borderSkipped: false }] },
-          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } } }
+          data: { labels: rev.map(s => s.label), datasets: [{ label: "Revenus TND", data: rev.map(s => Math.round(s.value)), backgroundColor: rev.map(s => s.value > 0 ? "rgba(47,107,255,.75)" : "rgba(47,107,255,.2)"), borderRadius: 8, borderSkipped: false }] },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString("fr-FR")} TND` } } },
+            scales: { y: { beginAtZero: true, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } },
+            onClick(_, elements) {
+              if (!elements.length) return;
+              history.pushState({ tab: "payments" }, "", "#payments");
+              switchToTab("payments");
+            }
+          }
         }));
 
-        // Fleet chart — Doughnut
-        const fleet = getFleetSeries().filter(s => s.value > 0);
+        // Fleet chart — Doughnut (show ALL statuses, click → navigate + filter)
+        const fleet = getFleetSeries(); // no filter — show 0 values too
         const fleetCanvas = cjsCanvas("cjsFleet", "fleetBars");
-        if (fleetCanvas && fleet.length) cjsSave("cjsFleet", new Chart(fleetCanvas, {
+        if (fleetCanvas) cjsSave("cjsFleet", new Chart(fleetCanvas, {
           type: "doughnut",
           data: { labels: fleet.map(s => s.label), datasets: [{ data: fleet.map(s => s.value), backgroundColor: ["#16a34a","#2563eb","#f97316","#dc2626"], borderWidth: 2, borderColor: "#fff" }] },
-          options: { responsive: true, cutout: "65%", plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } } }
+          options: {
+            responsive: true, cutout: "65%",
+            plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
+            onClick(_, elements) {
+              if (!elements.length) return;
+              const label = fleet[elements[0].index]?.label;
+              if (!label) return;
+              history.pushState({ tab: "cars" }, "", "#cars");
+              switchToTab("cars");
+              applyCarsFilter({ status: label });
+            }
+          }
         }));
 
         // Alerts chart — Doughnut
@@ -6620,7 +6642,14 @@
         if (alertCanvas && alertSeries.length) cjsSave("cjsAlerts", new Chart(alertCanvas, {
           type: "doughnut",
           data: { labels: alertSeries.map(s => s.label), datasets: [{ data: alertSeries.map(s => s.value), backgroundColor: ["#dc2626","#f97316","#eab308"], borderWidth: 2, borderColor: "#fff" }] },
-          options: { responsive: true, cutout: "65%", plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } } }
+          options: {
+            responsive: true, cutout: "65%",
+            plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
+            onClick() {
+              history.pushState({ tab: "alerts" }, "", "#alerts");
+              switchToTab("alerts");
+            }
+          }
         }));
 
         // Treasury chart — Line
@@ -6638,7 +6667,19 @@
         if (profCanvas && prof.length) cjsSave("cjsProfit", new Chart(profCanvas, {
           type: "bar",
           data: { labels: prof.map(s => s.label), datasets: [{ label: "Rentabilité TND", data: prof.map(s => Math.round(s.value)), backgroundColor: prof.map(s => s.value >= 0 ? "rgba(22,163,74,.7)" : "rgba(220,38,38,.7)"), borderRadius: 6 }] },
-          options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: "#f0f0f0" } }, y: { grid: { display: false } } } }
+          options: {
+            indexAxis: "y", responsive: true,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.x.toLocaleString("fr-FR")} TND` } } },
+            scales: { x: { beginAtZero: true, grid: { color: "#f0f0f0" } }, y: { grid: { display: false } } },
+            onClick(_, elements) {
+              if (!elements.length) return;
+              const plate = prof[elements[0].index]?.label;
+              if (!plate) return;
+              history.pushState({ tab: "cars" }, "", "#cars");
+              switchToTab("cars");
+              applyCarsFilter({ query: plate });
+            }
+          }
         }));
       } else {
         renderBarChart("revenueBars", getRevenueSeries());
