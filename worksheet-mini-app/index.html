@@ -3418,7 +3418,7 @@
         frame.classList.add("has-photo");
       }
 
-      host.querySelectorAll(".inspection-photo-frame").forEach((frame) => {
+      host.querySelectorAll(".inspection-photo-frame").forEach(async (frame) => {
         const pointKey = frame.getAttribute("data-point-key");
         if (!pointKey) return;
         const input = byId(`inspectionPoint-${pointKey}-photo`);
@@ -4984,7 +4984,7 @@
             groups.set(key, list);
           });
 
-        groups.forEach((list, carId) => {
+        groups.forEach(async (list, carId) => {
           const sorted = [...list].sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b));
           for (let i = 0; i < sorted.length - 1; i += 1) {
             const prev = sorted[i];
@@ -7059,7 +7059,7 @@
         tbody.appendChild(tr);
       }
 
-      tbody.querySelectorAll("[data-del-inspection]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-inspection]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-inspection");
@@ -7130,7 +7130,7 @@
         });
       });
 
-      tbody.querySelectorAll("[data-del-reservation]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-reservation]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-reservation");
@@ -7501,7 +7501,7 @@
           openRecordEditor("cars", id);
         });
       });
-      tbody.querySelectorAll("[data-del-car]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-car]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-car");
@@ -7731,7 +7731,7 @@
           openRecordEditor("customers", id);
         });
       });
-      tbody.querySelectorAll("[data-del-customer]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-customer]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-customer");
@@ -8179,7 +8179,7 @@
         });
       });
 
-      tbody.querySelectorAll("[data-del-maintenance]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-maintenance]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-maintenance");
@@ -8451,7 +8451,7 @@
         });
       });
 
-      tbody.querySelectorAll("[data-del-insurance]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-insurance]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-insurance");
@@ -8572,7 +8572,7 @@
         });
       });
 
-      tbody.querySelectorAll("[data-del-leasing]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-leasing]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-leasing");
@@ -8723,7 +8723,7 @@
         });
       });
 
-      tbody.querySelectorAll("[data-del-vig]").forEach((btn) => {
+      tbody.querySelectorAll("[data-del-vig]").forEach(async (btn) => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-vig");
