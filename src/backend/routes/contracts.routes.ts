@@ -22,7 +22,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const id = req.body.id || uuidv4();
-    await global.db.post('/contracts', { ...req.body, id, status: req.body.status || 'active' });
+    await global.db.post('/contracts', { ...req.body, id, status: req.body.status || 'active' }, { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: { id, ...req.body } });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });

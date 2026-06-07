@@ -42,7 +42,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       odometer_km: odometer_km || 0,
       location: location || agency || null,
       ...(notes && { notes }),
-    });
+    }, { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: { id, plate, model, status: status || 'disponible' } });
   } catch (err: any) {
     const detail = err?.response?.data || err?.message || String(err);

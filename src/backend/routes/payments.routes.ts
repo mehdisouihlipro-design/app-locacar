@@ -19,7 +19,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const result = await global.db.post('/payments', {
       ...req.body,
       id: req.body.id || uuidv4()
-    });
+    }, { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
