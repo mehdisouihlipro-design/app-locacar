@@ -3857,17 +3857,77 @@
       });
     }
 
+    // ── Pagination state ────────────────────────────────────────────────
+    const PAGE_SIZE = 15;
+    const _pages = {};
+    const _tabsWithPagination = ["cars","customers","contracts","invoices","payments","reservations","maintenance","inspections","insurance","leasing","alerts","collections","vignettes"];
+
+    function getPage(tab) { return _pages[tab] || 0; }
+    function setPage(tab, n) { _pages[tab] = n; }
+
+    function paginateArray(arr, tab) {
+      const page = getPage(tab);
+      const total = arr.length;
+      const pages = Math.ceil(total / PAGE_SIZE) || 1;
+      const safePage = Math.min(page, pages - 1);
+      if (_pages[tab] !== safePage) _pages[tab] = safePage;
+      return { items: arr.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE), page: safePage, pages, total };
+    }
+
+    function renderPaginationControls(containerId, tab, total, page, pages) {
+      const existing = document.getElementById("pagination-" + tab);
+      if (existing) existing.remove();
+      if (total <= PAGE_SIZE) return;
+      const panel = document.getElementById(tab);
+      if (!panel) return;
+      const div = document.createElement("div");
+      div.id = "pagination-" + tab;
+      div.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:10px 0;gap:8px;flex-wrap:wrap;";
+      div.innerHTML = `
+        <span class="muted" style="font-size:13px;">Page ${page + 1} / ${pages} — ${total} enregistrements</span>
+        <div style="display:flex;gap:6px;">
+          <button class="secondary" style="padding:4px 12px;font-size:13px;" onclick="navPage('${tab}',-1)" ${page === 0 ? "disabled" : ""}>← Précédent</button>
+          <button class="secondary" style="padding:4px 12px;font-size:13px;" onclick="navPage('${tab}',1)" ${page >= pages - 1 ? "disabled" : ""}>Suivant →</button>
+        </div>`;
+      panel.appendChild(div);
+    }
+
+    window.navPage = (tab, dir) => {
+      const page = getPage(tab);
+      setPage(tab, Math.max(0, page + dir));
+      render();
+      document.getElementById(tab)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    // ── Hash-based navigation ───────────────────────────────────────────
+    function switchToTab(tabId) {
+      const tab = document.querySelector(`.tab[data-tab="${tabId}"]`);
+      if (!tab) return;
+      tabs.forEach((t) => t.classList.remove("active"));
+      panels.forEach((p) => p.classList.remove("active"));
+      tab.classList.add("active");
+      const panel = document.getElementById(tabId);
+      if (panel) panel.classList.add("active");
+      if (tabId === "gps") renderGpsMap();
+      if (tabId === "users") renderUsers();
+    }
+
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
-        tabs.forEach((t) => t.classList.remove("active"));
-        panels.forEach((p) => p.classList.remove("active"));
-        tab.classList.add("active");
-        document.getElementById(tab.dataset.tab).classList.add("active");
-        if (tab.dataset.tab === "gps") {
-          renderGpsMap();
-        }
+        const tabId = tab.dataset.tab;
+        history.pushState({ tab: tabId }, "", "#" + tabId);
+        switchToTab(tabId);
       });
     });
+
+    window.addEventListener("popstate", (e) => {
+      const tabId = (e.state && e.state.tab) || location.hash.replace("#", "") || "home";
+      switchToTab(tabId);
+    });
+
+    // Restore tab from URL on load
+    const _initialTab = location.hash.replace("#", "") || "home";
+    if (_initialTab !== "home") switchToTab(_initialTab);
 
     byId("cancelRecordBtn").addEventListener("click", closeRecordEditor);
     byId("saveRecordBtn").addEventListener("click", saveRecordEditor);
@@ -4385,7 +4445,7 @@
       saveAndRender();
     });
 
-    document.getElementById("addContractBtn").addEventListener("click", () => {
+    document.getElementById("addContractBtn").addEventListener("click", async () => {
       const customerId = byId("contractCustomer").value;
       const carId = byId("contractCar").value;
       const type = byId("contractType").value;
@@ -4419,11 +4479,14 @@
         return;
       }
 
-      const contractId = uid("CTR");
+      let contractId = uid("CTR");
       const totalAmountOriginal = type === "long" ? months * rate : days * rate;
       const totalAmountTnd = convertToTnd(totalAmountOriginal, rateCurrency, state.settings.eurToTnd);
       const quotientTnd = convertToTnd(quotient, quotientCurrency, state.settings.eurToTnd);
       const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
+
+      const savedContract = await apiPost("/contracts", { id: contractId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, contract_date: today, type, days, months, rate, rate_currency: rateCurrency, quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd, total_amount_original: totalAmountOriginal, total_amount_tnd: totalAmountTnd, payment_moment: paymentMoment, payment_plan: paymentPlan, status: "active" });
+      if (savedContract && savedContract.id) contractId = savedContract.id;
 
       state.contracts.push({
         id: contractId,
@@ -4451,8 +4514,11 @@
       if (type === "long") {
         for (let i = 1; i <= months; i += 1) {
           const amountTnd = convertToTnd(rate, rateCurrency, state.settings.eurToTnd);
+          let invId = uid("FAC");
+          const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: rate, currency: rateCurrency, amount_tnd: amountTnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: `Mensualite ${i}/${months}`, due_date: addDaysToIsoDate(today, i * 30), status: "en_attente", reminder_count: 0 });
+          if (savedInv && savedInv.id) invId = savedInv.id;
           state.invoices.push({
-            id: uid("FAC"),
+            id: invId,
             contractId,
             customerName: customer.name,
             amountOriginal: rate,
@@ -4467,8 +4533,11 @@
           });
         }
       } else {
+        let invId = uid("FAC");
+        const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: totalAmountOriginal, currency: rateCurrency, amount_tnd: totalAmountTnd, paid_amount_tnd: 0, due_amount_tnd: totalAmountTnd, label: "Contrat court", due_date: addDaysToIsoDate(today, 7), status: "en_attente", reminder_count: 0 });
+        if (savedInv && savedInv.id) invId = savedInv.id;
         state.invoices.push({
-          id: uid("FAC"),
+          id: invId,
           contractId,
           customerName: customer.name,
           amountOriginal: totalAmountOriginal,
@@ -4743,7 +4812,7 @@
       }
     }
 
-    document.getElementById("addPaymentBtn").addEventListener("click", () => {
+    document.getElementById("addPaymentBtn").addEventListener("click", async () => {
       const invoiceId = byId("paymentInvoice").value;
       const amountTnd = Number(byId("paymentAmount").value || 0);
       const method = byId("paymentMethod").value;
@@ -4771,8 +4840,12 @@
 
       const contract = state.contracts.find((c) => c.id === invoice.contractId);
 
+      let payId = uid("PAY");
+      const savedPay = await apiPost("/payments", { id: payId, invoice_id: invoiceId, contract_id: invoice.contractId, customer_name: invoice.customerName, contract_type: contract ? contract.type : "", payment_date: date, amount_original: amountTnd, currency: "TND", amount_tnd: amountTnd, method });
+      if (savedPay && savedPay.id) payId = savedPay.id;
+
       state.payments.push({
-        id: uid("PAY"),
+        id: payId,
         invoiceId,
         contractId: invoice.contractId,
         customerName: invoice.customerName,
@@ -4786,7 +4859,7 @@
       saveAndRender();
     });
 
-    document.getElementById("addReservationBtn").addEventListener("click", () => {
+    document.getElementById("addReservationBtn").addEventListener("click", async () => {
       const customerId = byId("reservationCustomer").value;
       const carId = byId("reservationCar").value;
       const startDate = byId("reservationStartDate").value;
@@ -4829,8 +4902,12 @@
         return;
       }
 
+      let resId = uid("RES");
+      const savedRes = await apiPost("/reservations", { id: resId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status });
+      if (savedRes && savedRes.id) resId = savedRes.id;
+
       state.reservations.push({
-        id: uid("RES"),
+        id: resId,
         customerId,
         customerName: customer.name,
         carId,
@@ -4846,7 +4923,7 @@
     });
 
     if (byId("addMaintenanceBtn")) {
-      byId("addMaintenanceBtn").addEventListener("click", () => {
+      byId("addMaintenanceBtn").addEventListener("click", async () => {
         const carId = byId("maintenanceCar").value;
         const type = byId("maintenanceType").value || "reparation";
         const date = byId("maintenanceDate").value || today;
@@ -4865,15 +4942,20 @@
           return;
         }
 
+        let mntId = uid("MNT");
+        const amountTnd = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
+        const savedMnt = await apiPost("/maintenance", { id: mntId, car_id: carId, car_plate: car.plate, type, date, amount_original: amountOriginal, currency, amount_tnd: amountTnd, status, note, source_key: "" });
+        if (savedMnt && savedMnt.id) mntId = savedMnt.id;
+
         state.maintenanceCosts.push({
-          id: uid("MNT"),
+          id: mntId,
           carId,
           carPlate: car.plate,
           type,
           date,
           amountOriginal,
           currency,
-          amountTnd: convertToTnd(amountOriginal, currency, state.settings.eurToTnd),
+          amountTnd,
           status,
           note,
           sourceKey: "",
@@ -4883,7 +4965,7 @@
     }
 
     if (byId("generateWashCostsBtn")) {
-      byId("generateWashCostsBtn").addEventListener("click", () => {
+      byId("generateWashCostsBtn").addEventListener("click", async () => {
         const defaultCostTnd = Number(byId("washDefaultCostTnd")?.value || 0);
         if (!Number.isFinite(defaultCostTnd) || defaultCostTnd < 0) {
           alert("Prix lavage auto invalide.");
@@ -4915,10 +4997,14 @@
             if (state.maintenanceCosts.some((m) => m.sourceKey === sourceKey)) continue;
 
             const car = state.cars.find((c) => String(c.id) === String(carId));
+            const carPlateWash = car ? car.plate : (prev.carPlate || carId);
+            let washId = uid("MNT");
+            const savedWash = await apiPost("/maintenance", { id: washId, car_id: carId, car_plate: carPlateWash, type: "lavage", date: prev.endDate, amount_original: defaultCostTnd, currency: "TND", amount_tnd: defaultCostTnd, status: "a_payer", note: `Lavage auto entre ${prev.id} et ${next.id}`, source_key: sourceKey });
+            if (savedWash && savedWash.id) washId = savedWash.id;
             state.maintenanceCosts.push({
-              id: uid("MNT"),
+              id: washId,
               carId,
-              carPlate: car ? car.plate : (prev.carPlate || carId),
+              carPlate: carPlateWash,
               type: "lavage",
               date: prev.endDate,
               amountOriginal: defaultCostTnd,
@@ -5019,6 +5105,8 @@
           state.inspections[editIndex] = previous;
         };
       } else {
+        const savedIns = await apiPost("/inspections", { id: inspectionRecord.id, type: inspectionRecord.type || "sortie", contract_id: inspectionRecord.contractId || null, car_id: inspectionRecord.carId, car_plate: inspectionRecord.carPlate || "", date: inspectionRecord.date || today, time: inspectionRecord.time || "00:00", odometer_km: inspectionRecord.odometerKm || null, fuel_level: inspectionRecord.fuelLevel || null, condition_note: inspectionRecord.conditionNote || null, observation: inspectionRecord.observation || "" });
+        if (savedIns && savedIns.id) inspectionRecord.id = savedIns.id;
         state.inspections.push(inspectionRecord);
         rollback = () => {
           state.inspections = state.inspections.filter((x) => x.id !== inspectionRecord.id);
@@ -5128,6 +5216,8 @@
           if (idx >= 0) {
             state.inspections[idx] = updated;
           } else {
+            const savedInsD = await apiPost("/inspections", { id: updated.id, type: updated.type || "sortie", contract_id: updated.contractId || null, car_id: updated.carId, car_plate: updated.carPlate || "", date: updated.date || today, time: updated.time || "00:00", odometer_km: updated.odometerKm || null, fuel_level: updated.fuelLevel || null, condition_note: updated.conditionNote || null, observation: updated.observation || "" });
+            if (savedInsD && savedInsD.id) updated.id = savedInsD.id;
             state.inspections.push(updated);
           }
           inspectionDetailId = updated.id;
@@ -5423,7 +5513,9 @@
       }
 
       const attachment = await readAttachmentFile(attachmentInput);
-      const insuranceId = uid("INS");
+      let insuranceId = uid("INS");
+      const savedIns = await apiPost("/insurances", { id: insuranceId, car_id: carId, car_plate: car.plate, insurance_company: provider, policy_number: policyNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      if (savedIns && savedIns.id) insuranceId = savedIns.id;
 
       state.insurances.push({
         id: insuranceId,
@@ -5487,7 +5579,9 @@
       }
 
       const attachment = await readAttachmentFile(attachmentInput);
-      const leasingId = uid("LEA");
+      let leasingId = uid("LEA");
+      const savedLea = await apiPost("/leasing", { id: leasingId, car_id: carId, car_plate: car.plate, leasing_company: lender, contract_number: contractNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      if (savedLea && savedLea.id) leasingId = savedLea.id;
 
       state.leasingContracts.push({
         id: leasingId,
@@ -5552,8 +5646,12 @@
       }
 
       const attachment = await readAttachmentFile(attachmentInput);
+      let vigId = uid("VIG");
+      const savedVig = await apiPost("/vignettes", { id: vigId, car_id: carId, car_plate: car.plate, fiscal_year: fiscalYear, amount_original: amount, currency, amount_tnd: convertToTnd(amount, currency, state.settings.eurToTnd), due_date: dueDate, status: "a_payer" });
+      if (savedVig && savedVig.id) vigId = savedVig.id;
+
       state.vignettes.push({
-        id: uid("VIG"),
+        id: vigId,
         carId,
         carPlate: car.plate,
         fiscalYear,
@@ -6962,9 +7060,10 @@
       }
 
       tbody.querySelectorAll("[data-del-inspection]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-inspection");
+          await apiDelete("/inspections/" + id);
           state.inspections = state.inspections.filter((x) => String(x.id) !== String(id));
           saveAndRender();
         });
@@ -7032,9 +7131,10 @@
       });
 
       tbody.querySelectorAll("[data-del-reservation]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-reservation");
+          await apiDelete("/reservations/" + id);
           state.reservations = state.reservations.filter((x) => String(x.id) !== String(id));
           saveAndRender();
         });
@@ -7366,14 +7466,14 @@
       tbody.innerHTML = "";
       const statusFilter = dashboardFilters.cars.status;
       const query = String(dashboardFilters.cars.query || "").trim().toLowerCase();
-      state.cars
-        .filter((car) => {
+      const filtered = state.cars.filter((car) => {
           const matchesStatus = statusFilter ? car.status === statusFilter : true;
           const haystack = `${car.plate || ""} ${car.model || ""} ${car.agency || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesStatus && matchesQuery;
-        })
-        .forEach((car) => {
+        });
+      const { items, page, pages, total } = paginateArray(filtered, "cars");
+      items.forEach((car) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         if (selectedRows.cars === String(car.id)) tr.classList.add("selected");
@@ -7410,6 +7510,7 @@
           saveAndRender();
         });
       });
+      renderPaginationControls(null, "cars", total, page, pages);
     }
 
     async function renderUsers() {
@@ -7595,14 +7696,14 @@
       tbody.innerHTML = "";
       const typeFilter = dashboardFilters.customers.type;
       const query = String(dashboardFilters.customers.query || "").trim().toLowerCase();
-      state.customers
-        .filter((customer) => {
+      const filtered = state.customers.filter((customer) => {
           const matchesType = typeFilter ? customer.type === typeFilter : true;
           const haystack = `${customer.name || ""} ${customer.phone || ""} ${customer.email || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesType && matchesQuery;
-        })
-        .forEach((customer) => {
+        });
+      const { items, page, pages, total } = paginateArray(filtered, "customers");
+      items.forEach((customer) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         if (selectedRows.customers === String(customer.id)) tr.classList.add("selected");
@@ -7631,13 +7732,15 @@
         });
       });
       tbody.querySelectorAll("[data-del-customer]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-customer");
+          await apiDelete(`/customers/${id}`);
           state.customers = state.customers.filter((c) => c.id !== id);
           saveAndRender();
         });
       });
+      renderPaginationControls(null, "customers", total, page, pages);
     }
 
     function renderContractOptions() {
@@ -7674,14 +7777,14 @@
       tbody.innerHTML = "";
       const typeFilter = dashboardFilters.contracts.type;
       const query = String(dashboardFilters.contracts.query || "").trim().toLowerCase();
-      state.contracts
-        .filter((contract) => {
+      const filtered = state.contracts.filter((contract) => {
           const matchesType = typeFilter ? contract.type === typeFilter : true;
           const haystack = `${contract.id || ""} ${contract.customerName || ""} ${contract.carPlate || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesType && matchesQuery;
-        })
-        .forEach((contract) => {
+        });
+      const { items, page, pages, total } = paginateArray(filtered, "contracts");
+      items.forEach((contract) => {
         const totals = getContractTotals(contract.id);
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -7712,6 +7815,7 @@
           openRecordEditor("contracts", id);
         });
       });
+      renderPaginationControls(null, "contracts", total, page, pages);
     }
 
     function getInvoiceStatusInfo(invoice) {
@@ -8076,9 +8180,10 @@
       });
 
       tbody.querySelectorAll("[data-del-maintenance]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-maintenance");
+          await apiDelete("/maintenance/" + id);
           state.maintenanceCosts = state.maintenanceCosts.filter((x) => String(x.id) !== String(id));
           saveAndRender();
         });
@@ -8347,9 +8452,10 @@
       });
 
       tbody.querySelectorAll("[data-del-insurance]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-insurance");
+          await apiDelete("/insurances/" + id);
           state.insurances = state.insurances.filter((x) => String(x.id) !== String(id));
           state.insuranceInstallments = state.insuranceInstallments.filter((x) => String(x.ownerId) !== String(id));
           saveAndRender();
@@ -8467,9 +8573,10 @@
       });
 
       tbody.querySelectorAll("[data-del-leasing]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-leasing");
+          await apiDelete("/leasing/" + id);
           state.leasingContracts = state.leasingContracts.filter((x) => String(x.id) !== String(id));
           state.leasingInstallments = state.leasingInstallments.filter((x) => String(x.ownerId) !== String(id));
           saveAndRender();
@@ -8617,9 +8724,10 @@
       });
 
       tbody.querySelectorAll("[data-del-vig]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-vig");
+          await apiDelete("/vignettes/" + id);
           state.vignettes = state.vignettes.filter((x) => String(x.id) !== String(id));
           saveAndRender();
         });
@@ -9137,7 +9245,7 @@
       editorState.isNew = false;
     }
 
-    function saveRecordEditor() {
+    async function saveRecordEditor() {
       const { entity, id } = editorState;
       if (!entity || !id) return;
 
@@ -9177,6 +9285,16 @@
         if (conflict) {
           alert(`Conflit de reservation (buffer inclus): ${conflict.startDate} ${conflict.startTime || "00:00"} -> ${conflict.endDate} ${conflict.endTime || "23:59"}.`);
           return;
+        }
+      }
+
+      if (editorState.isNew && entity === "maintenanceCosts") {
+        const m = record;
+        const savedMntE = await apiPost("/maintenance", { id: m.id, car_id: m.carId, car_plate: m.carPlate || "", type: m.type || "", date: m.date || today, amount_original: m.amountOriginal || 0, currency: m.currency || "TND", amount_tnd: m.amountTnd || 0, status: m.status || "paye", note: m.note || "", source_key: m.sourceKey || "" });
+        if (savedMntE && savedMntE.id && savedMntE.id !== m.id) {
+          const idx = collection.findIndex((r) => String(r.id) === String(m.id));
+          if (idx >= 0) collection[idx].id = savedMntE.id;
+          editorState.id = savedMntE.id;
         }
       }
 
