@@ -5742,7 +5742,8 @@
       }
 
       const carsResult = await upsertMany("/cars", state.cars, c => ({
-        id: c.id, plate: c.plate, model: c.model, agency: c.agency || "",
+        id: c.id, plate: c.plate, model: c.model,
+        location: c.agency || c.location || "",
         status: c.status === "dispo" ? "disponible" : (c.status || "disponible"),
       }));
 

@@ -30,14 +30,18 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { plate, model, brand, year, color, vin, status, mileage, agency, notes, daily_rate } = req.body;
+    const { plate, model, brand, color, vin, status, odometer_km, agency, location, notes } = req.body;
     if (!plate || !model) return res.status(400).json({ success: false, message: 'Immatriculation et modèle requis.' });
-    const id = uuidv4();
+    const id = req.body.id || uuidv4();
     const result = await global.db.post('/cars', {
-      id, plate, model, brand, year, color, vin,
+      id, plate, model,
+      ...(brand && { brand }),
+      ...(color && { color }),
+      ...(vin && { vin }),
       status: status || 'disponible',
-      mileage: mileage || 0,
-      agency, notes, daily_rate,
+      odometer_km: odometer_km || 0,
+      location: location || agency || null,
+      ...(notes && { notes }),
     }, { headers: { Prefer: 'return=representation' } });
     res.status(201).json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
   } catch (err) {
