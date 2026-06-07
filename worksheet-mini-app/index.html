@@ -4,11 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>E-Drive - Gestion Locative</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap");
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;600;700;800&display=swap");
 
     :root {
-      --bg: #eaf4ff;
+      --bg: #f0f4ff;
       --panel: #ffffff;
       --ink: #0d244a;
       --muted: #4d6a97;
@@ -20,19 +21,14 @@
       --line: #c8daf9;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: "Manrope", "Trebuchet MS", sans-serif;
+      font-family: "Inter", "Manrope", system-ui, sans-serif;
       color: var(--ink);
-      background:
-        radial-gradient(circle at 18% 8%, #d7ebff 0, transparent 34%),
-        radial-gradient(circle at 85% 4%, #c9e1ff 0, transparent 38%),
-        linear-gradient(160deg, #eaf4ff 0%, #f8fbff 55%, #dcecff 100%),
-        var(--bg);
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 60%, #e8efff 100%);
+      min-height: 100vh;
     }
 
     .wrap {
@@ -121,48 +117,62 @@
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 8px 20px rgba(47, 107, 255, 0.08);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 2px 12px rgba(47, 107, 255, 0.07), 0 1px 3px rgba(0,0,0,.05);
+      transition: box-shadow .15s;
     }
+    .card:hover { box-shadow: 0 4px 20px rgba(47, 107, 255, 0.13); }
 
     .kpi {
-      font-size: 24px;
-      font-weight: 700;
-      margin-top: 4px;
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 6px;
+      letter-spacing: -.5px;
     }
 
     .tabs {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
-      margin: 10px 0 16px;
+      margin: 12px 0 18px;
+      padding: 6px;
+      background: rgba(255,255,255,.7);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
     }
 
     .tab {
-      border: 1px solid var(--line);
-      background: #ffffff;
-      color: var(--ink);
-      border-radius: 999px;
-      padding: 8px 14px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 10px;
+      padding: 7px 14px;
       cursor: pointer;
-      font-weight: 700;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all .15s;
     }
+    .tab:hover { background: rgba(47,107,255,.08); color: var(--brand); }
 
     .tab.active {
-      background: linear-gradient(135deg, #67b6ff, #2f6bff);
+      background: var(--brand);
       color: #ffffff;
-      border-color: #1540c8;
+      border-color: var(--brand-2);
+      box-shadow: 0 2px 8px rgba(47,107,255,.3);
     }
 
     .panel {
       display: none;
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 10px 24px rgba(47, 107, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(47, 107, 255, 0.07);
+      animation: fadeIn .2s ease;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
     .panel.active {
       display: block;
@@ -188,23 +198,33 @@
 
     input, select, button {
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 9px 10px;
+      border-radius: 10px;
+      padding: 9px 12px;
       font-size: 14px;
+      font-family: inherit;
+      transition: border-color .15s, box-shadow .15s;
     }
+    input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,107,255,.12); }
 
     button {
       cursor: pointer;
-      background: linear-gradient(135deg, #67b6ff, #2f6bff);
+      background: var(--brand);
       color: #ffffff;
-      border-color: #1540c8;
+      border-color: var(--brand);
       font-weight: 600;
+      letter-spacing: .01em;
+      transition: all .15s;
     }
+    button:hover:not(:disabled) { background: var(--brand-2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(47,107,255,.25); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
 
     button.secondary {
       background: #ffffff;
       color: var(--ink);
+      border-color: var(--line);
     }
+    button.secondary:hover:not(:disabled) { background: #f8faff; border-color: var(--brand); color: var(--brand); box-shadow: none; transform: none; }
 
     button.warn {
       background: var(--warn);
@@ -218,16 +238,20 @@
     }
 
     th, td {
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid #eef2ff;
       text-align: left;
-      padding: 10px 8px;
-      font-size: 14px;
-      vertical-align: top;
+      padding: 11px 10px;
+      font-size: 13.5px;
+      vertical-align: middle;
     }
 
     th {
       color: var(--muted);
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #f8faff;
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.03em;
@@ -2287,6 +2311,30 @@
 
     <section id="settings" class="panel">
       <h3>Actions rapides</h3>
+
+      <!-- White-label config -->
+      <div class="card" style="margin-bottom:16px;background:#f8faff;">
+        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Personnalisation (White-label)</h4>
+        <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div>
+            <label>Nom de l'entreprise</label>
+            <input id="companyName" placeholder="Ex: E-Drive Location" />
+          </div>
+          <div>
+            <label>URL du logo</label>
+            <input id="logoUrl" placeholder="https://example.com/logo.png" />
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px;">
+            <button id="applyBrandingBtn">Appliquer</button>
+            <div id="logoPreview" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff;">
+              <img id="logoPreviewImg" src="" style="max-width:100%;max-height:100%;display:none;" />
+            </div>
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:8px 0 0;">Les modifications sont appliquées immédiatement et sauvegardées pour tous les utilisateurs.</p>
+      </div>
+
+      <!-- Financial settings -->
       <div class="row">
         <div>
           <label>Devise principale</label>
@@ -3998,6 +4046,32 @@
         email,
         password,
       });
+    }
+
+    // ── White-label branding ───────────────────────────────────────────
+    function applyBranding(logoUrl, companyName) {
+      // Logo
+      const logoImg = document.querySelector(".brand-logo img");
+      const heroPreview = byId("logoPreviewImg");
+      const url = logoUrl || window._LOGO_URL || "/1000095084.jpg";
+      if (logoImg && url) { logoImg.src = url; }
+      if (heroPreview) { heroPreview.src = url; heroPreview.style.display = url ? "block" : "none"; }
+      // Company name
+      const name = companyName || window._COMPANY_NAME || "E-Drive";
+      const h1 = document.querySelector("#appShell h1");
+      if (h1 && name) h1.textContent = name;
+      document.title = name + " - Gestion Locative";
+      // Save to localStorage
+      localStorage.setItem("locacar-branding", JSON.stringify({ logoUrl: url, companyName: name }));
+    }
+
+    function loadBranding() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("locacar-branding") || "{}");
+        if (saved.logoUrl || saved.companyName) applyBranding(saved.logoUrl, saved.companyName);
+        if (byId("logoUrl") && saved.logoUrl) byId("logoUrl").value = saved.logoUrl;
+        if (byId("companyName") && saved.companyName) byId("companyName").value = saved.companyName;
+      } catch (_) {}
     }
 
     function setAppVisibility(isAuthenticated) {
@@ -6495,6 +6569,18 @@
       initSignatureCanvas("inspectionSignatureClient", "inspectionSignatureClientClear");
     }
 
+    // ── Chart.js helpers ───────────────────────────────────────────────
+    const _cjsInstances = {};
+    function cjsCanvas(id, parentId) {
+      const parent = byId(parentId);
+      if (!parent) return null;
+      let canvas = parent.querySelector("canvas#" + id);
+      if (!canvas) { parent.innerHTML = ""; canvas = document.createElement("canvas"); canvas.id = id; canvas.style.maxHeight = "200px"; parent.appendChild(canvas); }
+      if (_cjsInstances[id]) { _cjsInstances[id].destroy(); delete _cjsInstances[id]; }
+      return canvas;
+    }
+    function cjsSave(id, chart) { _cjsInstances[id] = chart; }
+
     function renderHomeDashboard() {
       const availableCars = state.cars.filter((c) => c.status === "dispo").length;
       const activeReservations = state.reservations.filter((r) => ["en_attente", "confirmee"].includes(r.status)).length;
@@ -6509,11 +6595,58 @@
       if (byId("homeKpiTreasury60d")) byId("homeKpiTreasury60d").textContent = formatTnd(treasury.projectedCashTnd);
       if (byId("homeKpiTreasuryMin")) byId("homeKpiTreasuryMin").textContent = formatTnd(treasury.minProjectedCashTnd);
 
-      renderBarChart("revenueBars", getRevenueSeries());
-      renderBarChart("fleetBars", getFleetSeries());
-      renderBarChart("alertsBars", getAlertsSeries(allAlerts));
-      renderBarChart("treasuryBars", getTreasurySeries(treasury));
-      renderBarChart("profitabilityBars", getProfitabilitySeries());
+      // Revenue chart — Bar
+      if (typeof Chart !== "undefined") {
+        const rev = getRevenueSeries();
+        const revCanvas = cjsCanvas("cjsRevenue", "revenueBars");
+        if (revCanvas) cjsSave("cjsRevenue", new Chart(revCanvas, {
+          type: "bar",
+          data: { labels: rev.map(s => s.label), datasets: [{ label: "Revenus TND", data: rev.map(s => Math.round(s.value)), backgroundColor: "rgba(47,107,255,.75)", borderRadius: 8, borderSkipped: false }] },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } } }
+        }));
+
+        // Fleet chart — Doughnut
+        const fleet = getFleetSeries().filter(s => s.value > 0);
+        const fleetCanvas = cjsCanvas("cjsFleet", "fleetBars");
+        if (fleetCanvas && fleet.length) cjsSave("cjsFleet", new Chart(fleetCanvas, {
+          type: "doughnut",
+          data: { labels: fleet.map(s => s.label), datasets: [{ data: fleet.map(s => s.value), backgroundColor: ["#16a34a","#2563eb","#f97316","#dc2626"], borderWidth: 2, borderColor: "#fff" }] },
+          options: { responsive: true, cutout: "65%", plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } } }
+        }));
+
+        // Alerts chart — Doughnut
+        const alertSeries = getAlertsSeries(allAlerts).filter(s => s.value > 0);
+        const alertCanvas = cjsCanvas("cjsAlerts", "alertsBars");
+        if (alertCanvas && alertSeries.length) cjsSave("cjsAlerts", new Chart(alertCanvas, {
+          type: "doughnut",
+          data: { labels: alertSeries.map(s => s.label), datasets: [{ data: alertSeries.map(s => s.value), backgroundColor: ["#dc2626","#f97316","#eab308"], borderWidth: 2, borderColor: "#fff" }] },
+          options: { responsive: true, cutout: "65%", plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } } }
+        }));
+
+        // Treasury chart — Line
+        const tSeries = getTreasurySeries(treasury).slice(0, 12);
+        const tCanvas = cjsCanvas("cjsTreasury", "treasuryBars");
+        if (tCanvas && tSeries.length) cjsSave("cjsTreasury", new Chart(tCanvas, {
+          type: "line",
+          data: { labels: tSeries.map(s => s.label), datasets: [{ label: "Trésorerie TND", data: tSeries.map(s => Math.round(s.value)), borderColor: "#2f6bff", backgroundColor: "rgba(47,107,255,.08)", fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2 }] },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } } }
+        }));
+
+        // Profitability chart — Horizontal Bar
+        const prof = getProfitabilitySeries().slice(0, 8);
+        const profCanvas = cjsCanvas("cjsProfit", "profitabilityBars");
+        if (profCanvas && prof.length) cjsSave("cjsProfit", new Chart(profCanvas, {
+          type: "bar",
+          data: { labels: prof.map(s => s.label), datasets: [{ label: "Rentabilité TND", data: prof.map(s => Math.round(s.value)), backgroundColor: prof.map(s => s.value >= 0 ? "rgba(22,163,74,.7)" : "rgba(220,38,38,.7)"), borderRadius: 6 }] },
+          options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: "#f0f0f0" } }, y: { grid: { display: false } } } }
+        }));
+      } else {
+        renderBarChart("revenueBars", getRevenueSeries());
+        renderBarChart("fleetBars", getFleetSeries());
+        renderBarChart("alertsBars", getAlertsSeries(allAlerts));
+        renderBarChart("treasuryBars", getTreasurySeries(treasury));
+        renderBarChart("profitabilityBars", getProfitabilitySeries());
+      }
       renderTreasuryForecastTable(treasury);
 
       const riskEl = byId("treasuryRiskMessage");
@@ -7610,6 +7743,35 @@
       byId("changePasswordModal").style.display = "flex";
     });
     byId("heroLogoutBtn").addEventListener("click", onLogout);
+
+    // Branding
+    loadBranding();
+    document.getElementById("applyBrandingBtn").addEventListener("click", () => {
+      const logoUrl = byId("logoUrl").value.trim();
+      const companyName = byId("companyName").value.trim();
+      applyBranding(logoUrl, companyName);
+      // Save to API settings if connected
+      const token = localStorage.getItem("locacar-jwt");
+      if (token && API_URL) {
+        fetch(`${API_URL}/settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ logo_url: logoUrl, company_name: companyName }),
+        }).catch(() => {});
+      }
+      const s = document.createElement("span");
+      s.textContent = " ✅ Appliqué"; s.style.color = "#16a34a"; s.style.fontSize = "13px";
+      const btn = byId("applyBrandingBtn");
+      btn.parentNode.appendChild(s);
+      setTimeout(() => s.remove(), 2000);
+    });
+
+    // Logo preview on input change
+    byId("logoUrl").addEventListener("input", () => {
+      const preview = byId("logoPreviewImg");
+      const url = byId("logoUrl").value.trim();
+      if (preview) { preview.src = url; preview.style.display = url ? "block" : "none"; }
+    });
     byId("refreshDataBtn").addEventListener("click", async () => {
       const btn = byId("refreshDataBtn");
       btn.textContent = "...";
