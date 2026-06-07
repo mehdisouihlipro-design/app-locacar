@@ -21,6 +21,7 @@ import insurancesRoutes from './routes/insurances.routes';
 import leasingRoutes from './routes/leasing.routes';
 import vignettesRoutes from './routes/vignettes.routes';
 import settingsRoutes from './routes/settings.routes';
+import demoRoutes from './routes/demo.routes';
 
 // Supabase REST API Client
 // Uses service role key when available (bypasses RLS for backend writes)
@@ -120,6 +121,7 @@ app.use('/api/v1/insurances', insurancesRoutes);
 app.use('/api/v1/leasing', leasingRoutes);
 app.use('/api/v1/vignettes', vignettesRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/demo', demoRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

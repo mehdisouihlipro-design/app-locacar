@@ -5727,18 +5727,39 @@
       const token = localStorage.getItem("locacar-jwt");
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
-      async function upsertMany(endpoint, items, mapFn) {
-        let ok = 0, fail = 0;
-        for (const item of items) {
-          try {
-            const res = await fetch(`${API_URL}${endpoint}`, {
-              method: "POST", headers, body: JSON.stringify(mapFn(item)),
-            });
-            const d = await res.json();
-            if (d.success) ok++; else { fail++; console.warn(`${endpoint} fail:`, d); }
-          } catch (_) { fail++; }
+      const mapCar = c => ({ id: c.id, plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible") });
+      const mapCustomer = c => ({ id: c.id, name: c.name, phone: c.phone || "", email: c.email || "" });
+      const mapContract = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", contract_date: c.contractDate || today, type: c.type || "court", days: c.days || 0, months: c.months || 0, rate: c.rate || 0, rate_currency: c.rateCurrency || "TND", quotient: c.quotient || 0, quotient_currency: c.quotientCurrency || "TND", quotient_tnd: c.quotientTnd || 0, total_amount_original: c.totalAmountOriginal || 0, total_amount_tnd: c.totalAmountTnd || 0, payment_moment: c.paymentMoment || "", payment_plan: c.paymentPlan || "", status: c.status === "actif" ? "active" : (c.status || "active") });
+      const mapInvoice = c => ({ id: c.id, contract_id: c.contractId || null, customer_name: c.customerName || "", amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, paid_amount_tnd: c.paidAmountTnd || 0, due_amount_tnd: c.dueAmountTnd || 0, label: c.label || "", due_date: c.dueDate || today, status: c.status || "en_attente", reminder_count: c.reminderCount || 0 });
+      const mapPayment = c => ({ id: c.id, invoice_id: c.invoiceId || null, contract_id: c.contractId || null, customer_name: c.customerName || "", contract_type: c.contractType || "", payment_date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, method: c.method || "" });
+      const mapMaint = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", type: c.type || "", date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, status: c.status || "paye", note: c.note || "", source_key: c.sourceKey || "" });
+      const mapVignette = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", fiscal_year: c.fiscalYear || new Date().getFullYear(), amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, due_date: c.dueDate || null, status: c.status || "a_payer" });
+      const mapReservation = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente" });
+
+      try {
+        const res = await fetch(`${API_URL}/demo/reset`, {
+          method: "POST", headers,
+          body: JSON.stringify({
+            cars: (state.cars || []).map(mapCar),
+            customers: (state.customers || []).map(mapCustomer),
+            contracts: (state.contracts || []).map(mapContract),
+            invoices: (state.invoices || []).map(mapInvoice),
+            payments: (state.payments || []).map(mapPayment),
+            maintenance: (state.maintenanceCosts || []).map(mapMaint),
+            vignettes: (state.vignettes || []).map(mapVignette),
+            reservations: (state.reservations || []).map(mapReservation),
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          const summary = Object.entries(data.results).map(([k,v]) => `${k}: ${v.ok}✅/${v.fail}❌`).join(" — ");
+          console.log("Sync API:", summary);
+        } else {
+          console.error("Sync API failed:", data);
         }
-        return { ok, fail };
+        return;
+      } catch (err) {
+        console.error("Sync API error:", err);
       }
 
       const r = {};
