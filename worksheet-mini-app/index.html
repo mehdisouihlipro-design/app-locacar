@@ -1119,6 +1119,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <div class="hero-chip" id="heroUserChip">Mode Worksheet</div>
+        <button id="refreshDataBtn" class="secondary" style="font-size:12px;padding:4px 10px;display:none;">↻ Rafraîchir</button>
         <button id="changeMyPasswordBtn" class="secondary" style="font-size:12px;padding:4px 10px;display:none;">🔑 Mon mot de passe</button>
         <button id="heroLogoutBtn" class="secondary" style="font-size:12px;padding:4px 10px;display:none;">Déconnexion</button>
       </div>
@@ -3948,6 +3949,8 @@
       if (btnPwd) btnPwd.style.display = isAuthenticated ? "inline-block" : "none";
       const btnLogout = byId("heroLogoutBtn");
       if (btnLogout) btnLogout.style.display = isAuthenticated ? "inline-block" : "none";
+      const btnRefresh = byId("refreshDataBtn");
+      if (btnRefresh) btnRefresh.style.display = isAuthenticated ? "inline-block" : "none";
     }
 
     function initSupabaseClientFromInputs() {
@@ -4158,15 +4161,77 @@
     }
 
     async function loadDataFromAPI() {
-      const cars = await apiGet("/cars");
-      if (cars) {
-        state.cars = cars.map(c => ({
-          id: c.id, plate: c.plate, model: c.model,
-          brand: c.brand || "", agency: c.agency || "",
-          status: c.status || "disponible",
-          gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
-        }));
-      }
+      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations] = await Promise.all([
+        apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
+        apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
+        apiGet("/vignettes"), apiGet("/reservations"),
+      ]);
+
+      if (cars) state.cars = cars.map(c => ({
+        id: c.id, plate: c.plate, model: c.model, brand: c.brand || "",
+        agency: c.location || c.agency || "", status: c.status || "disponible",
+        gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
+      }));
+
+      if (customers) state.customers = customers.map(c => ({
+        id: c.id, name: c.name, phone: c.phone || "", email: c.email || "",
+        address: c.address || "", type: c.type || "particulier",
+      }));
+
+      if (contracts) state.contracts = contracts.map(c => ({
+        id: c.id, customerId: c.customer_id, carId: c.car_id,
+        customerName: c.customer_name || "", carPlate: c.car_plate || "",
+        contractDate: c.contract_date, type: c.type || "court",
+        days: c.days || 0, months: c.months || 0,
+        rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
+        quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND",
+        quotientTnd: c.quotient_tnd || 0,
+        totalAmountOriginal: c.total_amount_original || 0,
+        totalAmountTnd: c.total_amount_tnd || 0,
+        paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
+        status: c.status || "active",
+      }));
+
+      if (invoices) state.invoices = invoices.map(i => ({
+        id: i.id, contractId: i.contract_id, customerName: i.customer_name || "",
+        amountOriginal: i.amount_original || 0, currency: i.currency || "TND",
+        amountTnd: i.amount_tnd || 0, paidAmountTnd: i.paid_amount_tnd || 0,
+        dueAmountTnd: i.due_amount_tnd || 0, label: i.label || "",
+        dueDate: i.due_date || "", status: i.status || "en_attente",
+        reminderCount: i.reminder_count || 0,
+      }));
+
+      if (payments) state.payments = payments.map(p => ({
+        id: p.id, invoiceId: p.invoice_id, contractId: p.contract_id,
+        customerName: p.customer_name || "", contractType: p.contract_type || "",
+        date: p.payment_date || "", amountOriginal: p.amount_original || 0,
+        currency: p.currency || "TND", amountTnd: p.amount_tnd || 0,
+        method: p.method || "",
+      }));
+
+      if (maintenance) state.maintenanceCosts = maintenance.map(m => ({
+        id: m.id, carId: m.car_id, carPlate: m.car_plate || "",
+        type: m.type || "", date: m.date || "",
+        amountOriginal: m.amount_original || 0, currency: m.currency || "TND",
+        amountTnd: m.amount_tnd || 0, status: m.status || "paye",
+        note: m.note || "", sourceKey: m.source_key || "",
+      }));
+
+      if (vignettes) state.vignettes = vignettes.map(v => ({
+        id: v.id, carId: v.car_id, carPlate: v.car_plate || "",
+        fiscalYear: v.fiscal_year || new Date().getFullYear(),
+        amountOriginal: v.amount_original || 0, currency: v.currency || "TND",
+        amountTnd: v.amount_tnd || 0, dueDate: v.due_date || "",
+        status: v.status || "a_payer",
+      }));
+
+      if (reservations) state.reservations = reservations.map(r => ({
+        id: r.id, customerId: r.customer_id, carId: r.car_id,
+        customerName: r.customer_name || "", carPlate: r.car_plate || "",
+        startDate: r.start_date || "", startTime: r.start_time || "09:00",
+        endDate: r.end_date || "", endTime: r.end_time || "18:00",
+        status: r.status || "en_attente",
+      }));
     }
 
     async function initAuth() {
@@ -4301,18 +4366,19 @@
       selectGpsCar(carId);
     });
 
-    document.getElementById("addCustomerBtn").addEventListener("click", () => {
+    document.getElementById("addCustomerBtn").addEventListener("click", async () => {
       const name = byId("custName").value.trim();
       const phone = byId("custPhone").value.trim();
       const email = byId("custEmail").value.trim();
       const type = byId("custType").value;
 
-      if (!name || !phone) {
-        alert("Nom et telephone sont obligatoires.");
-        return;
-      }
+      if (!name || !phone) { alert("Nom et telephone sont obligatoires."); return; }
 
-      state.customers.push({ id: uid("CLI"), name, phone, email, type });
+      let id = uid("CLI");
+      const saved = await apiPost("/customers", { name, phone, email, type });
+      if (saved && saved.id) id = saved.id;
+
+      state.customers.push({ id, name, phone, email, type });
       byId("custName").value = "";
       byId("custPhone").value = "";
       byId("custEmail").value = "";
@@ -7443,6 +7509,13 @@
       byId("changePasswordModal").style.display = "flex";
     });
     byId("heroLogoutBtn").addEventListener("click", onLogout);
+    byId("refreshDataBtn").addEventListener("click", async () => {
+      const btn = byId("refreshDataBtn");
+      btn.textContent = "...";
+      await loadDataFromAPI();
+      render();
+      btn.textContent = "↻ Rafraîchir";
+    });
     byId("cpCloseBtn").addEventListener("click", () => { byId("changePasswordModal").style.display = "none"; });
     byId("changePasswordModal").addEventListener("click", (e) => { if (e.target === byId("changePasswordModal")) byId("changePasswordModal").style.display = "none"; });
 
