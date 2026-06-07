@@ -1117,7 +1117,11 @@
           <p class="sub">Gestion locative de parc automobile, multi-agence et multi-devise.</p>
         </div>
       </div>
-      <div class="hero-chip">Mode Worksheet</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="hero-chip" id="heroUserChip">Mode Worksheet</div>
+        <button id="changeMyPasswordBtn" class="secondary" style="font-size:12px;padding:4px 10px;display:none;">🔑 Mon mot de passe</button>
+        <button id="heroLogoutBtn" class="secondary" style="font-size:12px;padding:4px 10px;display:none;">Déconnexion</button>
+      </div>
     </div>
 
     <div class="grid">
@@ -2391,6 +2395,59 @@
         <tbody id="usersTable"></tbody>
       </table>
     </section>
+
+    <!-- Modal détail utilisateur -->
+    <div id="userDetailModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(480px,100%);max-height:90vh;overflow:auto;">
+        <h3 id="userDetailTitle" style="margin:0 0 16px;">Détail utilisateur</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div><label>Email</label><input id="udEmail" type="email" style="width:100%;" /></div>
+          <div><label>Nom complet</label><input id="udName" style="width:100%;" /></div>
+          <div>
+            <label>Rôle</label>
+            <select id="udRole" style="width:100%;">
+              <option value="agent">Agent</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input id="udActive" type="checkbox" />
+            <label for="udActive">Compte actif</label>
+          </div>
+          <div>
+            <label>Mot de passe</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="udPassword" type="password" placeholder="••••••••" style="flex:1;" disabled />
+              <button id="udEditPasswordBtn" class="secondary" style="white-space:nowrap;font-size:12px;">Modifier</button>
+            </div>
+            <p id="udPasswordHint" class="muted" style="font-size:11px;margin:4px 0 0;">Laisser vide pour ne pas changer le mot de passe.</p>
+          </div>
+          <div id="udStatus" style="display:none;padding:8px;border-radius:6px;font-size:13px;"></div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          <button id="udSaveBtn">Enregistrer</button>
+          <button id="udCloseBtn" class="secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal changement de mon mot de passe -->
+    <div id="changePasswordModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(400px,100%);">
+        <h3 style="margin:0 0 16px;">Changer mon mot de passe</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div><label>Mot de passe actuel</label><input id="cpCurrent" type="password" style="width:100%;" /></div>
+          <div><label>Nouveau mot de passe</label><input id="cpNew" type="password" style="width:100%;" /></div>
+          <div><label>Confirmer</label><input id="cpConfirm" type="password" style="width:100%;" /></div>
+          <div id="cpStatus" style="display:none;padding:8px;border-radius:6px;font-size:13px;"></div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          <button id="cpSaveBtn">Changer le mot de passe</button>
+          <button id="cpCloseBtn" class="secondary">Annuler</button>
+        </div>
+      </div>
+    </div>
 
     <div id="inspectionDetailModal" class="modal" aria-hidden="true">
       <div class="modal-card" style="width:min(1100px,100%);">
@@ -3885,10 +3942,12 @@
     function setAppVisibility(isAuthenticated) {
       byId("authPanel").classList.toggle("hidden", isAuthenticated);
       byId("appShell").classList.toggle("hidden", !isAuthenticated);
-      const chip = document.querySelector(".hero-chip");
-      if (chip) {
-        chip.textContent = isAuthenticated && currentUser ? `Connecte: ${currentUser.email}` : "Mode Worksheet";
-      }
+      const chip = byId("heroUserChip");
+      if (chip) chip.textContent = isAuthenticated && currentUser ? `${currentUser.email} (${currentUser.role})` : "Mode Worksheet";
+      const btnPwd = byId("changeMyPasswordBtn");
+      if (btnPwd) btnPwd.style.display = isAuthenticated ? "inline-block" : "none";
+      const btnLogout = byId("heroLogoutBtn");
+      if (btnLogout) btnLogout.style.display = isAuthenticated ? "inline-block" : "none";
     }
 
     function initSupabaseClientFromInputs() {
@@ -7297,18 +7356,118 @@
         return;
       }
       tbody.innerHTML = users.map(u => `
-        <tr>
+        <tr class="clickable-row" onclick="openUserDetail('${u.id}')" style="cursor:pointer;">
           <td>${u.email}</td>
           <td>${u.full_name || '-'}</td>
           <td><span style="background:#edf4ff;color:#1540c8;padding:2px 8px;border-radius:999px;font-size:12px;">${u.role}</span></td>
           <td>${u.is_active ? '✅' : '❌'}</td>
           <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '-'}</td>
-          <td>
+          <td onclick="event.stopPropagation()">
             <button class="secondary" style="font-size:11px;padding:3px 8px;" onclick="toggleUserActive('${u.id}',${!u.is_active})">${u.is_active ? 'Désactiver' : 'Activer'}</button>
             <button style="font-size:11px;padding:3px 8px;background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;cursor:pointer;" onclick="deleteUser('${u.id}','${u.email}')">Supprimer</button>
           </td>
         </tr>`).join('');
     }
+
+    // ── User detail modal ──────────────────────────────────────────────
+    let _currentEditUserId = null;
+
+    window.openUserDetail = async (id) => {
+      _currentEditUserId = id;
+      const user = await apiGet(`/users/${id}`);
+      if (!user) return;
+      byId("userDetailTitle").textContent = `Utilisateur — ${user.email}`;
+      byId("udEmail").value = user.email || "";
+      byId("udName").value = user.full_name || "";
+      byId("udRole").value = user.role || "agent";
+      byId("udActive").checked = user.is_active !== false;
+      byId("udPassword").value = "";
+      byId("udPassword").disabled = true;
+      byId("udPasswordHint").style.display = "block";
+      const s = byId("udStatus"); s.style.display = "none";
+      const modal = byId("userDetailModal");
+      modal.style.display = "flex";
+    };
+
+    byId("udEditPasswordBtn").addEventListener("click", () => {
+      const input = byId("udPassword");
+      input.disabled = !input.disabled;
+      byId("udEditPasswordBtn").textContent = input.disabled ? "Modifier" : "Annuler";
+      byId("udPasswordHint").style.display = input.disabled ? "block" : "none";
+      if (!input.disabled) input.focus();
+      else input.value = "";
+    });
+
+    byId("udCloseBtn").addEventListener("click", () => { byId("userDetailModal").style.display = "none"; });
+    byId("userDetailModal").addEventListener("click", (e) => { if (e.target === byId("userDetailModal")) byId("userDetailModal").style.display = "none"; });
+
+    byId("udSaveBtn").addEventListener("click", async () => {
+      if (!_currentEditUserId) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const payload = {
+        email: byId("udEmail").value.trim(),
+        full_name: byId("udName").value.trim(),
+        role: byId("udRole").value,
+        is_active: byId("udActive").checked,
+      };
+      const pwd = byId("udPassword").value;
+      if (pwd && !byId("udPassword").disabled) payload.password = pwd;
+
+      const s = byId("udStatus");
+      s.style.display = "block";
+      s.textContent = "Enregistrement...";
+      s.style.background = "#f0f9ff"; s.style.color = "#0369a1";
+
+      try {
+        const res = await fetch(`${API_URL}/users/${_currentEditUserId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.success) {
+          s.textContent = "✅ Modifications enregistrées.";
+          s.style.background = "#dcfce7"; s.style.color = "#166534";
+          renderUsers();
+        } else {
+          s.textContent = `❌ ${data.message}`;
+          s.style.background = "#fee2e2"; s.style.color = "#b91c1c";
+        }
+      } catch (err) { s.textContent = `Erreur: ${err.message}`; s.style.background = "#fee2e2"; s.style.color = "#b91c1c"; }
+    });
+
+    // ── Change my own password ──────────────────────────────────────────
+    byId("changeMyPasswordBtn").addEventListener("click", () => {
+      byId("cpCurrent").value = ""; byId("cpNew").value = ""; byId("cpConfirm").value = "";
+      const s = byId("cpStatus"); s.style.display = "none";
+      byId("changePasswordModal").style.display = "flex";
+    });
+    byId("heroLogoutBtn").addEventListener("click", onLogout);
+    byId("cpCloseBtn").addEventListener("click", () => { byId("changePasswordModal").style.display = "none"; });
+    byId("changePasswordModal").addEventListener("click", (e) => { if (e.target === byId("changePasswordModal")) byId("changePasswordModal").style.display = "none"; });
+
+    byId("cpSaveBtn").addEventListener("click", async () => {
+      const current = byId("cpCurrent").value;
+      const newPwd = byId("cpNew").value;
+      const confirm = byId("cpConfirm").value;
+      const s = byId("cpStatus");
+      s.style.display = "block";
+      if (newPwd !== confirm) { s.textContent = "❌ Les mots de passe ne correspondent pas."; s.style.background = "#fee2e2"; s.style.color = "#b91c1c"; return; }
+      if (newPwd.length < 6) { s.textContent = "❌ Au moins 6 caractères requis."; s.style.background = "#fee2e2"; s.style.color = "#b91c1c"; return; }
+      s.textContent = "Mise à jour..."; s.style.background = "#f0f9ff"; s.style.color = "#0369a1";
+      try {
+        const res = await fetch(`${API_URL}/auth/change-password`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("locacar-jwt")}` },
+          body: JSON.stringify({ current_password: current, new_password: newPwd }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          s.textContent = "✅ Mot de passe mis à jour."; s.style.background = "#dcfce7"; s.style.color = "#166534";
+          setTimeout(() => { byId("changePasswordModal").style.display = "none"; }, 1500);
+        } else { s.textContent = `❌ ${data.message}`; s.style.background = "#fee2e2"; s.style.color = "#b91c1c"; }
+      } catch (err) { s.textContent = `Erreur: ${err.message}`; s.style.background = "#fee2e2"; s.style.color = "#b91c1c"; }
+    });
 
     window.toggleUserActive = async (id, active) => {
       const token = localStorage.getItem("locacar-jwt");

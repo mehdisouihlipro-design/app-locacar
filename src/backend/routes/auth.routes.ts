@@ -136,4 +136,30 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
   }
 });
 
+router.put('/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: 'Non authentifié.' });
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ success: false, message: 'Mot de passe actuel et nouveau requis.' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Le nouveau mot de passe doit faire au moins 6 caractères.' });
+    }
+    const result = await global.db.get(`/users?id=eq.${req.user.id}&select=password_hash`).catch(() => ({ data: [] }));
+    if (!result.data || result.data.length === 0) {
+      return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+    }
+    const matches = await bcrypt.compare(current_password, result.data[0].password_hash);
+    if (!matches) {
+      return res.status(401).json({ success: false, message: 'Mot de passe actuel incorrect.' });
+    }
+    const newHash = await bcrypt.hash(new_password, 10);
+    await global.db.patch(`/users?id=eq.${req.user.id}`, { password_hash: newHash });
+    return res.json({ success: true, message: 'Mot de passe mis à jour.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Erreur serveur.' });
+  }
+});
+
 export default router;
