@@ -44,8 +44,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       ...(notes && { notes }),
     });
     res.status(201).json({ success: true, data: { id, plate, model, status: status || 'disponible' } });
-  } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+  } catch (err: any) {
+    const detail = err?.response?.data || err?.message || String(err);
+    res.status(500).json({ success: false, error: String(err), detail });
   }
 });
 
