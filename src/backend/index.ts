@@ -23,14 +23,16 @@ import vignettesRoutes from './routes/vignettes.routes';
 import settingsRoutes from './routes/settings.routes';
 
 // Supabase REST API Client
+// Uses service role key when available (bypasses RLS for backend writes)
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseAnonKey;
 
 const supabaseClient = axios.create({
   baseURL: `${supabaseUrl}/rest/v1`,
   headers: {
-    'apikey': supabaseKey,
-    'Authorization': `Bearer ${supabaseKey}`,
+    'apikey': supabaseServiceKey,
+    'Authorization': `Bearer ${supabaseServiceKey}`,
     'Content-Type': 'application/json',
   },
 });
