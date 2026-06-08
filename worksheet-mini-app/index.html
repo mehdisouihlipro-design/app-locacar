@@ -5395,17 +5395,20 @@
       element.innerHTML = header + clientBlock + lineTable + totalsBlock + wordsLine + footer;
 
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: 8,
         filename: `Facture-${invoice.id}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true },
         jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
       };
 
-      // Passer l'outerHTML (string) plutôt que l'élément DOM : html2pdf crée lui-même
-      // un div caché dans le body avec la bonne largeur, évitant les bugs de rendu
-      // flexbox/width sur un élément hors-DOM.
-      html2pdf().set(opt).from(element.outerHTML).save();
+      try {
+        html2pdf().set(opt).from(element).save();
+      } catch (err) {
+        console.error("Erreur PDF facture:", err);
+        alert("Erreur lors de la generation du PDF: " + (err.message || err));
+      }
     }
 
     document.getElementById("addPaymentBtn").addEventListener("click", async () => {
