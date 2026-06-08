@@ -5286,18 +5286,10 @@
 
     function generateInvoicePdf(invoiceId) {
       const invoice = state.invoices.find((i) => String(i.id) === String(invoiceId));
-      if (!invoice) {
-        alert("Facture introuvable.");
-        return;
-      }
-      if (typeof html2pdf === "undefined") {
-        alert("Librairie PDF non disponible. Verifier le chargement du fichier html2pdf.bundle.min.js");
-        return;
-      }
+      if (!invoice) { alert("Facture introuvable."); return; }
 
       const { contract, car, customer } = getInvoiceContext(invoice);
       const days = Number(invoice.rentalDays || (contract && contract.days) || 0);
-      // Si amountHt absent (factures créées avant le calcul HT/TVA), on rétro-calcule depuis amountTnd (TTC)
       const amountTtcFallback = Number(invoice.amountTnd || invoice.dueAmountTnd || 0);
       const breakdown = invoice.amountHt
         ? computeTtcFromHt(Number(invoice.amountHt), days)
@@ -5309,125 +5301,140 @@
       const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
       const settings = state.settings || {};
 
-      const element = document.createElement("div");
-      element.style.padding = "15px";
-      element.style.fontFamily = "Arial, sans-serif";
-      element.style.fontSize = "11px";
-      element.style.color = "#0d244a";
-      element.style.lineHeight = "1.4";
-      element.style.width = "100%";
-      element.style.maxWidth = "210mm";
-
-      const header = `<table style="width:100%;border-collapse:collapse;margin-bottom:0;">
-        <tr>
-          <td style="vertical-align:top;padding-bottom:10px;border-bottom:2px solid #0d244a;">
-            <table style="border-collapse:collapse;">
-              <tr>
-                <td style="vertical-align:middle;padding-right:12px;">
-                  <img src="${safe(logoUrl)}" style="max-width:70px;max-height:70px;display:block;" />
-                </td>
-                <td style="vertical-align:middle;">
-                  <h1 style="margin:0;font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
-                  <p style="margin:2px 0;font-size:9px;color:#4d6a97;">LOCATION DE VOITURES</p>
-                  <p style="margin:0;font-size:9px;color:#4d6a97;">${safe(settings.companyAddress || "")}</p>
-                  <p style="margin:0;font-size:9px;color:#4d6a97;">${settings.companyPhone ? "Tel: " + safe(settings.companyPhone) : ""}${settings.companyRib ? " &middot; RIB: " + safe(settings.companyRib) : ""}</p>
-                  <p style="margin:0;font-size:9px;color:#4d6a97;">${settings.companyTaxId ? "Matricule fiscal: " + safe(settings.companyTaxId) : ""}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-          <td style="vertical-align:top;text-align:right;padding-bottom:10px;border-bottom:2px solid #0d244a;">
-            <h2 style="margin:0;font-size:14px;color:#1540c8;">FACTURE</h2>
-            <p style="margin:3px 0;font-size:10px;">N&deg; <strong>${safe(invoice.id)}</strong></p>
-            <p style="margin:0;font-size:10px;">Contrat: <strong>${safe(invoice.contractId || "-")}</strong></p>
-            <p style="margin:0;font-size:10px;">Date: <strong>${safe(invoice.dueDate || new Date().toISOString().slice(0, 10))}</strong></p>
-          </td>
-        </tr>
-        <tr><td colspan="2" style="height:14px;"></td></tr>
-      </table>`;
-
-      const clientBlock = `<div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px;background:#f5f7ff;">
-        <h3 style="margin:0 0 4px 0;font-size:11px;color:#1540c8;">Client</h3>
-        <p style="margin:0;font-size:10px;"><strong>${safe(invoice.customerName || (customer && customer.name) || "-")}</strong></p>
-        <p style="margin:0;font-size:9px;color:#4d6a97;">${safe((customer && (customer.address || customer.phone)) ? [customer.address, customer.phone].filter(Boolean).join(" &middot; ") : "")}</p>
-      </div>`;
-
-      const designation = car ? `${safe(car.model || "Vehicule")}` : "Vehicule";
+      const designation = car ? safe(car.model || "Vehicule") : "Vehicule";
       const plate = car ? safe(car.plate || "-") : "-";
-      const lineTable = `<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:14px;">
-        <thead>
-          <tr style="background:#0d244a;color:#fff;">
-            <th style="padding:6px;border:1px solid #0d244a;">Contrat</th>
-            <th style="padding:6px;border:1px solid #0d244a;">Designation</th>
-            <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
-            <th style="padding:6px;border:1px solid #0d244a;">DU</th>
-            <th style="padding:6px;border:1px solid #0d244a;">AU</th>
-            <th style="padding:6px;border:1px solid #0d244a;">Nb.j</th>
-            <th style="padding:6px;border:1px solid #0d244a;">Prix HT</th>
-            <th style="padding:6px;border:1px solid #0d244a;">TVA</th>
-            <th style="padding:6px;border:1px solid #0d244a;">Prix TTC</th>
-          </tr>
-        </thead>
-        <tbody>
+      const clientName = safe(invoice.customerName || (customer && customer.name) || "-");
+      const clientInfo = (customer && (customer.address || customer.phone))
+        ? [customer.address, customer.phone].filter(Boolean).join(" · ")
+        : "";
+
+      const win = window.open("", "_blank");
+      if (!win) {
+        alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur.");
+        return;
+      }
+
+      win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Facture ${safe(invoice.id)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #0d244a; margin: 0; padding: 24px 30px; line-height: 1.4; }
+    h1, h2, h3, p { margin: 0; padding: 0; }
+    table { border-collapse: collapse; }
+    .print-btn { display:block; margin-bottom:16px; text-align:right; }
+    .print-btn button { background:#0d244a; color:#fff; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; }
+    .print-btn button:hover { background:#1540c8; }
+    @media print {
+      @page { margin: 12mm; size: A4 portrait; }
+      body { padding: 0; }
+      .print-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-btn">
+    <button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+  </div>
+
+  <!-- En-tête -->
+  <table width="100%" style="margin-bottom:14px;border-bottom:2px solid #0d244a;padding-bottom:10px;">
+    <tr>
+      <td style="vertical-align:middle;">
+        <table>
           <tr>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.contractId || "-")}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodStart || "-")}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodEnd || "-")}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${days}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountHt)}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.vatAmount)}</td>
-            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountTtc)}</td>
+            <td style="padding-right:12px;vertical-align:middle;">
+              <img src="${safe(logoUrl)}" style="max-width:70px;max-height:70px;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <h1 style="font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
+              <p style="font-size:9px;color:#4d6a97;margin-top:2px;">LOCATION DE VOITURES</p>
+              ${settings.companyAddress ? `<p style="font-size:9px;color:#4d6a97;">${safe(settings.companyAddress)}</p>` : ""}
+              ${(settings.companyPhone || settings.companyRib) ? `<p style="font-size:9px;color:#4d6a97;">${settings.companyPhone ? "Tel: " + safe(settings.companyPhone) : ""}${settings.companyRib ? " &middot; RIB: " + safe(settings.companyRib) : ""}</p>` : ""}
+              ${settings.companyTaxId ? `<p style="font-size:9px;color:#4d6a97;">Matricule fiscal: ${safe(settings.companyTaxId)}</p>` : ""}
+            </td>
           </tr>
-        </tbody>
-      </table>`;
+        </table>
+      </td>
+      <td style="vertical-align:top;text-align:right;">
+        <h2 style="font-size:14px;color:#1540c8;">FACTURE</h2>
+        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(invoice.id)}</strong></p>
+        <p style="font-size:10px;">Contrat&nbsp;: <strong>${safe(invoice.contractId || "-")}</strong></p>
+        <p style="font-size:10px;">Date&nbsp;: <strong>${safe(invoice.dueDate || new Date().toISOString().slice(0, 10))}</strong></p>
+      </td>
+    </tr>
+  </table>
 
-      const totalsBlock = `<table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;">
-        <tr>
-          <td></td>
-          <td style="width:260px;">
-            <table style="width:100%;border-collapse:collapse;">
-              <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.amountHt)}</td></tr>
-              <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 0)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.vatAmount)}</td></tr>
-              <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/jour (${days} j)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.dailyTaxAmount)}</td></tr>
-              <tr><td style="padding:4px 8px;">Timbre fiscal</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.stampDutyAmount)}</td></tr>
-              <tr style="font-weight:bold;border-top:2px solid #0d244a;"><td style="padding:6px 8px;">Total T.T.C</td><td style="padding:6px 8px;text-align:right;">${formatTnd(breakdown.amountTtc)}</td></tr>
-            </table>
-          </td>
-        </tr>
-      </table>`;
+  <!-- Client -->
+  <div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px 10px;background:#f5f7ff;">
+    <p style="font-size:10px;color:#1540c8;font-weight:bold;margin-bottom:4px;">Client</p>
+    <p style="font-size:10px;"><strong>${clientName}</strong></p>
+    ${clientInfo ? `<p style="font-size:9px;color:#4d6a97;">${safe(clientInfo)}</p>` : ""}
+  </div>
 
-      const wordsLine = `<div style="border-top:1px dashed #c8daf9;padding-top:8px;margin-bottom:20px;font-size:10px;font-style:italic;">
-        Arretee la presente facture a la somme de : <strong>${amountToFrenchWords(breakdown.amountTtc)}</strong>.
-      </div>`;
+  <!-- Lignes de facture -->
+  <table width="100%" style="font-size:9px;margin-bottom:14px;">
+    <thead>
+      <tr style="background:#0d244a;color:#fff;">
+        <th style="padding:6px;border:1px solid #0d244a;">Contrat</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Désignation</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
+        <th style="padding:6px;border:1px solid #0d244a;">DU</th>
+        <th style="padding:6px;border:1px solid #0d244a;">AU</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Nb.j</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Prix HT</th>
+        <th style="padding:6px;border:1px solid #0d244a;">TVA</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Prix TTC</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.contractId || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodStart || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodEnd || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${days || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountHt)}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.vatAmount)}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountTtc)}</td>
+      </tr>
+    </tbody>
+  </table>
 
-      const footer = `<div style="border-top:1px solid #c8daf9;padding-top:6px;font-size:8px;color:#4d6a97;text-align:center;">
-        ${safe(companyName)} ${settings.companyAddress ? "&middot; " + safe(settings.companyAddress) : ""} ${settings.companyPhone ? "&middot; Tel: " + safe(settings.companyPhone) : ""} ${settings.companyTaxId ? "&middot; Matricule fiscal: " + safe(settings.companyTaxId) : ""}
-      </div>`;
+  <!-- Totaux -->
+  <table width="100%" style="font-size:10px;margin-bottom:10px;">
+    <tr>
+      <td></td>
+      <td width="280">
+        <table width="100%">
+          <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.amountHt)}</td></tr>
+          <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 0)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.vatAmount)}</td></tr>
+          <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/j (${days || 0} j)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.dailyTaxAmount)}</td></tr>
+          <tr><td style="padding:4px 8px;">Timbre fiscal</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.stampDutyAmount)}</td></tr>
+          <tr style="font-weight:bold;border-top:2px solid #0d244a;">
+            <td style="padding:6px 8px;">Total T.T.C</td>
+            <td style="padding:6px 8px;text-align:right;">${formatTnd(breakdown.amountTtc)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 
-      element.innerHTML = header + clientBlock + lineTable + totalsBlock + wordsLine + footer;
+  <!-- Montant en lettres -->
+  <div style="border-top:1px dashed #c8daf9;padding-top:8px;margin-bottom:24px;font-size:10px;font-style:italic;">
+    Arrêtée la présente facture à la somme de&nbsp;: <strong>${amountToFrenchWords(breakdown.amountTtc)}</strong>.
+  </div>
 
-      // Ancrage dans le DOM : sans parent, html2canvas ne peut pas calculer
-      // les largeurs (width:100% = 0) et décale le contenu selon le scroll de la page.
-      element.style.position = "fixed";
-      element.style.top = "0";
-      element.style.left = "-10000px";
-      element.style.width = "794px";
-      element.style.backgroundColor = "#ffffff";
-      document.body.appendChild(element);
-
-      const opt = {
-        margin: 8,
-        filename: `Facture-${invoice.id}.pdf`,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true, scrollX: 0, scrollY: 0 },
-        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
-      };
-
-      html2pdf().set(opt).from(element).save().then(function () {
-        if (element.parentNode) element.parentNode.removeChild(element);
-      });
+  <!-- Pied de page -->
+  <div style="border-top:1px solid #c8daf9;padding-top:6px;font-size:8px;color:#4d6a97;text-align:center;">
+    ${safe(companyName)}${settings.companyAddress ? " &middot; " + safe(settings.companyAddress) : ""}${settings.companyPhone ? " &middot; Tel: " + safe(settings.companyPhone) : ""}${settings.companyTaxId ? " &middot; Matricule fiscal: " + safe(settings.companyTaxId) : ""}
+  </div>
+</body>
+</html>`);
+      win.document.close();
     }
 
     document.getElementById("addPaymentBtn").addEventListener("click", async () => {
