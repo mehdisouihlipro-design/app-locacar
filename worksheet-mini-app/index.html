@@ -6054,7 +6054,28 @@
         },
       ];
 
+      const addMonthsToIsoDate = (isoDate, months) => {
+        const d = new Date(`${isoDate}T00:00:00`);
+        d.setMonth(d.getMonth() + months);
+        return d.toISOString().slice(0, 10);
+      };
+      const carPlateOf = (carId) => state.cars.find((c) => c.id === carId).plate;
+      const fy = new Date().getFullYear();
+
       state.maintenanceCosts = [
+        {
+          id: uid("MNT"),
+          carId: car1,
+          carPlate: "TU-1903",
+          type: "vidange",
+          date: addMonthsToIsoDate(today, -2),
+          amountOriginal: 180,
+          currency: "TND",
+          amountTnd: 180,
+          status: "paye",
+          note: "Vidange + filtres",
+          sourceKey: "",
+        },
         {
           id: uid("MNT"),
           carId: car2,
@@ -6081,29 +6102,155 @@
           note: "Remplacement retroviseur droit",
           sourceKey: "",
         },
-      ];
-
-      state.insurances = [];
-      state.insuranceInstallments = [];
-      state.leasingContracts = [];
-      state.leasingInstallments = [];
-      state.vignettes = [
         {
-          id: uid("VIG"),
-          carId: car1,
-          carPlate: "TU-1903",
-          fiscalYear: new Date().getFullYear(),
-          amountOriginal: 280,
+          id: uid("MNT"),
+          carId: car4,
+          carPlate: "TU-1906",
+          type: "pneus",
+          date: addMonthsToIsoDate(today, -3),
+          amountOriginal: 450,
           currency: "TND",
-          amountTnd: 280,
-          dueDate: `${new Date().getFullYear()}-12-31`,
+          amountTnd: 450,
+          status: "paye",
+          note: "Train de 4 pneus",
+          sourceKey: "",
+        },
+        {
+          id: uid("MNT"),
+          carId: car5,
+          carPlate: "TU-1907",
+          type: "carrosserie",
+          date: addMonthsToIsoDate(today, -1),
+          amountOriginal: 275,
+          currency: "TND",
+          amountTnd: 275,
           status: "a_payer",
-          paidDate: "",
-          attachmentName: "",
-          attachmentType: "",
-          attachmentData: "",
+          note: "Reparation pare-chocs arriere",
+          sourceKey: "",
+        },
+        {
+          id: uid("MNT"),
+          carId: car6,
+          carPlate: "TU-1908",
+          type: "revision",
+          date: today,
+          amountOriginal: 350,
+          currency: "TND",
+          amountTnd: 350,
+          status: "paye",
+          note: "Revision generale 50 000 km",
+          sourceKey: "",
+        },
+        {
+          id: uid("MNT"),
+          carId: car7,
+          carPlate: "TU-9808",
+          type: "revision",
+          date: addMonthsToIsoDate(today, -2),
+          amountOriginal: 600,
+          currency: "TND",
+          amountTnd: 600,
+          status: "paye",
+          note: "Revision complete + plaquettes de frein",
+          sourceKey: "",
         },
       ];
+
+      const leasingPlans = [
+        { car: car1, lender: "Attijari Leasing", contractNumber: "ATL-2024-1903", monthlyAmount: 520, monthsAgo: 14, monthsAhead: 22 },
+        { car: car2, lender: "BIAT Leasing", contractNumber: "BTL-2024-1904", monthlyAmount: 540, monthsAgo: 12, monthsAhead: 24 },
+        { car: car3, lender: "Wifak Leasing", contractNumber: "WFL-2023-1905", monthlyAmount: 510, monthsAgo: 18, monthsAhead: 18 },
+        { car: car4, lender: "Arab Tunisian Lease", contractNumber: "ATLS-2024-1906", monthlyAmount: 500, monthsAgo: 10, monthsAhead: 26 },
+        { car: car5, lender: "Attijari Leasing", contractNumber: "ATL-2024-1907", monthlyAmount: 530, monthsAgo: 8, monthsAhead: 28 },
+        { car: car6, lender: "BIAT Leasing", contractNumber: "BTL-2023-1908", monthlyAmount: 550, monthsAgo: 20, monthsAhead: 16 },
+        { car: car7, lender: "El Wifack Leasing", contractNumber: "EWL-2024-9808", monthlyAmount: 980, monthsAgo: 9, monthsAhead: 27 },
+      ];
+
+      state.leasingContracts = leasingPlans.map((p) => ({
+        id: uid("LEA"),
+        carId: p.car,
+        carPlate: carPlateOf(p.car),
+        lender: p.lender,
+        contractNumber: p.contractNumber,
+        monthlyAmount: p.monthlyAmount,
+        currency: "TND",
+        monthlyAmountTnd: p.monthlyAmount,
+        startDate: addMonthsToIsoDate(today, -p.monthsAgo),
+        endDate: addMonthsToIsoDate(today, p.monthsAhead),
+        attachmentName: "",
+        attachmentType: "",
+        attachmentData: "",
+      }));
+      state.leasingInstallments = state.leasingContracts.flatMap((l) => buildMonthlyInstallments({
+        ownerType: "leasing",
+        ownerId: l.id,
+        carId: l.carId,
+        carPlate: l.carPlate,
+        startDate: l.startDate,
+        endDate: l.endDate,
+        amountOriginal: l.monthlyAmount,
+        currency: l.currency,
+      }));
+
+      const insurancePlans = [
+        { car: car1, provider: "STAR Assurances", policyNumber: "STR-1903-26", monthlyAmount: 95, monthsAgo: 6, monthsAhead: 6 },
+        { car: car2, provider: "GAT Assurances", policyNumber: "GAT-1904-26", monthlyAmount: 90, monthsAgo: 5, monthsAhead: 7 },
+        { car: car3, provider: "Maghrebia Assurances", policyNumber: "MAG-1905-26", monthlyAmount: 98, monthsAgo: 7, monthsAhead: 5 },
+        { car: car4, provider: "Comar Assurances", policyNumber: "COM-1906-26", monthlyAmount: 92, monthsAgo: 4, monthsAhead: 8 },
+        { car: car5, provider: "Astree Assurances", policyNumber: "AST-1907-26", monthlyAmount: 96, monthsAgo: 3, monthsAhead: 9 },
+        { car: car6, provider: "Lloyd Tunisien", policyNumber: "LLT-1908-26", monthlyAmount: 100, monthsAgo: 9, monthsAhead: 3 },
+        { car: car7, provider: "AMI Assurances", policyNumber: "AMI-9808-26", monthlyAmount: 165, monthsAgo: 5, monthsAhead: 7 },
+      ];
+
+      state.insurances = insurancePlans.map((p) => ({
+        id: uid("INS"),
+        carId: p.car,
+        carPlate: carPlateOf(p.car),
+        provider: p.provider,
+        policyNumber: p.policyNumber,
+        monthlyAmount: p.monthlyAmount,
+        currency: "TND",
+        monthlyAmountTnd: p.monthlyAmount,
+        startDate: addMonthsToIsoDate(today, -p.monthsAgo),
+        endDate: addMonthsToIsoDate(today, p.monthsAhead),
+        attachmentName: "",
+        attachmentType: "",
+        attachmentData: "",
+      }));
+      state.insuranceInstallments = state.insurances.flatMap((i) => buildYearlyInstallments({
+        ownerType: "insurance",
+        ownerId: i.id,
+        carId: i.carId,
+        carPlate: i.carPlate,
+        startDate: i.startDate,
+        endDate: i.endDate,
+        amountOriginal: i.monthlyAmount,
+        currency: i.currency,
+      }));
+
+      state.vignettes = [
+        { car: car1, plate: "TU-1903", amount: 280, status: "a_payer" },
+        { car: car2, plate: "TU-1904", amount: 240, status: "paye" },
+        { car: car3, plate: "TU-1905", amount: 230, status: "a_payer" },
+        { car: car4, plate: "TU-1906", amount: 250, status: "paye" },
+        { car: car5, plate: "TU-1907", amount: 245, status: "a_payer" },
+        { car: car6, plate: "TU-1908", amount: 260, status: "paye" },
+        { car: car7, plate: "TU-9808", amount: 320, status: "a_payer" },
+      ].map((v) => ({
+        id: uid("VIG"),
+        carId: v.car,
+        carPlate: v.plate,
+        fiscalYear: fy,
+        amountOriginal: v.amount,
+        currency: "TND",
+        amountTnd: v.amount,
+        dueDate: `${fy}-12-31`,
+        status: v.status,
+        paidDate: v.status === "paye" ? today : "",
+        attachmentName: "",
+        attachmentType: "",
+        attachmentData: "",
+      }));
 
       saveAndRender();
       syncStateToAPI();
