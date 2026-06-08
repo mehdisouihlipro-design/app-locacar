@@ -379,6 +379,13 @@ LocaCar is a comprehensive car rental management system designed for small-to-me
 - BR7: Payment due: 30 days from invoice date
 - BR8: Multi-agency rental: Cost = base_cost + subcontractor_markup (10-20%)
 - BR9: Commission: Agency receives 80% of rental fee, company 20%
+- BR15: Calcul HT ⇄ TTC (règles tunisiennes, paramétrables dans `Paramètres → Paramètres de facturation`) :
+  - Le tarif du contrat (`rate`) est le montant **HT**
+  - `TVA = montant_HT × taux_TVA / 100` (taux par défaut : 19 %, paramétrable)
+  - `Taxe journalière = nb_jours_location × taxe_par_jour` (montant par défaut : 2 TND/jour, paramétrable)
+  - `Timbre fiscal` = montant fixe pour toute la location (par défaut : 1 TND, paramétrable)
+  - `Montant_TTC = montant_HT + TVA + Taxe_journalière + Timbre` — c'est ce montant TTC qui constitue le `amount_tnd` facturé/dû au client
+  - Le sens inverse (TTC → HT) est disponible pour ré-éditer une facture à partir d'un montant TTC cible
 
 ### 6.3 Fleet Rules
 - BR10: Vehicle must pass inspection every 6 months

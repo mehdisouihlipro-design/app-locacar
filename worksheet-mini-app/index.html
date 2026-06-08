@@ -1565,6 +1565,7 @@
             <th>Paye (TND)</th>
             <th>Restant (TND)</th>
             <th>Statut</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody id="invoicesTable"></tbody>
@@ -2353,6 +2354,49 @@
         <p class="muted" style="font-size:12px;margin:8px 0 0;">Les modifications sont appliquées immédiatement et sauvegardées pour tous les utilisateurs.</p>
       </div>
 
+      <!-- Coordonnees legales (pour entete des factures) -->
+      <div class="card" style="margin-bottom:16px;background:#f8faff;">
+        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Coordonnées légales (en-tête des factures)</h4>
+        <div class="row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+          <div>
+            <label>Adresse</label>
+            <input id="companyAddress" placeholder="Ex: 18 Av. de l'Independance, Zaghouan 1100" />
+          </div>
+          <div>
+            <label>Telephone (Gsm)</label>
+            <input id="companyPhone" placeholder="Ex: (+216) 98 966 755" />
+          </div>
+          <div>
+            <label>RIB</label>
+            <input id="companyRib" placeholder="Ex: UBCI Zaghouan 11 070 000 1115 002 788 12" />
+          </div>
+          <div>
+            <label>Matricule fiscal / Code TVA</label>
+            <input id="companyTaxId" placeholder="Ex: 1182562/Y/M/A/000" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Parametres de facturation -->
+      <div class="card" style="margin-bottom:16px;background:#f8faff;">
+        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Paramètres de facturation</h4>
+        <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div>
+            <label>TVA (%)</label>
+            <input id="vatRate" type="number" min="0" step="0.1" value="19" />
+          </div>
+          <div>
+            <label>Taxe par jour de location (TND)</label>
+            <input id="dailyTaxTnd" type="number" min="0" step="0.1" value="2" />
+          </div>
+          <div>
+            <label>Timbre fiscal (TND)</label>
+            <input id="stampDutyTnd" type="number" min="0" step="0.1" value="1" />
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:8px 0 0;">Utilisés pour calculer le TTC à partir du HT (et inversement) lors de l'édition des factures.</p>
+      </div>
+
       <!-- Financial settings -->
       <div class="row">
         <div>
@@ -2496,6 +2540,42 @@
         <div class="actions" style="margin-top:16px;">
           <button id="udSaveBtn">Enregistrer</button>
           <button id="udCloseBtn" class="secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal édition / impression de facture -->
+    <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(640px,100%);max-height:90vh;overflow:auto;">
+        <h3 style="margin:0 0 16px;">Facture <span id="ieNumber"></span></h3>
+        <div id="ieInfo" class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px;"></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:180px;">
+              <label>Montant HT (TND)</label>
+              <input id="ieAmountHt" type="number" step="0.001" style="width:100%;" />
+            </div>
+            <div style="flex:1;min-width:180px;">
+              <label>Montant TTC (TND)</label>
+              <input id="ieAmountTtc" type="number" step="0.001" style="width:100%;" />
+            </div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tbody>
+              <tr><td style="padding:4px 0;">Montant HT</td><td style="padding:4px 0;text-align:right;" id="ieRowHt"></td></tr>
+              <tr><td style="padding:4px 0;">TVA (<span id="ieVatRateLabel"></span>%)</td><td style="padding:4px 0;text-align:right;" id="ieRowVat"></td></tr>
+              <tr><td style="padding:4px 0;">Taxe <span id="ieDailyTaxLabel"></span> dt/jour (<span id="ieDaysLabel"></span> j)</td><td style="padding:4px 0;text-align:right;" id="ieRowDailyTax"></td></tr>
+              <tr><td style="padding:4px 0;">Timbre fiscal</td><td style="padding:4px 0;text-align:right;" id="ieRowStamp"></td></tr>
+              <tr style="font-weight:600;border-top:1px solid #e2e8f0;"><td style="padding:6px 0;">Total TTC</td><td style="padding:6px 0;text-align:right;" id="ieRowTtc"></td></tr>
+            </tbody>
+          </table>
+          <div id="ieWords" class="muted" style="font-size:12px;font-style:italic;"></div>
+          <div id="ieStatus" style="display:none;padding:8px;border-radius:6px;font-size:13px;"></div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          <button id="ieSaveBtn">Enregistrer</button>
+          <button id="iePdfBtn" class="secondary">Télécharger PDF</button>
+          <button id="ieCloseBtn" class="secondary">Fermer</button>
         </div>
       </div>
     </div>
@@ -2752,6 +2832,13 @@
     byId("paymentDate").value = today;
     byId("eurToTnd").value = state.settings.eurToTnd;
     byId("openingCashTnd").value = state.settings.openingCashTnd || 0;
+    byId("vatRate").value = state.settings.vatRate ?? 19;
+    byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
+    byId("stampDutyTnd").value = state.settings.stampDutyTnd ?? 1;
+    byId("companyAddress").value = state.settings.companyAddress || "";
+    byId("companyPhone").value = state.settings.companyPhone || "";
+    byId("companyRib").value = state.settings.companyRib || "";
+    byId("companyTaxId").value = state.settings.companyTaxId || "";
     byId("contractRateCurrency").value = "TND";
     byId("contractQuotientCurrency").value = "TND";
     byId("reservationStartDate").value = today;
@@ -4378,6 +4465,20 @@
       } catch (_) { return null; }
     }
 
+    async function apiPut(path, body) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return null;
+      try {
+        const res = await fetch(`${API_URL}${path}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        return data.success ? data.data : null;
+      } catch (_) { return null; }
+    }
+
     async function apiDelete(path) {
       const token = localStorage.getItem("locacar-jwt");
       if (!token || !API_URL) return;
@@ -4428,6 +4529,9 @@
         dueAmountTnd: i.due_amount_tnd || 0, label: i.label || "",
         dueDate: i.due_date || "", status: i.status || "en_attente",
         reminderCount: i.reminder_count || 0,
+        amountHt: i.amount_ht || 0, vatAmount: i.vat_amount || 0,
+        dailyTaxAmount: i.daily_tax_amount || 0, stampDutyAmount: i.stamp_duty_amount || 0,
+        rentalDays: i.rental_days || 0, periodStart: i.period_start || "", periodEnd: i.period_end || "",
       }));
 
       if (payments) state.payments = payments.map(p => ({
@@ -4700,11 +4804,18 @@
 
       car.status = "loue";
 
+      // Le tarif saisi (rate) est le prix HT : la facture facturee au client est le TTC
+      // = HT + TVA + taxe journaliere + timbre fiscal (regles parametrables, voir computeTtcFromHt).
       if (type === "long") {
         for (let i = 1; i <= months; i += 1) {
-          const amountTnd = convertToTnd(rate, rateCurrency, state.settings.eurToTnd);
+          const periodStart = addDaysToIsoDate(today, (i - 1) * 30);
+          const periodEnd = addDaysToIsoDate(today, i * 30);
+          const rentalDays = 30;
+          const amountHt = convertToTnd(rate, rateCurrency, state.settings.eurToTnd);
+          const breakdown = computeTtcFromHt(amountHt, rentalDays);
+          const amountTnd = breakdown.amountTtc;
           let invId = uid("FAC");
-          const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: rate, currency: rateCurrency, amount_tnd: amountTnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: `Mensualite ${i}/${months}`, due_date: addDaysToIsoDate(today, i * 30), status: "en_attente", reminder_count: 0 });
+          const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: rate, currency: rateCurrency, amount_tnd: amountTnd, amount_ht: breakdown.amountHt, vat_amount: breakdown.vatAmount, daily_tax_amount: breakdown.dailyTaxAmount, stamp_duty_amount: breakdown.stampDutyAmount, rental_days: rentalDays, period_start: periodStart, period_end: periodEnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: `Mensualite ${i}/${months}`, due_date: addDaysToIsoDate(today, i * 30), status: "en_attente", reminder_count: 0 });
           if (savedInv && savedInv.id) invId = savedInv.id;
           state.invoices.push({
             id: invId,
@@ -4713,6 +4824,13 @@
             amountOriginal: rate,
             currency: rateCurrency,
             amountTnd,
+            amountHt: breakdown.amountHt,
+            vatAmount: breakdown.vatAmount,
+            dailyTaxAmount: breakdown.dailyTaxAmount,
+            stampDutyAmount: breakdown.stampDutyAmount,
+            rentalDays,
+            periodStart,
+            periodEnd,
             paidAmountTnd: 0,
             dueAmountTnd: amountTnd,
             label: `Mensualite ${i}/${months}`,
@@ -4722,8 +4840,14 @@
           });
         }
       } else {
+        const periodStart = today;
+        const periodEnd = addDaysToIsoDate(today, days);
+        const rentalDays = days;
+        const amountHt = totalAmountTnd;
+        const breakdown = computeTtcFromHt(amountHt, rentalDays);
+        const amountTnd = breakdown.amountTtc;
         let invId = uid("FAC");
-        const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: totalAmountOriginal, currency: rateCurrency, amount_tnd: totalAmountTnd, paid_amount_tnd: 0, due_amount_tnd: totalAmountTnd, label: "Contrat court", due_date: addDaysToIsoDate(today, 7), status: "en_attente", reminder_count: 0 });
+        const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: totalAmountOriginal, currency: rateCurrency, amount_tnd: amountTnd, amount_ht: breakdown.amountHt, vat_amount: breakdown.vatAmount, daily_tax_amount: breakdown.dailyTaxAmount, stamp_duty_amount: breakdown.stampDutyAmount, rental_days: rentalDays, period_start: periodStart, period_end: periodEnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: "Contrat court", due_date: addDaysToIsoDate(today, 7), status: "en_attente", reminder_count: 0 });
         if (savedInv && savedInv.id) invId = savedInv.id;
         state.invoices.push({
           id: invId,
@@ -4731,9 +4855,16 @@
           customerName: customer.name,
           amountOriginal: totalAmountOriginal,
           currency: rateCurrency,
-          amountTnd: totalAmountTnd,
+          amountTnd,
+          amountHt: breakdown.amountHt,
+          vatAmount: breakdown.vatAmount,
+          dailyTaxAmount: breakdown.dailyTaxAmount,
+          stampDutyAmount: breakdown.stampDutyAmount,
+          rentalDays,
+          periodStart,
+          periodEnd,
           paidAmountTnd: 0,
-          dueAmountTnd: totalAmountTnd,
+          dueAmountTnd: amountTnd,
           label: "Contrat court",
           dueDate: addDaysToIsoDate(today, 7),
           lastReminderAt: "",
@@ -4997,6 +5128,129 @@
         html2pdf().set(opt).from(element).save();
       } catch (err) {
         console.error("Erreur PDF:", err);
+        alert("Erreur lors de la generation du PDF: " + (err.message || err));
+      }
+    }
+
+    function generateInvoicePdf(invoiceId) {
+      const invoice = state.invoices.find((i) => String(i.id) === String(invoiceId));
+      if (!invoice) {
+        alert("Facture introuvable.");
+        return;
+      }
+      if (typeof html2pdf === "undefined") {
+        alert("Librairie PDF non disponible. Verifier le chargement du fichier html2pdf.bundle.min.js");
+        return;
+      }
+
+      const { contract, car, customer } = getInvoiceContext(invoice);
+      const days = Number(invoice.rentalDays || 0);
+      const breakdown = computeTtcFromHt(Number(invoice.amountHt || 0), days);
+
+      let branding = {};
+      try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
+      const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
+      const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
+      const settings = state.settings || {};
+
+      const element = document.createElement("div");
+      element.style.padding = "15px";
+      element.style.fontFamily = "Arial, sans-serif";
+      element.style.fontSize = "11px";
+      element.style.color = "#0d244a";
+      element.style.lineHeight = "1.4";
+      element.style.width = "100%";
+      element.style.maxWidth = "210mm";
+
+      const header = `<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0d244a;padding-bottom:10px;margin-bottom:14px;">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <img src="${safe(logoUrl)}" style="max-width:70px;max-height:70px;object-fit:contain;" />
+          <div>
+            <h1 style="margin:0;font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
+            <p style="margin:2px 0;font-size:9px;color:#4d6a97;">LOCATION DE VOITURES</p>
+            <p style="margin:0;font-size:9px;color:#4d6a97;">${safe(settings.companyAddress || "")}</p>
+            <p style="margin:0;font-size:9px;color:#4d6a97;">${settings.companyPhone ? `Tel: ${safe(settings.companyPhone)}` : ""}${settings.companyRib ? ` &middot; RIB: ${safe(settings.companyRib)}` : ""}</p>
+            <p style="margin:0;font-size:9px;color:#4d6a97;">${settings.companyTaxId ? `Matricule fiscal: ${safe(settings.companyTaxId)}` : ""}</p>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <h2 style="margin:0;font-size:14px;color:#1540c8;">FACTURE</h2>
+          <p style="margin:3px 0;font-size:10px;">N&deg; <strong>${safe(invoice.id)}</strong></p>
+          <p style="margin:0;font-size:10px;">Contrat: <strong>${safe(invoice.contractId || "-")}</strong></p>
+          <p style="margin:0;font-size:10px;">Date: <strong>${safe(invoice.dueDate || new Date().toISOString().slice(0, 10))}</strong></p>
+        </div>
+      </div>`;
+
+      const clientBlock = `<div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px;background:#f5f7ff;">
+        <h3 style="margin:0 0 4px 0;font-size:11px;color:#1540c8;">Client</h3>
+        <p style="margin:0;font-size:10px;"><strong>${safe(invoice.customerName || (customer && customer.name) || "-")}</strong></p>
+        <p style="margin:0;font-size:9px;color:#4d6a97;">${safe((customer && (customer.address || customer.phone)) ? [customer.address, customer.phone].filter(Boolean).join(" &middot; ") : "")}</p>
+      </div>`;
+
+      const designation = car ? `${safe(car.model || "Vehicule")}` : "Vehicule";
+      const plate = car ? safe(car.plate || "-") : "-";
+      const lineTable = `<table style="width:100%;border-collapse:collapse;font-size:9px;margin-bottom:14px;">
+        <thead>
+          <tr style="background:#0d244a;color:#fff;">
+            <th style="padding:6px;border:1px solid #0d244a;">Contrat</th>
+            <th style="padding:6px;border:1px solid #0d244a;">Designation</th>
+            <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
+            <th style="padding:6px;border:1px solid #0d244a;">DU</th>
+            <th style="padding:6px;border:1px solid #0d244a;">AU</th>
+            <th style="padding:6px;border:1px solid #0d244a;">Nb.j</th>
+            <th style="padding:6px;border:1px solid #0d244a;">Prix HT</th>
+            <th style="padding:6px;border:1px solid #0d244a;">TVA</th>
+            <th style="padding:6px;border:1px solid #0d244a;">Prix TTC</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.contractId || "-")}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodStart || "-")}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodEnd || "-")}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${days}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountHt)}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.vatAmount)}</td>
+            <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountTtc)}</td>
+          </tr>
+        </tbody>
+      </table>`;
+
+      const totalsBlock = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <table style="width:260px;border-collapse:collapse;font-size:10px;">
+          <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.amountHt)}</td></tr>
+          <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 0)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.vatAmount)}</td></tr>
+          <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/jour (${days} j)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.dailyTaxAmount)}</td></tr>
+          <tr><td style="padding:4px 8px;">Timbre fiscal</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.stampDutyAmount)}</td></tr>
+          <tr style="font-weight:bold;border-top:2px solid #0d244a;"><td style="padding:6px 8px;">Total T.T.C</td><td style="padding:6px 8px;text-align:right;">${formatTnd(breakdown.amountTtc)}</td></tr>
+        </table>
+      </div>`;
+
+      const wordsLine = `<div style="border-top:1px dashed #c8daf9;padding-top:8px;margin-bottom:20px;font-size:10px;font-style:italic;">
+        Arretee la presente facture a la somme de : <strong>${amountToFrenchWords(breakdown.amountTtc)}</strong>.
+      </div>`;
+
+      const footer = `<div style="border-top:1px solid #c8daf9;padding-top:6px;font-size:8px;color:#4d6a97;text-align:center;">
+        ${safe(companyName)} ${settings.companyAddress ? "&middot; " + safe(settings.companyAddress) : ""} ${settings.companyPhone ? "&middot; Tel: " + safe(settings.companyPhone) : ""} ${settings.companyTaxId ? "&middot; Matricule fiscal: " + safe(settings.companyTaxId) : ""}
+      </div>`;
+
+      element.innerHTML = header + clientBlock + lineTable + totalsBlock + wordsLine + footer;
+
+      const opt = {
+        margin: 8,
+        filename: `Facture-${invoice.id}.pdf`,
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true },
+        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+      };
+
+      try {
+        html2pdf().set(opt).from(element).save();
+      } catch (err) {
+        console.error("Erreur PDF facture:", err);
         alert("Erreur lors de la generation du PDF: " + (err.message || err));
       }
     }
@@ -6435,7 +6689,7 @@
       const mapCar = c => ({ id: c.id, plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible") });
       const mapCustomer = c => ({ id: c.id, name: c.name, phone: c.phone || "", email: c.email || "" });
       const mapContract = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", contract_date: c.contractDate || today, type: c.type || "court", days: c.days || 0, months: c.months || 0, rate: c.rate || 0, rate_currency: c.rateCurrency || "TND", quotient: c.quotient || 0, quotient_currency: c.quotientCurrency || "TND", quotient_tnd: c.quotientTnd || 0, total_amount_original: c.totalAmountOriginal || 0, total_amount_tnd: c.totalAmountTnd || 0, payment_moment: c.paymentMoment || "", payment_plan: c.paymentPlan || "", status: c.status === "actif" ? "active" : (c.status || "active") });
-      const mapInvoice = c => ({ id: c.id, contract_id: c.contractId || null, customer_name: c.customerName || "", amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, paid_amount_tnd: c.paidAmountTnd || 0, due_amount_tnd: c.dueAmountTnd || 0, label: c.label || "", due_date: c.dueDate || today, status: c.status || "en_attente", reminder_count: c.reminderCount || 0 });
+      const mapInvoice = c => ({ id: c.id, contract_id: c.contractId || null, customer_name: c.customerName || "", amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, paid_amount_tnd: c.paidAmountTnd || 0, due_amount_tnd: c.dueAmountTnd || 0, label: c.label || "", due_date: c.dueDate || today, status: c.status || "en_attente", reminder_count: c.reminderCount || 0, amount_ht: c.amountHt || 0, vat_amount: c.vatAmount || 0, daily_tax_amount: c.dailyTaxAmount || 0, stamp_duty_amount: c.stampDutyAmount || 0, rental_days: c.rentalDays || 0, period_start: c.periodStart || null, period_end: c.periodEnd || null });
       const mapPayment = c => ({ id: c.id, invoice_id: c.invoiceId || null, contract_id: c.contractId || null, customer_name: c.customerName || "", contract_type: c.contractType || "", payment_date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, method: c.method || "" });
       const mapMaint = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", type: c.type || "", date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, status: c.status || "paye", note: c.note || "", source_key: c.sourceKey || "" });
       const mapVignette = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", fiscal_year: c.fiscalYear || new Date().getFullYear(), amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, due_date: c.dueDate || null, status: c.status || "a_payer" });
@@ -6508,6 +6762,9 @@
         label: c.label || "", due_date: c.dueDate || today,
         status: c.status || "en_attente",
         reminder_count: c.reminderCount || 0,
+        amount_ht: c.amountHt || 0, vat_amount: c.vatAmount || 0,
+        daily_tax_amount: c.dailyTaxAmount || 0, stamp_duty_amount: c.stampDutyAmount || 0,
+        rental_days: c.rentalDays || 0, period_start: c.periodStart || null, period_end: c.periodEnd || null,
       }));
 
       r.payments = await upsertMany("/payments", state.payments || [], c => ({
@@ -6563,7 +6820,7 @@
       state.leasingContracts = [];
       state.leasingInstallments = [];
       state.vignettes = [];
-      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month" };
+      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" };
       saveAndRender();
     });
 
@@ -6571,6 +6828,9 @@
       const newRate = Number(byId("eurToTnd").value || 3.4);
       const openingCashTnd = Number(byId("openingCashTnd").value || 0);
       const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
+      const vatRate = Number(byId("vatRate").value || 0);
+      const dailyTaxTnd = Number(byId("dailyTaxTnd").value || 0);
+      const stampDutyTnd = Number(byId("stampDutyTnd").value || 0);
       if (newRate <= 0) {
         alert("Le taux EUR→TND doit etre positif.");
         return;
@@ -6583,17 +6843,147 @@
         alert("Le buffer des reservations doit etre >= 0.");
         return;
       }
+      if (!Number.isFinite(vatRate) || vatRate < 0) {
+        alert("Le taux de TVA doit etre >= 0.");
+        return;
+      }
+      if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) {
+        alert("La taxe par jour doit etre >= 0.");
+        return;
+      }
+      if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) {
+        alert("Le timbre fiscal doit etre >= 0.");
+        return;
+      }
       state.settings.eurToTnd = newRate;
       state.settings.openingCashTnd = openingCashTnd;
       state.settings.reservationBufferHours = reservationBufferHours;
+      state.settings.vatRate = vatRate;
+      state.settings.dailyTaxTnd = dailyTaxTnd;
+      state.settings.stampDutyTnd = stampDutyTnd;
+      state.settings.companyAddress = byId("companyAddress").value.trim();
+      state.settings.companyPhone = byId("companyPhone").value.trim();
+      state.settings.companyRib = byId("companyRib").value.trim();
+      state.settings.companyTaxId = byId("companyTaxId").value.trim();
       saveAndRender();
-      alert("Parametres enregistres. Les calculs et la regle de buffer reservations sont mis a jour.");
+      const token = localStorage.getItem("locacar-jwt");
+      if (token && API_URL) {
+        fetch(`${API_URL}/settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            eur_to_tnd: newRate,
+            opening_cash_tnd: openingCashTnd,
+            reservation_buffer_hours: reservationBufferHours,
+            vat_rate: vatRate,
+            daily_tax_tnd: dailyTaxTnd,
+            stamp_duty_tnd: stampDutyTnd,
+            company_address: state.settings.companyAddress,
+            company_phone: state.settings.companyPhone,
+            company_rib: state.settings.companyRib,
+            company_tax_id: state.settings.companyTaxId,
+          }),
+        }).catch(() => {});
+      }
+      alert("Parametres enregistres. Les calculs de facturation et la regle de buffer reservations sont mis a jour.");
     });
 
     function convertToTnd(amount, currency, eurToTnd) {
       if (currency === "TND") return amount;
       if (currency === "EUR") return amount * eurToTnd;
       return amount;
+    }
+
+    // Regles de facturation : TVA, taxe journaliere et timbre fiscal sont parametrables (Parametres > Facturation).
+    // TTC = HT + (HT x TVA%) + (jours x taxe/jour) + timbre
+    function computeTtcFromHt(amountHt, days) {
+      const vatRate = Number(state.settings.vatRate || 0);
+      const dailyTaxTnd = Number(state.settings.dailyTaxTnd || 0);
+      const stampDutyTnd = Number(state.settings.stampDutyTnd || 0);
+      const ht = Number(amountHt) || 0;
+      const nbDays = Number(days) || 0;
+      const vatAmount = ht * (vatRate / 100);
+      const dailyTaxAmount = nbDays * dailyTaxTnd;
+      const stampDutyAmount = stampDutyTnd;
+      return {
+        amountHt: ht,
+        vatAmount,
+        dailyTaxAmount,
+        stampDutyAmount,
+        amountTtc: ht + vatAmount + dailyTaxAmount + stampDutyAmount,
+      };
+    }
+
+    // Sens inverse : a partir du TTC voulu, retrouve le HT (et la ventilation TVA/taxe/timbre correspondante)
+    function computeHtFromTtc(amountTtc, days) {
+      const vatRate = Number(state.settings.vatRate || 0);
+      const dailyTaxTnd = Number(state.settings.dailyTaxTnd || 0);
+      const stampDutyTnd = Number(state.settings.stampDutyTnd || 0);
+      const ttc = Number(amountTtc) || 0;
+      const nbDays = Number(days) || 0;
+      const dailyTaxAmount = nbDays * dailyTaxTnd;
+      const stampDutyAmount = stampDutyTnd;
+      const amountHt = (ttc - dailyTaxAmount - stampDutyAmount) / (1 + vatRate / 100);
+      return {
+        amountHt,
+        vatAmount: amountHt * (vatRate / 100),
+        dailyTaxAmount,
+        stampDutyAmount,
+        amountTtc: ttc,
+      };
+    }
+
+    // Conversion d'un montant en toutes lettres (francais, dinars/millimes) pour la mention
+    // "Arretee la presente facture a la somme de ..." sur le PDF.
+    function amountToFrenchWords(amount) {
+      const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix",
+        "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+      const tens = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
+
+      function chunkToWords(n) {
+        if (n === 0) return "";
+        if (n < 20) return units[n];
+        if (n < 100) {
+          const t = Math.floor(n / 10);
+          const u = n % 10;
+          if (t === 7 || t === 9) {
+            return `${tens[t - 1]}-${units[10 + u]}`;
+          }
+          if (u === 0) return tens[t];
+          if (u === 1 && t !== 8) return `${tens[t]} et un`;
+          return `${tens[t]}-${units[u]}`;
+        }
+        const h = Math.floor(n / 100);
+        const r = n % 100;
+        const hWord = h === 1 ? "cent" : `${units[h]} cent`;
+        if (r === 0) return h > 1 ? `${hWord}s` : hWord;
+        return `${hWord} ${chunkToWords(r)}`;
+      }
+
+      function integerToWords(n) {
+        if (n === 0) return "zero";
+        const billions = Math.floor(n / 1000000000);
+        const millions = Math.floor((n % 1000000000) / 1000000);
+        const thousands = Math.floor((n % 1000000) / 1000);
+        const rest = n % 1000;
+        const parts = [];
+        if (billions) parts.push(`${billions === 1 ? "un" : chunkToWords(billions)} milliard${billions > 1 ? "s" : ""}`);
+        if (millions) parts.push(`${millions === 1 ? "un" : chunkToWords(millions)} million${millions > 1 ? "s" : ""}`);
+        if (thousands) parts.push(thousands === 1 ? "mille" : `${chunkToWords(thousands)} mille`);
+        if (rest) parts.push(chunkToWords(rest));
+        return parts.join(" ");
+      }
+
+      const safeAmount = Math.max(0, Number(amount) || 0);
+      const dinars = Math.floor(safeAmount);
+      const millimes = Math.round((safeAmount - dinars) * 1000);
+      const dinarsWords = integerToWords(dinars);
+      const capitalized = dinarsWords.charAt(0).toUpperCase() + dinarsWords.slice(1);
+      let result = `${capitalized} dinar${dinars > 1 || dinars === 0 ? "s" : ""}`;
+      if (millimes > 0) {
+        result += ` et ${integerToWords(millimes)} millime${millimes > 1 ? "s" : ""}`;
+      }
+      return result;
     }
 
     function formatMoney(amount, currency) {
@@ -6603,7 +6993,7 @@
     function load() {
       try {
         const raw = localStorage.getItem(KEY);
-        const defaultSettings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2 };
+        const defaultSettings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" };
         
         if (!raw) {
           return {
@@ -6800,7 +7190,7 @@
           leasingInstallments: [],
           vignettes: [],
           inspections: [],
-          settings: { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2 },
+          settings: { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" },
         };
       }
     }
@@ -8668,6 +9058,107 @@
       return byName && byName.email ? byName.email : "";
     }
 
+    // ── Invoice edit/print modal (HT <-> TTC live recalculation + PDF) ──────
+    function getInvoiceContext(invoice) {
+      const contract = state.contracts.find((c) => String(c.id) === String(invoice.contractId || ""));
+      const car = contract ? state.cars.find((c) => String(c.id) === String(contract.carId || "")) : null;
+      const customer = state.customers.find((c) => String(c.id) === String(contract && contract.customerId || ""))
+        || state.customers.find((c) => String(c.name || "").trim().toLowerCase() === String(invoice.customerName || "").trim().toLowerCase());
+      return { contract, car, customer };
+    }
+
+    let _currentEditInvoiceId = null;
+
+    function renderInvoiceEditBreakdown(breakdown, days) {
+      byId("ieAmountHt").value = Number(breakdown.amountHt.toFixed(3));
+      byId("ieAmountTtc").value = Number(breakdown.amountTtc.toFixed(3));
+      byId("ieRowHt").textContent = formatTnd(breakdown.amountHt);
+      byId("ieRowVat").textContent = formatTnd(breakdown.vatAmount);
+      byId("ieRowDailyTax").textContent = formatTnd(breakdown.dailyTaxAmount);
+      byId("ieRowStamp").textContent = formatTnd(breakdown.stampDutyAmount);
+      byId("ieRowTtc").textContent = formatTnd(breakdown.amountTtc);
+      byId("ieVatRateLabel").textContent = Number(state.settings.vatRate || 0);
+      byId("ieDailyTaxLabel").textContent = Number(state.settings.dailyTaxTnd || 0);
+      byId("ieDaysLabel").textContent = days;
+      byId("ieWords").textContent = `Arretee la presente facture a la somme de : ${amountToFrenchWords(breakdown.amountTtc)}.`;
+    }
+
+    window.openInvoiceEditModal = (invoiceId) => {
+      const invoice = state.invoices.find((i) => String(i.id) === String(invoiceId));
+      if (!invoice) return;
+      _currentEditInvoiceId = invoice.id;
+      const { contract, car, customer } = getInvoiceContext(invoice);
+      const days = Number(invoice.rentalDays || 0);
+
+      byId("ieNumber").textContent = invoice.id;
+      byId("ieInfo").innerHTML = `
+        Contrat : <strong>${safe(invoice.contractId || "-")}</strong> &middot;
+        Client : <strong>${safe(invoice.customerName || (customer && customer.name) || "-")}</strong> &middot;
+        Vehicule : <strong>${safe(car ? `${car.plate || ""}${car.model ? " · " + car.model : ""}` : "-")}</strong><br/>
+        Periode : <strong>${safe(invoice.periodStart || "-")}</strong> au <strong>${safe(invoice.periodEnd || "-")}</strong> (${days} jour${days > 1 ? "s" : ""})
+      `;
+
+      const breakdown = computeTtcFromHt(Number(invoice.amountHt || 0), days);
+      renderInvoiceEditBreakdown(breakdown, days);
+      const s = byId("ieStatus"); s.style.display = "none";
+      byId("invoiceEditModal").style.display = "flex";
+    };
+
+    byId("ieAmountHt").addEventListener("input", () => {
+      const days = Number((state.invoices.find((i) => String(i.id) === String(_currentEditInvoiceId)) || {}).rentalDays || 0);
+      const breakdown = computeTtcFromHt(Number(byId("ieAmountHt").value || 0), days);
+      byId("ieAmountTtc").value = Number(breakdown.amountTtc.toFixed(3));
+      renderInvoiceEditBreakdown(breakdown, days);
+      byId("ieAmountHt").value = Number(byId("ieAmountHt").value);
+    });
+
+    byId("ieAmountTtc").addEventListener("input", () => {
+      const days = Number((state.invoices.find((i) => String(i.id) === String(_currentEditInvoiceId)) || {}).rentalDays || 0);
+      const breakdown = computeHtFromTtc(Number(byId("ieAmountTtc").value || 0), days);
+      byId("ieAmountHt").value = Number(breakdown.amountHt.toFixed(3));
+      renderInvoiceEditBreakdown(breakdown, days);
+      byId("ieAmountTtc").value = Number(byId("ieAmountTtc").value);
+    });
+
+    byId("ieSaveBtn").addEventListener("click", async () => {
+      const invoice = state.invoices.find((i) => String(i.id) === String(_currentEditInvoiceId));
+      if (!invoice) return;
+      const days = Number(invoice.rentalDays || 0);
+      const breakdown = computeTtcFromHt(Number(byId("ieAmountHt").value || 0), days);
+      const s = byId("ieStatus");
+      s.style.display = "block";
+      s.textContent = "Enregistrement...";
+      s.style.background = "#f0f9ff"; s.style.color = "#0369a1";
+
+      const delta = breakdown.amountTtc - Number(invoice.amountTnd || 0);
+      invoice.amountHt = breakdown.amountHt;
+      invoice.vatAmount = breakdown.vatAmount;
+      invoice.dailyTaxAmount = breakdown.dailyTaxAmount;
+      invoice.stampDutyAmount = breakdown.stampDutyAmount;
+      invoice.amountTnd = breakdown.amountTtc;
+      invoice.dueAmountTnd = Math.max(0, Number(invoice.dueAmountTnd || 0) + delta);
+
+      await apiPut(`/invoices/${invoice.id}`, {
+        amount_ht: invoice.amountHt,
+        vat_amount: invoice.vatAmount,
+        daily_tax_amount: invoice.dailyTaxAmount,
+        stamp_duty_amount: invoice.stampDutyAmount,
+        amount_tnd: invoice.amountTnd,
+        due_amount_tnd: invoice.dueAmountTnd,
+      });
+      s.textContent = "✅ Facture mise a jour.";
+      s.style.background = "#dcfce7"; s.style.color = "#166534";
+      saveAndRender();
+      renderInvoices();
+    });
+
+    byId("iePdfBtn").addEventListener("click", () => {
+      if (_currentEditInvoiceId) generateInvoicePdf(_currentEditInvoiceId);
+    });
+
+    byId("ieCloseBtn").addEventListener("click", () => { byId("invoiceEditModal").style.display = "none"; });
+    byId("invoiceEditModal").addEventListener("click", (e) => { if (e.target === byId("invoiceEditModal")) byId("invoiceEditModal").style.display = "none"; });
+
     function composeInvoiceReminderMailto(email, invoices, customerName) {
       const title = invoices.length > 1 ? "Rappel de paiement de factures" : "Rappel de paiement de facture";
       const lines = invoices.map((i) => `- ${i.id} | Echeance: ${i.dueDate} | Restant: ${Number(i.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND`).join("\n");
@@ -8783,6 +9274,7 @@
           <td>${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td><span class="pill ${statusClass}">${statusLabel}</span></td>
+          <td><button class="secondary" style="font-size:12px;padding:4px 10px;" data-edit-invoice="${safe(invoice.id)}">Facture</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -8792,6 +9284,13 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-invoice");
           openRecordEditor("invoices", id);
+        });
+      });
+      tbody.querySelectorAll("[data-edit-invoice]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openInvoiceEditModal(btn.getAttribute("data-edit-invoice"));
         });
       });
     }

@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS settings (
   eur_to_tnd DECIMAL(10, 4) NOT NULL DEFAULT 3.4,
   opening_cash_tnd DECIMAL(15, 2) NOT NULL DEFAULT 0,
   reservation_buffer_hours INTEGER NOT NULL DEFAULT 2,
+  -- Regles de facturation (calcul HT <-> TTC)
+  vat_rate DECIMAL(5, 2) NOT NULL DEFAULT 19,
+  daily_tax_tnd DECIMAL(10, 3) NOT NULL DEFAULT 2,
+  stamp_duty_tnd DECIMAL(10, 3) NOT NULL DEFAULT 1,
+  -- Coordonnees legales (en-tete des factures)
+  company_address TEXT,
+  company_phone VARCHAR(50),
+  company_rib VARCHAR(50),
+  company_tax_id VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,6 +68,10 @@ CREATE TABLE IF NOT EXISTS settings (
 - `eur_to_tnd`: EUR to TND exchange rate for conversion
 - `opening_cash_tnd`: Initial cash balance
 - `reservation_buffer_hours`: Hours between reservations to prevent overlap
+- `vat_rate`: Taux de TVA (%) appliqué au calcul HT → TTC des factures (défaut 19)
+- `daily_tax_tnd`: Taxe journalière de location en TND ("2dt/jour", paramétrable, défaut 2)
+- `stamp_duty_tnd`: Timbre fiscal en TND pour toute la location (paramétrable, défaut 1)
+- `company_address`, `company_phone`, `company_rib`, `company_tax_id`: Coordonnées légales de l'agence affichées dans l'en-tête des factures imprimées (PDF)
 
 **Note**: Only one record exists in this table (id = 1)
 
@@ -272,6 +285,14 @@ CREATE TABLE IF NOT EXISTS invoices (
   last_reminder_at TIMESTAMP,
   reminder_count INTEGER DEFAULT 0,
   notes TEXT,
+  -- Ventilation HT/TVA/taxe journaliere/timbre (amount_tnd reste le total TTC)
+  amount_ht DECIMAL(15, 2) DEFAULT 0,
+  vat_amount DECIMAL(15, 2) DEFAULT 0,
+  daily_tax_amount DECIMAL(15, 2) DEFAULT 0,
+  stamp_duty_amount DECIMAL(15, 2) DEFAULT 0,
+  rental_days INTEGER DEFAULT 0,
+  period_start DATE,
+  period_end DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -283,6 +304,14 @@ CREATE TABLE IF NOT EXISTS invoices (
 - `payee`: Fully paid
 - `en_retard`: Overdue
 - `annulee`: Cancelled
+
+**Ventilation HT/TTC** (calculée automatiquement à la génération de la facture, voir `Paramètres → Paramètres de facturation` pour les taux) :
+- `amount_ht`: Montant hors taxes (le tarif du contrat)
+- `vat_amount`: Montant de la TVA (`amount_ht × vat_rate / 100`)
+- `daily_tax_amount`: Taxe journalière (`rental_days × daily_tax_tnd`)
+- `stamp_duty_amount`: Timbre fiscal (montant fixe `stamp_duty_tnd`)
+- `rental_days`, `period_start`, `period_end`: Durée et période facturée (ligne DU/AU/Nb.j du document imprimé)
+- `amount_tnd` reste le montant **TTC** total dû/encaissé : `amount_ht + vat_amount + daily_tax_amount + stamp_duty_amount`
 
 ### PAYMENTS
 Records individual payment transactions.

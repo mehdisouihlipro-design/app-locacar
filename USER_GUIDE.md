@@ -1,7 +1,7 @@
 # 📖 Guide d'Utilisation Complet - E-Drive Gestion Locative
 
-**Version:** 1.0  
-**Date:** Mai 2026  
+**Version:** 1.1  
+**Date:** Juin 2026  
 **Application:** LocaCar - Gestion Multi-Agences de Location de Véhicules
 
 ---
@@ -20,8 +20,9 @@
 10. [Assurance & Leasing](#assurance--leasing)
 11. [Vignettes & GPS](#vignettes--gps)
 12. [Trésorerie & Prévisions](#trésorerie--prévisions)
-13. [Alertes & Notifications](#alertes--notifications)
-14. [Paramètres](#paramètres)
+13. [Rentabilité par Véhicule](#rentabilité-par-véhicule)
+14. [Alertes & Notifications](#alertes--notifications)
+15. [Paramètres](#paramètres)
 
 ---
 
@@ -49,7 +50,7 @@
 
 ### Accès à l'Application
 ```
-http://localhost:3000
+https://web-production-b4967.up.railway.app
 ```
 
 ### Connexion (Optionnel)
@@ -453,6 +454,42 @@ Voir section **Accueil** pour KPIs trésorerie
 
 ---
 
+## Rentabilité par Véhicule
+
+### Onglet: Rentabilité (NEW!)
+
+#### Vue d'Ensemble (Tableau global)
+Liste paginée de tous les véhicules de la flotte avec, pour chacun :
+
+**Colonnes:**
+| Col | Signification |
+|-----|---------------|
+| Immatriculation | Plaque du véhicule |
+| Modèle | Marque / modèle |
+| CA généré | Total des paiements clients liés à ce véhicule |
+| Dépenses | Total maintenance + leasing + assurance + vignette |
+| Solde | CA généré − Dépenses (🟢 positif / 🔴 négatif) |
+| Action | Bouton **"Détails"** → ouvre le bilan détaillé du véhicule |
+
+#### Modale "Bilan financier" (détail par véhicule)
+En cliquant sur **"Détails"**, une fenêtre s'ouvre avec :
+1. **Sélecteur d'année** : permet de changer l'année analysée (le graphique et le tableau se mettent à jour automatiquement)
+2. **Graphique mensuel** : compare CA généré, dépenses et solde mois par mois sur l'année sélectionnée
+3. **Tableau mensuel détaillé** — colonnes : Mois | CA généré | Maintenance | Leasing | Assurance | Vignette | Total dépenses | Solde
+4. **Récapitulatif annuel** : totaux de l'année (CA, dépenses par catégorie, solde net)
+
+#### D'où viennent les chiffres ?
+- **CA généré** : somme des paiements clients (`Paiements`) rattachés aux contrats du véhicule
+- **Maintenance** : somme des coûts de maintenance enregistrés pour le véhicule
+- **Leasing / Assurance** : montant mensuel du contrat réparti sur les mois où il est actif
+- **Vignette** : montant de la vignette à sa date d'échéance
+
+#### Interprétation
+- Solde positif (🟢) = le véhicule rapporte plus qu'il ne coûte sur la période
+- Solde négatif (🔴) = le véhicule coûte plus cher qu'il ne rapporte → à surveiller (révision du tarif de location, arbitrage flotte, etc.)
+
+---
+
 ## Alertes & Notifications
 
 ### Onglet: Alertes
@@ -567,9 +604,9 @@ Voir section **Accueil** pour KPIs trésorerie
 ## 📞 Support & Troubleshooting
 
 ### Problème: L'app ne charge pas
-1. Vérifier URL: `http://localhost:3000`
-2. Vérifier serve.js lancé: `node serve.js`
-3. Vérifier port 3000 libre: `netstat -ano | findstr :3000`
+1. Vérifier l'URL: `https://web-production-b4967.up.railway.app`
+2. Vérifier votre connexion internet
+3. Essayer un rafraîchissement forcé (`Ctrl+F5`) pour vider le cache du navigateur
 
 ### Problème: Données disparues après refresh
 1. Vérifier localStorage activé (pas mode incognito)
@@ -587,5 +624,5 @@ Voir section **Accueil** pour KPIs trésorerie
 
 ---
 
-**Dernière mise à jour:** Mai 2026  
+**Dernière mise à jour:** Juin 2026  
 **Prochaines évolutions:** Factures récurrentes, API mobile, Dashboard temps réel

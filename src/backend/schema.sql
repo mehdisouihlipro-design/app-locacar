@@ -8,6 +8,15 @@ CREATE TABLE IF NOT EXISTS settings (
   eur_to_tnd DECIMAL(10, 4) NOT NULL DEFAULT 3.4,
   opening_cash_tnd DECIMAL(15, 2) NOT NULL DEFAULT 0,
   reservation_buffer_hours INTEGER NOT NULL DEFAULT 2,
+  -- Regles de facturation (calcul HT <-> TTC)
+  vat_rate DECIMAL(5, 2) NOT NULL DEFAULT 19,
+  daily_tax_tnd DECIMAL(10, 3) NOT NULL DEFAULT 2,
+  stamp_duty_tnd DECIMAL(10, 3) NOT NULL DEFAULT 1,
+  -- Coordonnees legales (en-tete des factures)
+  company_address TEXT,
+  company_phone VARCHAR(50),
+  company_rib VARCHAR(50),
+  company_tax_id VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -139,6 +148,14 @@ CREATE TABLE IF NOT EXISTS invoices (
   last_reminder_at TIMESTAMP,
   reminder_count INTEGER DEFAULT 0,
   notes TEXT,
+  -- Ventilation HT/TVA/taxe journaliere/timbre (amount_tnd reste le total TTC)
+  amount_ht DECIMAL(15, 2) DEFAULT 0,
+  vat_amount DECIMAL(15, 2) DEFAULT 0,
+  daily_tax_amount DECIMAL(15, 2) DEFAULT 0,
+  stamp_duty_amount DECIMAL(15, 2) DEFAULT 0,
+  rental_days INTEGER DEFAULT 0,
+  period_start DATE,
+  period_end DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

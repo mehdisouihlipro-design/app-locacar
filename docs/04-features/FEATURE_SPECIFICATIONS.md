@@ -776,6 +776,41 @@ Draft → Issued → Paid
 - Debit note (additional charges)
 - Recurring invoices (for multi-day rentals)
 
+**4.1.5 Regles de calcul HT ⇄ TTC (Tunisie)**
+
+Le tarif saisi à la création du contrat (`rate`) est considéré comme le prix **HT** (hors taxes). À chaque génération de facture (location courte = 1 facture, location longue = 1 facture par mensualité de 30 jours), le système calcule automatiquement la ventilation et le montant **TTC** facturé au client, à partir de paramètres réglables dans `Paramètres → Paramètres de facturation` :
+
+- **TVA** : taux en % (par défaut 19 %)
+- **Taxe journalière** : montant fixe en TND par jour de location (ex. "2dt/jour", paramétrable)
+- **Timbre fiscal** : montant fixe en TND pour toute la location (paramétrable)
+
+Formule (HT → TTC) :
+```
+TVA            = montant_HT × taux_TVA / 100
+Taxe_journaliere = nb_jours × taxe_par_jour
+Timbre         = timbre_fiscal
+Montant_TTC    = montant_HT + TVA + Taxe_journaliere + Timbre
+```
+
+Le sens inverse (TTC → HT) est également disponible — utile pour la modale d'édition de facture quand on souhaite fixer le montant TTC final et en déduire le HT correspondant :
+```
+Taxe_journaliere = nb_jours × taxe_par_jour
+Timbre         = timbre_fiscal
+Montant_HT     = (Montant_TTC − Taxe_journaliere − Timbre) / (1 + taux_TVA / 100)
+TVA            = Montant_HT × taux_TVA / 100
+```
+
+`amountTnd` (et `dueAmountTnd`/`paidAmountTnd`) continuent de représenter le montant **TTC** dû — aucune autre partie de l'application (relances, trésorerie, rapprochement de paiements, KPIs) n'a besoin d'être modifiée. La ventilation est stockée séparément sur la facture : `amountHt`, `vatAmount`, `dailyTaxAmount`, `stampDutyAmount`, ainsi que `rentalDays`, `periodStart`, `periodEnd` (période facturée, utilisés pour la ligne DU/AU/Nb.j du document imprimé).
+
+**4.1.6 Édition et impression de facture**
+
+Depuis l'onglet **Factures**, le bouton **"Facture"** ouvre une modale qui permet de :
+- consulter le détail (contrat, client, véhicule, période facturée) ;
+- modifier le montant **HT** ou le montant **TTC** — l'autre valeur et la ventilation complète (TVA / taxe journalière / timbre / total TTC) se recalculent en direct, dans les deux sens ;
+- visualiser le montant en toutes lettres ("Arrêtée la présente facture à la somme de … dinars") ;
+- **Enregistrer** la ventilation choisie (persistée via `PUT /invoices/:id` → Supabase) ;
+- **Télécharger le PDF** de la facture, généré via `html2pdf` à partir d'un gabarit reproduisant le format papier de l'agence : en-tête (logo, nom société, adresse, téléphone, RIB, matricule fiscal — issus du white-label et des `Paramètres de facturation`), bloc client, ligne de prestation (Contrat | Désignation | Immatriculation | DU | AU | Nb.j | Prix HT | TVA | Prix TTC), bloc de totaux (Total HT / TVA / Taxe journalière / Timbre / Total TTC) et montant en toutes lettres.
+
 #### API Endpoints
 
 ```
