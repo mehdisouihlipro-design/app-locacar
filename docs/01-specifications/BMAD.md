@@ -245,6 +245,7 @@ LocaCar is a comprehensive car rental management system designed for small-to-me
 - **Actors**: Financial Manager, Rental Agent
 - **Requirements**:
   - Automatic invoice generation from contracts
+  - Manual invoice creation (free invoices for extras/out-of-contract services, linked or not to a contract)
   - Invoice line items (rental fee, insurance, extras, damage, late fees)
   - Multi-currency support
   - Tax calculation

@@ -811,6 +811,15 @@ Depuis l'onglet **Factures**, le bouton **"Facture"** ouvre une modale qui perme
 - **Enregistrer** la ventilation choisie (persistée via `PUT /invoices/:id` → Supabase) ;
 - **Télécharger le PDF** de la facture, généré via `html2pdf` à partir d'un gabarit reproduisant le format papier de l'agence : en-tête (logo, nom société, adresse, téléphone, RIB, matricule fiscal — issus du white-label et des `Paramètres de facturation`), bloc client, ligne de prestation (Contrat | Désignation | Immatriculation | DU | AU | Nb.j | Prix HT | TVA | Prix TTC), bloc de totaux (Total HT / TVA / Taxe journalière / Timbre / Total TTC) et montant en toutes lettres.
 
+**4.1.7 Création manuelle de facture**
+
+En plus de la génération automatique depuis les contrats, l'onglet **Factures** propose un bouton **"Nouvelle facture"** qui ouvre un formulaire permettant de créer une facture libre (extras, prestations hors-contrat, régularisations, etc.) :
+- **Client** (obligatoire) — liste de `state.customers` ;
+- **Contrat** (optionnel) — liste filtrée sur les contrats du client sélectionné, ou "Aucun (facture libre)" pour une facture sans contrat ;
+- **Libellé**, **Montant HT**, **Devise**, **Nombre de jours** (utilisé pour la taxe journalière et la ligne DU/AU/Nb.j du PDF), **Début de période** et **Date d'échéance**.
+
+À la création, le montant HT est converti en TND si nécessaire (`convertToTnd`), la ventilation HT/TVA/taxe journalière/timbre est calculée via `computeTtcFromHt` (mêmes règles paramétrables que pour les factures automatiques), la facture est persistée via `POST /invoices` (mêmes champs `amount_ht`/`vat_amount`/`daily_tax_amount`/`stamp_duty_amount`/`rental_days`/`period_start`/`period_end`) puis ajoutée à `state.invoices`. Elle apparaît ensuite dans le tableau et peut être éditée/imprimée comme toute autre facture (voir 4.1.6) — `getInvoiceContext` et `generateInvoicePdf` gèrent l'absence de contrat/véhicule (affichage "-").
+
 #### API Endpoints
 
 ```

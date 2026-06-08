@@ -1532,8 +1532,70 @@
 
     <section id="invoices" class="panel">
       <h3>Factures generees</h3>
-      <p class="small">Contrat court: 1 facture. Contrat long: facturation mensuelle automatique.</p>
-      
+      <p class="small">Contrat court: 1 facture. Contrat long: facturation mensuelle automatique. Une facture peut aussi etre creee manuellement (extras, prestations hors-contrat, etc.).</p>
+
+      <div class="actions" style="margin-bottom: 10px;">
+        <button id="newInvoiceBtn">Nouvelle facture</button>
+      </div>
+
+      <div id="invoiceLegacyForm" style="display:none;">
+        <div class="row">
+          <div>
+            <label>Client</label>
+            <select id="invoiceCustomer"></select>
+          </div>
+          <div>
+            <label>Contrat (optionnel)</label>
+            <select id="invoiceContract">
+              <option value="">Aucun (facture libre)</option>
+            </select>
+          </div>
+          <div>
+            <label>Libelle</label>
+            <input id="invoiceLabel" placeholder="ex: Facture additionnelle" value="Facture manuelle" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Montant HT</label>
+            <input id="invoiceAmountHt" type="number" min="0" value="100" />
+          </div>
+          <div>
+            <label>Devise</label>
+            <select id="invoiceCurrency">
+              <option value="TND">TND</option>
+              <option value="EUR">EUR</option>
+              <option value="SAR">SAR</option>
+              <option value="CAD">CAD</option>
+              <option value="AED">AED</option>
+              <option value="USD">USD</option>
+              <option value="JPY">JPY</option>
+              <option value="KWD">KWD</option>
+              <option value="CHF">CHF</option>
+              <option value="BHD">BHD</option>
+              <option value="CNY">CNY</option>
+              <option value="OMR">OMR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <div>
+            <label>Nombre de jours (taxe journaliere)</label>
+            <input id="invoiceRentalDays" type="number" min="0" value="1" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Debut periode</label>
+            <input id="invoicePeriodStart" type="date" />
+          </div>
+          <div>
+            <label>Date d'echeance</label>
+            <input id="invoiceDueDate" type="date" />
+          </div>
+        </div>
+        <button id="addInvoiceBtn">Creer facture</button>
+      </div>
+
       <div class="row">
         <div>
           <label>Filtre statut</label>
@@ -2830,15 +2892,7 @@
     initAuth();
 
     byId("paymentDate").value = today;
-    byId("eurToTnd").value = state.settings.eurToTnd;
-    byId("openingCashTnd").value = state.settings.openingCashTnd || 0;
-    byId("vatRate").value = state.settings.vatRate ?? 19;
-    byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
-    byId("stampDutyTnd").value = state.settings.stampDutyTnd ?? 1;
-    byId("companyAddress").value = state.settings.companyAddress || "";
-    byId("companyPhone").value = state.settings.companyPhone || "";
-    byId("companyRib").value = state.settings.companyRib || "";
-    byId("companyTaxId").value = state.settings.companyTaxId || "";
+    populateSettingsFields();
     byId("contractRateCurrency").value = "TND";
     byId("contractQuotientCurrency").value = "TND";
     byId("reservationStartDate").value = today;
@@ -2854,7 +2908,6 @@
     byId("vignetteCurrency").value = "TND";
     byId("inspectionDate").value = today;
     byId("inspectionTime").value = new Date().toTimeString().slice(0, 5);
-    byId("reservationBufferHours").value = Number(state.settings.reservationBufferHours || 2);
     if (byId("maintenanceDate")) byId("maintenanceDate").value = today;
 
     applyInspectionDraft(loadInspectionDraft());
@@ -4396,6 +4449,7 @@
         currentUser = data.data.user;
         authTransport = "jwt";
         await loadDataFromAPI();
+        populateSettingsFields();
         render();
         setAppVisibility(true);
         setAuthStatus(`Connecté: ${currentUser.email} (${currentUser.role})`);
@@ -4488,12 +4542,27 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances] = await Promise.all([
+      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
-        apiGet("/leasing"), apiGet("/insurances"),
+        apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
       ]);
+
+      if (settingsRow) state.settings = {
+        ...state.settings,
+        baseCurrency: settingsRow.base_currency || state.settings.baseCurrency || "TND",
+        eurToTnd: Number(settingsRow.eur_to_tnd ?? state.settings.eurToTnd ?? 3.4),
+        openingCashTnd: Number(settingsRow.opening_cash_tnd ?? state.settings.openingCashTnd ?? 0),
+        reservationBufferHours: Number(settingsRow.reservation_buffer_hours ?? state.settings.reservationBufferHours ?? 2),
+        vatRate: Number(settingsRow.vat_rate ?? state.settings.vatRate ?? 19),
+        dailyTaxTnd: Number(settingsRow.daily_tax_tnd ?? state.settings.dailyTaxTnd ?? 2),
+        stampDutyTnd: Number(settingsRow.stamp_duty_tnd ?? state.settings.stampDutyTnd ?? 1),
+        companyAddress: settingsRow.company_address || state.settings.companyAddress || "",
+        companyPhone: settingsRow.company_phone || state.settings.companyPhone || "",
+        companyRib: settingsRow.company_rib || state.settings.companyRib || "",
+        companyTaxId: settingsRow.company_tax_id || state.settings.companyTaxId || "",
+      };
 
       if (cars) state.cars = cars.map(c => ({
         id: c.id, plate: c.plate, model: c.model, brand: c.brand || "",
@@ -4601,6 +4670,7 @@
             currentUser = data.data;
             authTransport = "jwt";
             await loadDataFromAPI();
+            populateSettingsFields();
             render();
             setAppVisibility(true);
             setAuthStatus(`Connecté: ${currentUser.email} (${currentUser.role})`);
@@ -4874,6 +4944,66 @@
 
       saveAndRender();
     });
+
+    if (byId("invoiceCustomer")) {
+      byId("invoiceCustomer").addEventListener("change", () => {
+        renderInvoiceContractOptions(byId("invoiceCustomer").value);
+      });
+    }
+
+    if (byId("addInvoiceBtn")) {
+      document.getElementById("addInvoiceBtn").addEventListener("click", async () => {
+        const customerId = byId("invoiceCustomer").value;
+        const contractId = byId("invoiceContract").value || null;
+        const label = byId("invoiceLabel").value.trim() || "Facture manuelle";
+        const amountOriginal = Number(byId("invoiceAmountHt").value || 0);
+        const currency = byId("invoiceCurrency").value || "TND";
+        const rentalDays = Number(byId("invoiceRentalDays").value || 0);
+        const periodStart = byId("invoicePeriodStart").value || today;
+        const dueDate = byId("invoiceDueDate").value || addDaysToIsoDate(today, 7);
+
+        const customer = state.customers.find((c) => c.id === customerId);
+        if (!customer || amountOriginal < 0) {
+          alert("Verifier les champs facture (client et montant requis).");
+          return;
+        }
+
+        const periodEnd = addDaysToIsoDate(periodStart, rentalDays);
+        const amountHt = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
+        const breakdown = computeTtcFromHt(amountHt, rentalDays);
+        const amountTnd = breakdown.amountTtc;
+
+        let invId = uid("FAC");
+        const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: amountOriginal, currency, amount_tnd: amountTnd, amount_ht: breakdown.amountHt, vat_amount: breakdown.vatAmount, daily_tax_amount: breakdown.dailyTaxAmount, stamp_duty_amount: breakdown.stampDutyAmount, rental_days: rentalDays, period_start: periodStart, period_end: periodEnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label, due_date: dueDate, status: "en_attente", reminder_count: 0 });
+        if (savedInv && savedInv.id) invId = savedInv.id;
+
+        state.invoices.push({
+          id: invId,
+          contractId,
+          customerName: customer.name,
+          amountOriginal,
+          currency,
+          amountTnd,
+          amountHt: breakdown.amountHt,
+          vatAmount: breakdown.vatAmount,
+          dailyTaxAmount: breakdown.dailyTaxAmount,
+          stampDutyAmount: breakdown.stampDutyAmount,
+          rentalDays,
+          periodStart,
+          periodEnd,
+          paidAmountTnd: 0,
+          dueAmountTnd: amountTnd,
+          label,
+          dueDate,
+          lastReminderAt: "",
+          reminderCount: 0,
+        });
+
+        byId("invoiceLegacyForm").style.display = "none";
+        saveAndRender();
+        renderInvoices();
+      });
+    }
 
 
 
@@ -5727,6 +5857,27 @@
             byId("contractPaymentMoment").value = "debut";
             byId("contractQuotient").value = "0";
             byId("contractCustomer").focus();
+          }
+        }
+      });
+    }
+
+    if (byId("newInvoiceBtn")) {
+      byId("newInvoiceBtn").addEventListener("click", () => {
+        const form = byId("invoiceLegacyForm");
+        if (form) {
+          form.style.display = form.style.display === "none" ? "block" : "none";
+          if (form.style.display === "block") {
+            renderInvoiceFormOptions();
+            byId("invoiceCustomer").value = "";
+            byId("invoiceContract").value = "";
+            byId("invoiceLabel").value = "Facture manuelle";
+            byId("invoiceAmountHt").value = "100";
+            byId("invoiceCurrency").value = "TND";
+            byId("invoiceRentalDays").value = "1";
+            byId("invoicePeriodStart").value = today;
+            byId("invoiceDueDate").value = addDaysToIsoDate(today, 7);
+            byId("invoiceCustomer").focus();
           }
         }
       });
@@ -6892,6 +7043,19 @@
       if (currency === "TND") return amount;
       if (currency === "EUR") return amount * eurToTnd;
       return amount;
+    }
+
+    function populateSettingsFields() {
+      byId("eurToTnd").value = state.settings.eurToTnd;
+      byId("openingCashTnd").value = state.settings.openingCashTnd || 0;
+      byId("reservationBufferHours").value = Number(state.settings.reservationBufferHours || 2);
+      byId("vatRate").value = state.settings.vatRate ?? 19;
+      byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
+      byId("stampDutyTnd").value = state.settings.stampDutyTnd ?? 1;
+      byId("companyAddress").value = state.settings.companyAddress || "";
+      byId("companyPhone").value = state.settings.companyPhone || "";
+      byId("companyRib").value = state.settings.companyRib || "";
+      byId("companyTaxId").value = state.settings.companyTaxId || "";
     }
 
     // Regles de facturation : TVA, taxe journaliere et timbre fiscal sont parametrables (Parametres > Facturation).
@@ -8830,6 +8994,7 @@
       const btn = byId("refreshDataBtn");
       btn.textContent = "...";
       await loadDataFromAPI();
+      populateSettingsFields();
       render();
       btn.textContent = "↻ Rafraîchir";
     });
@@ -8986,6 +9151,41 @@
           opt.textContent = `${car.plate} - ${car.model}`;
           carSelect.appendChild(opt);
         });
+    }
+
+    function renderInvoiceContractOptions(customerId) {
+      const contractSelect = byId("invoiceContract");
+      if (!contractSelect) return;
+      contractSelect.innerHTML = "";
+      const noneOpt = document.createElement("option");
+      noneOpt.value = "";
+      noneOpt.textContent = "Aucun (facture libre)";
+      contractSelect.appendChild(noneOpt);
+      state.contracts
+        .filter((c) => !customerId || c.customerId === customerId)
+        .forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = c.id;
+          opt.textContent = `${c.id} - ${c.customerName} (${c.carPlate})`;
+          contractSelect.appendChild(opt);
+        });
+    }
+
+    function renderInvoiceFormOptions() {
+      const customerSelect = byId("invoiceCustomer");
+      if (!customerSelect) return;
+      customerSelect.innerHTML = "";
+      const cDefault = document.createElement("option");
+      cDefault.value = "";
+      cDefault.textContent = "Selectionner client";
+      customerSelect.appendChild(cDefault);
+      state.customers.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.phone})`;
+        customerSelect.appendChild(opt);
+      });
+      renderInvoiceContractOptions("");
     }
 
     function renderContracts() {
