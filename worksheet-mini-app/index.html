@@ -5875,6 +5875,13 @@
       const rateEur = 120;
       const quotientEur = 90;
       const totalCourt = rateEur * 4 * eurToTnd;
+      const addMonthsToIsoDate = (isoDate, months) => {
+        const d = new Date(`${isoDate}T00:00:00`);
+        d.setMonth(d.getMonth() + months);
+        return d.toISOString().slice(0, 10);
+      };
+      const carPlateOf = (carId) => state.cars.find((c) => c.id === carId).plate;
+      const fy = new Date().getFullYear();
 
       state.contracts = [
         {
@@ -6054,13 +6061,126 @@
         },
       ];
 
-      const addMonthsToIsoDate = (isoDate, months) => {
-        const d = new Date(`${isoDate}T00:00:00`);
-        d.setMonth(d.getMonth() + months);
-        return d.toISOString().slice(0, 10);
-      };
-      const carPlateOf = (carId) => state.cars.find((c) => c.id === carId).plate;
-      const fy = new Date().getFullYear();
+      const extraRentals = [
+        { car: car1, customer: cli2, days: 5, rateEur: 110, monthsAgo: 5, method: "carte", paidRatio: 1 },
+        { car: car2, customer: cli3, days: 3, rateEur: 100, monthsAgo: 4, method: "especes", paidRatio: 1 },
+        { car: car2, customer: cli9, days: 2, rateEur: 115, monthsAgo: 1, method: "virement", paidRatio: 0.5 },
+        { car: car3, customer: cli4, days: 6, rateEur: 95, monthsAgo: 3, method: "virement", paidRatio: 1 },
+        { car: car4, customer: cli5, days: 4, rateEur: 105, monthsAgo: 2, method: "carte", paidRatio: 1 },
+        { car: car5, customer: cli8, days: 8, rateEur: 90, monthsAgo: 6, method: "virement", paidRatio: 1 },
+        { car: car5, customer: cli7, days: 3, rateEur: 98, monthsAgo: 0, method: "especes", paidRatio: 0.6 },
+      ];
+
+      extraRentals.forEach((r) => {
+        const car = state.cars.find((c) => c.id === r.car);
+        const customer = state.customers.find((c) => c.id === r.customer);
+        const ctrId = uid("CTR");
+        const totalOriginal = r.rateEur * r.days;
+        const totalTnd = totalOriginal * eurToTnd;
+        const quotient = Math.round(r.rateEur * 0.75);
+        const rentalDate = addMonthsToIsoDate(today, -r.monthsAgo);
+        const paidAmountTnd = Math.round(totalTnd * r.paidRatio);
+        const invId = uid("FAC");
+
+        state.contracts.push({
+          id: ctrId,
+          type: "court",
+          customerId: customer.id,
+          customerName: customer.name,
+          carId: car.id,
+          carPlate: car.plate,
+          days: r.days,
+          months: 0,
+          rate: r.rateEur,
+          rateCurrency: "EUR",
+          quotient,
+          quotientCurrency: "EUR",
+          quotientTnd: quotient * eurToTnd,
+          paymentMoment: "debut",
+          paymentPlan: "paiement client debut",
+          totalAmountOriginal: totalOriginal,
+          totalAmountTnd: totalTnd,
+          status: "actif",
+        });
+
+        state.invoices.push({
+          id: invId,
+          contractId: ctrId,
+          customerName: customer.name,
+          amountOriginal: totalOriginal,
+          currency: "EUR",
+          amountTnd: totalTnd,
+          paidAmountTnd,
+          dueAmountTnd: totalTnd - paidAmountTnd,
+          label: `Location ${r.days} jours ${car.model}`,
+          dueDate: addDaysToIsoDate(rentalDate, r.days),
+          lastReminderAt: "",
+          reminderCount: 0,
+        });
+
+        state.payments.push({
+          id: uid("PAY"),
+          invoiceId: invId,
+          contractId: ctrId,
+          customerName: customer.name,
+          amountTnd: paidAmountTnd,
+          method: r.method,
+          date: rentalDate,
+          reconciliationStatus: "rapproche",
+          contractType: "court",
+        });
+      });
+
+      state.reservations.push(
+        {
+          id: uid("RES"),
+          customerId: cli4,
+          customerName: "Rym Kallel",
+          carId: car4,
+          carPlate: "TU-1906",
+          startDate: addDaysToIsoDate(today, 4),
+          startTime: "09:00",
+          endDate: addDaysToIsoDate(today, 6),
+          endTime: "18:00",
+          status: "confirmee",
+        },
+        {
+          id: uid("RES"),
+          customerId: cli5,
+          customerName: "Nader Mzoughi",
+          carId: car5,
+          carPlate: "TU-1907",
+          startDate: addDaysToIsoDate(today, 6),
+          startTime: "10:00",
+          endDate: addDaysToIsoDate(today, 9),
+          endTime: "17:00",
+          status: "en_attente",
+        },
+        {
+          id: uid("RES"),
+          customerId: cli8,
+          customerName: "Sahel Distribution",
+          carId: car6,
+          carPlate: "TU-1908",
+          startDate: addDaysToIsoDate(today, 8),
+          startTime: "08:00",
+          endDate: addDaysToIsoDate(today, 12),
+          endTime: "20:00",
+          status: "confirmee",
+        },
+        {
+          id: uid("RES"),
+          customerId: cli9,
+          customerName: "Le Kram Digital",
+          carId: car7,
+          carPlate: "TU-9808",
+          startDate: addDaysToIsoDate(today, 10),
+          startTime: "09:00",
+          endDate: addDaysToIsoDate(today, 13),
+          endTime: "18:00",
+          status: "confirmee",
+        }
+      );
 
       state.maintenanceCosts = [
         {
@@ -6155,6 +6275,32 @@
           sourceKey: "",
         },
       ];
+
+      const extraMaintenance = [
+        { car: car1, type: "plaquettes de frein", monthsAgo: 4, amount: 140, status: "paye", note: "Changement plaquettes avant" },
+        { car: car1, type: "controle technique", monthsAgo: 9, amount: 60, status: "paye", note: "Visite technique annuelle" },
+        { car: car2, type: "batterie", monthsAgo: 5, amount: 220, status: "paye", note: "Remplacement batterie 12V" },
+        { car: car3, type: "amortisseurs", monthsAgo: 6, amount: 380, status: "paye", note: "Amortisseurs avant + geometrie" },
+        { car: car4, type: "courroie de distribution", monthsAgo: 7, amount: 520, status: "paye", note: "Kit distribution + galets" },
+        { car: car5, type: "vidange", monthsAgo: 2, amount: 95, status: "paye", note: "Vidange + filtre a huile" },
+        { car: car6, type: "embrayage", monthsAgo: 8, amount: 750, status: "paye", note: "Kit embrayage complet" },
+        { car: car6, type: "controle technique", monthsAgo: 5, amount: 60, status: "paye", note: "Visite technique annuelle" },
+        { car: car7, type: "essuie-glaces", monthsAgo: 3, amount: 60, status: "paye", note: "Balais avant + ampoules" },
+        { car: car7, type: "pneus", monthsAgo: 5, amount: 980, status: "a_payer", note: "Train de 4 pneus (vehicule premium)" },
+      ];
+      state.maintenanceCosts.push(...extraMaintenance.map((m) => ({
+        id: uid("MNT"),
+        carId: m.car,
+        carPlate: carPlateOf(m.car),
+        type: m.type,
+        date: addMonthsToIsoDate(today, -m.monthsAgo),
+        amountOriginal: m.amount,
+        currency: "TND",
+        amountTnd: m.amount,
+        status: m.status,
+        note: m.note,
+        sourceKey: "",
+      })));
 
       const leasingPlans = [
         { car: car1, lender: "Attijari Leasing", contractNumber: "ATL-2024-1903", monthlyAmount: 520, monthsAgo: 14, monthsAhead: 22 },
