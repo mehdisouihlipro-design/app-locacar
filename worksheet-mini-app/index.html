@@ -1181,6 +1181,7 @@
       <button class="tab" data-tab="inspections">Etat des lieux</button>
       <button class="tab" data-tab="insurance">Assurances</button>
       <button class="tab" data-tab="leasing">Leasing</button>
+      <button class="tab" data-tab="rentabilite">Rentabilité</button>
       <button class="tab" data-tab="alerts">Alertes</button>
       <button class="tab" data-tab="gps">GPS</button>
       <button class="tab" data-tab="settings">Actions rapides</button>
@@ -2309,6 +2310,24 @@
       </table>
     </section>
 
+    <section id="rentabilite" class="panel">
+      <h3>Rentabilité par véhicule</h3>
+      <div class="small">Chiffre d'affaires généré, dépenses (maintenance, leasing, assurance, vignette) et solde par voiture. Cliquez sur "Détails" pour voir le bilan mensuel et annuel.</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Immatriculation</th>
+            <th>Modele</th>
+            <th>CA généré</th>
+            <th>Dépenses</th>
+            <th>Solde</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="rentabiliteTable"></tbody>
+      </table>
+    </section>
+
     <section id="settings" class="panel">
       <h3>Actions rapides</h3>
 
@@ -2586,6 +2605,58 @@
         </div>
       </div>
     </div>
+    </div>
+
+    <div id="carFinanceModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(1100px,100%);max-height:90vh;overflow:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <h3 id="carFinanceTitle" style="margin:0;">Bilan financier</h3>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="carFinanceYear" style="margin:0;">Année</label>
+            <select id="carFinanceYear"></select>
+          </div>
+        </div>
+
+        <div id="carFinanceCharts" class="bars" style="margin-top:12px;"></div>
+
+        <h4 style="margin:16px 0 8px;">Détail mensuel</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th>CA généré</th>
+              <th>Maintenance</th>
+              <th>Leasing</th>
+              <th>Assurance</th>
+              <th>Vignette</th>
+              <th>Total dépenses</th>
+              <th>Solde</th>
+            </tr>
+          </thead>
+          <tbody id="carFinanceMonthlyTable"></tbody>
+        </table>
+
+        <h4 style="margin:16px 0 8px;">Bilan annuel</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Année</th>
+              <th>CA généré</th>
+              <th>Maintenance</th>
+              <th>Leasing</th>
+              <th>Assurance</th>
+              <th>Vignette</th>
+              <th>Total dépenses</th>
+              <th>Solde</th>
+            </tr>
+          </thead>
+          <tbody id="carFinanceYearlyTable"></tbody>
+        </table>
+
+        <div class="actions" style="margin-top:16px;">
+          <button id="carFinanceCloseBtn" class="secondary">Fermer</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3894,21 +3965,17 @@
     });
     if (byId("homeCardTreasury")) byId("homeCardTreasury").addEventListener("click", scrollToTreasuryPanel);
 
-    if (byId("profitabilityBars")) {
-      byId("profitabilityBars").addEventListener("click", () => {
-        openTab("maintenance");
-      });
-    }
     if (byId("homeCardProfitability")) {
-      byId("homeCardProfitability").addEventListener("click", () => {
-        openTab("maintenance");
+      byId("homeCardProfitability").addEventListener("click", (e) => {
+        if (e.target.closest("#profitabilityBars")) return;
+        openTab("rentabilite");
       });
     }
 
     // ── Pagination state ────────────────────────────────────────────────
     const PAGE_SIZE = 15;
     const _pages = {};
-    const _tabsWithPagination = ["cars","customers","contracts","invoices","payments","reservations","maintenance","inspections","insurance","leasing","alerts","collections","vignettes"];
+    const _tabsWithPagination = ["cars","customers","contracts","invoices","payments","reservations","maintenance","inspections","insurance","leasing","alerts","collections","vignettes","rentabilite"];
 
     function getPage(tab) { return _pages[tab] || 0; }
     function setPage(tab, n) { _pages[tab] = n; }
@@ -4295,10 +4362,11 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations] = await Promise.all([
+      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
+        apiGet("/leasing"), apiGet("/insurances"),
       ]);
 
       if (cars) state.cars = cars.map(c => ({
@@ -4359,6 +4427,26 @@
         amountOriginal: v.amount_original || 0, currency: v.currency || "TND",
         amountTnd: v.amount_tnd || 0, dueDate: v.due_date || "",
         status: v.status || "a_payer",
+      }));
+
+      if (leasingContracts) state.leasingContracts = leasingContracts.map(l => ({
+        id: l.id, carId: l.car_id, carPlate: l.car_plate || "",
+        lender: l.leasing_company || "", contractNumber: l.contract_number || "",
+        monthlyAmount: l.monthly_amount || 0, currency: l.currency || "TND",
+        monthlyAmountTnd: l.monthly_amount_tnd || 0,
+        startDate: l.start_date || "", endDate: l.end_date || "",
+        attachmentName: l.attachment_name || "", attachmentType: l.attachment_type || "",
+        attachmentData: l.attachment_data || "",
+      }));
+
+      if (insurances) state.insurances = insurances.map(i => ({
+        id: i.id, carId: i.car_id, carPlate: i.car_plate || "",
+        provider: i.insurance_company || "", policyNumber: i.policy_number || "",
+        monthlyAmount: i.monthly_amount || 0, currency: i.currency || "TND",
+        monthlyAmountTnd: i.monthly_amount_tnd || 0,
+        startDate: i.start_date || "", endDate: i.end_date || "",
+        attachmentName: i.attachment_name || "", attachmentType: i.attachment_type || "",
+        attachmentData: i.attachment_data || "",
       }));
 
       if (reservations) state.reservations = reservations.map(r => ({
@@ -6561,6 +6649,7 @@
       renderLeasingContracts();
       renderLeasingInstallments();
       renderVignettes();
+      renderRentabilite();
       renderGpsOptions();
       renderGpsTable();
       renderGpsMap();
@@ -6673,13 +6762,16 @@
             indexAxis: "y", responsive: true,
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.x.toLocaleString("fr-FR")} TND` } } },
             scales: { x: { beginAtZero: true, grid: { color: "#f0f0f0" } }, y: { grid: { display: false } } },
+            onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
             onClick(_, elements) {
               if (!elements.length) return;
               const plate = prof[elements[0].index]?.label;
               if (!plate) return;
-              history.pushState({ tab: "cars" }, "", "#cars");
-              switchToTab("cars");
-              applyCarsFilter({ query: plate });
+              const car = state.cars.find((c) => c.plate === plate);
+              if (!car) return;
+              history.pushState({ tab: "rentabilite" }, "", "#rentabilite");
+              switchToTab("rentabilite");
+              openCarFinanceDetail(car.id);
             }
           }
         }));
@@ -6808,6 +6900,87 @@
         })
         .sort((a, b) => b.value - a.value)
         .slice(0, 8);
+    }
+
+    // Per-car monthly/yearly revenue, expenses (by category) and balance.
+    function getCarFinancialLedger(carId) {
+      const id = String(carId);
+      const monthsMap = {};
+
+      function ensureMonth(key) {
+        if (!monthsMap[key]) {
+          const [y, m] = key.split("-").map(Number);
+          const label = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+          monthsMap[key] = { key, label, revenue: 0, maintenance: 0, leasing: 0, insurance: 0, vignette: 0 };
+        }
+        return monthsMap[key];
+      }
+
+      state.payments.forEach((p) => {
+        const contract = state.contracts.find((c) => String(c.id) === String(p.contractId));
+        if (!contract || String(contract.carId) !== id) return;
+        const key = String(p.date || "").slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(key)) return;
+        ensureMonth(key).revenue += Number(p.amountTnd || 0);
+      });
+
+      (state.maintenanceCosts || []).forEach((m) => {
+        if (String(m.carId) !== id) return;
+        const key = String(m.date || "").slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(key)) return;
+        ensureMonth(key).maintenance += Number(m.amountTnd || 0);
+      });
+
+      (state.vignettes || []).forEach((v) => {
+        if (String(v.carId) !== id) return;
+        const key = String(v.dueDate || "").slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(key)) return;
+        ensureMonth(key).vignette += Number(v.amountTnd || 0);
+      });
+
+      // Leasing/insurance installments aren't persisted; derive monthly cost from
+      // the contract's monthly amount over its active date range (same logic as buildMonthlyInstallments).
+      function addRecurringExpense(contracts, field) {
+        (contracts || []).forEach((contract) => {
+          if (String(contract.carId) !== id) return;
+          const start = new Date(`${contract.startDate}T00:00:00`);
+          const end = new Date(`${contract.endDate}T00:00:00`);
+          if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) return;
+          const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+          const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+          while (cursor <= endMonth) {
+            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+            ensureMonth(key)[field] += Number(contract.monthlyAmountTnd || 0);
+            cursor.setMonth(cursor.getMonth() + 1);
+          }
+        });
+      }
+      addRecurringExpense(state.leasingContracts, "leasing");
+      addRecurringExpense(state.insurances, "insurance");
+
+      const months = Object.values(monthsMap)
+        .map((m) => {
+          const totalExpenses = m.maintenance + m.leasing + m.insurance + m.vignette;
+          return { ...m, totalExpenses, balance: m.revenue - totalExpenses };
+        })
+        .sort((a, b) => a.key.localeCompare(b.key));
+
+      const yearsMap = {};
+      months.forEach((m) => {
+        const year = Number(m.key.slice(0, 4));
+        if (!yearsMap[year]) yearsMap[year] = { year, revenue: 0, maintenance: 0, leasing: 0, insurance: 0, vignette: 0, totalExpenses: 0, balance: 0 };
+        const y = yearsMap[year];
+        y.revenue += m.revenue;
+        y.maintenance += m.maintenance;
+        y.leasing += m.leasing;
+        y.insurance += m.insurance;
+        y.vignette += m.vignette;
+        y.totalExpenses += m.totalExpenses;
+        y.balance += m.balance;
+      });
+      const years = Object.values(yearsMap).sort((a, b) => b.year - a.year);
+
+      return { months, years };
     }
 
     function renderTreasuryForecastTable(snapshot) {
@@ -7689,6 +7862,37 @@
       renderPaginationControls(null, "cars", total, page, pages);
     }
 
+    function renderRentabilite() {
+      const tbody = byId("rentabiliteTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      const { items, page, pages, total } = paginateArray(state.cars, "rentabilite");
+      items.forEach((car) => {
+        const ledger = getCarFinancialLedger(car.id);
+        const revenue = ledger.years.reduce((sum, y) => sum + y.revenue, 0);
+        const expenses = ledger.years.reduce((sum, y) => sum + y.totalExpenses, 0);
+        const balance = revenue - expenses;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${safe(car.plate)}</td>
+          <td>${safe(car.model)}</td>
+          <td>${formatTnd(revenue)}</td>
+          <td>${formatTnd(expenses)}</td>
+          <td style="color:${balance >= 0 ? "var(--ok)" : "var(--danger)"};font-weight:600;">${formatTnd(balance)}</td>
+          <td><button data-open-car-finance="${car.id}" class="secondary">Détails</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll("[data-open-car-finance]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const id = e.target.getAttribute("data-open-car-finance");
+          openCarFinanceDetail(id);
+        });
+      });
+      renderPaginationControls(null, "rentabilite", total, page, pages);
+    }
+
     async function renderUsers() {
       const tbody = byId("usersTable");
       if (!tbody) return;
@@ -7743,6 +7947,87 @@
 
     byId("udCloseBtn").addEventListener("click", () => { byId("userDetailModal").style.display = "none"; });
     byId("userDetailModal").addEventListener("click", (e) => { if (e.target === byId("userDetailModal")) byId("userDetailModal").style.display = "none"; });
+
+    // ── Car financial detail modal (revenue, expenses by category, balance — monthly & yearly) ──
+    let _carFinanceLedger = null;
+
+    function renderCarFinanceForYear(year) {
+      const ledger = _carFinanceLedger;
+      if (!ledger) return;
+      const months = ledger.months.filter((m) => m.key.startsWith(`${year}-`));
+
+      const monthlyTbody = byId("carFinanceMonthlyTable");
+      monthlyTbody.innerHTML = months.map((m) => `
+        <tr>
+          <td>${safe(m.label)}</td>
+          <td>${formatTnd(m.revenue)}</td>
+          <td>${formatTnd(m.maintenance)}</td>
+          <td>${formatTnd(m.leasing)}</td>
+          <td>${formatTnd(m.insurance)}</td>
+          <td>${formatTnd(m.vignette)}</td>
+          <td>${formatTnd(m.totalExpenses)}</td>
+          <td style="color:${m.balance >= 0 ? "var(--ok)" : "var(--danger)"};font-weight:600;">${formatTnd(m.balance)}</td>
+        </tr>
+      `).join("") || '<tr><td colspan="8" class="muted">Aucune donnee pour cette annee.</td></tr>';
+
+      if (typeof Chart !== "undefined") {
+        const canvas = cjsCanvas("cjsCarFinance", "carFinanceCharts");
+        if (canvas && months.length) cjsSave("cjsCarFinance", new Chart(canvas, {
+          type: "bar",
+          data: {
+            labels: months.map((m) => m.label),
+            datasets: [
+              { label: "CA généré", data: months.map((m) => Math.round(m.revenue)), backgroundColor: "rgba(47,107,255,.75)", borderRadius: 6 },
+              { label: "Dépenses", data: months.map((m) => Math.round(m.totalExpenses)), backgroundColor: "rgba(220,38,38,.6)", borderRadius: 6 },
+              { label: "Solde", data: months.map((m) => Math.round(m.balance)), backgroundColor: months.map((m) => m.balance >= 0 ? "rgba(22,163,74,.7)" : "rgba(220,38,38,.35)"), borderRadius: 6 },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")} TND` } } },
+            scales: { y: { beginAtZero: true, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } },
+          },
+        }));
+      }
+    }
+
+    window.openCarFinanceDetail = (carId) => {
+      const car = state.cars.find((c) => String(c.id) === String(carId));
+      if (!car) return;
+      _carFinanceLedger = getCarFinancialLedger(carId);
+
+      byId("carFinanceTitle").textContent = `Bilan financier — ${car.plate}${car.model ? " · " + car.model : ""}`;
+
+      const yearSelect = byId("carFinanceYear");
+      const years = _carFinanceLedger.years.map((y) => y.year);
+      const currentYear = new Date().getFullYear();
+      if (!years.includes(currentYear)) years.push(currentYear);
+      years.sort((a, b) => b - a);
+      yearSelect.innerHTML = years.map((y) => `<option value="${y}">${y}</option>`).join("");
+      yearSelect.value = String(years.includes(currentYear) ? currentYear : years[0]);
+
+      const yearlyTbody = byId("carFinanceYearlyTable");
+      yearlyTbody.innerHTML = _carFinanceLedger.years.map((y) => `
+        <tr>
+          <td>${y.year}</td>
+          <td>${formatTnd(y.revenue)}</td>
+          <td>${formatTnd(y.maintenance)}</td>
+          <td>${formatTnd(y.leasing)}</td>
+          <td>${formatTnd(y.insurance)}</td>
+          <td>${formatTnd(y.vignette)}</td>
+          <td>${formatTnd(y.totalExpenses)}</td>
+          <td style="color:${y.balance >= 0 ? "var(--ok)" : "var(--danger)"};font-weight:600;">${formatTnd(y.balance)}</td>
+        </tr>
+      `).join("") || '<tr><td colspan="8" class="muted">Aucune donnee.</td></tr>';
+
+      renderCarFinanceForYear(Number(yearSelect.value));
+
+      byId("carFinanceModal").style.display = "flex";
+    };
+
+    byId("carFinanceYear").addEventListener("change", (e) => renderCarFinanceForYear(Number(e.target.value)));
+    byId("carFinanceCloseBtn").addEventListener("click", () => { byId("carFinanceModal").style.display = "none"; });
+    byId("carFinanceModal").addEventListener("click", (e) => { if (e.target === byId("carFinanceModal")) byId("carFinanceModal").style.display = "none"; });
 
     byId("udSaveBtn").addEventListener("click", async () => {
       if (!_currentEditUserId) return;

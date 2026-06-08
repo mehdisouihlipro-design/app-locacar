@@ -270,6 +270,7 @@ LocaCar is a comprehensive car rental management system designed for small-to-me
   - Payment collection rate
   - Expense reports
   - Profit analysis
+  - Per-vehicle profitability: generated revenue, expenses by category (maintenance, leasing, insurance, vignette) and resulting balance, viewable monthly and yearly ("Rentabilité" tab)
 
 ---
 

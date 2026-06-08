@@ -939,6 +939,41 @@ ROI = (Revenue - Expenses) / Revenue
 
 ---
 
+### 4.4 Per-Vehicle Profitability ("Rentabilité")
+
+**Feature ID**: FM-004  
+**Module**: Financial Management  
+**Users**: Admin, Agency Manager, Fleet Supervisor
+
+#### Description
+Dedicated "Rentabilité" tab giving, for each vehicle, the generated revenue, the expenses broken down by category, and the resulting balance — both as an all-time summary table and as a detailed monthly/yearly drill-down.
+
+#### Overview Table (`#rentabilite` tab)
+Paginated list of all vehicles with, for each one, the all-time totals:
+- Plate, Model
+- CA généré (revenue collected on contracts linked to the vehicle)
+- Dépenses (sum of maintenance + leasing + insurance + vignette costs)
+- Solde (revenue − expenses), shown in green/red depending on sign
+- "Détails" action opening the per-vehicle financial detail modal
+
+#### Per-Vehicle Detail Modal (`#carFinanceModal`)
+- Year selector to switch the displayed period
+- Bar chart (Chart.js) comparing CA généré, total expenses and balance month by month for the selected year
+- Monthly breakdown table: Mois | CA généré | Maintenance | Leasing | Assurance | Vignette | Total dépenses | Solde
+- Yearly summary table aggregating the same columns across all years with activity
+
+#### Data Sources & Computation (`getCarFinancialLedger(carId)`)
+- **Revenue**: `payments` joined to their `contract` (`contract.carId`), bucketed by payment month
+- **Maintenance**: `maintenance_costs` filtered by `car_id`, bucketed by date
+- **Vignette**: `vignettes` filtered by `car_id`, bucketed by due date
+- **Leasing / Insurance**: derived month by month from the active `leasing_contracts` / `insurances` records for the vehicle (`monthly_amount_tnd` × each month between `start_date` and `end_date`) — computed on the fly rather than relying on persisted installment rows, since `leasing_installments`/`insurance_installments` are generated client-side only and not synced to the backend
+- Monthly buckets are aggregated into yearly totals; balance = revenue − total expenses at both granularities
+
+#### Related Fix
+`loadDataFromAPI` now also fetches `GET /leasing` and `GET /insurances` so leasing and insurance contracts (and therefore their monthly cost) are reloaded from the backend on every login instead of depending on local browser storage.
+
+---
+
 ## 5. Module 4: Reporting & Analytics
 
 ### 5.1 Business Intelligence Dashboards
