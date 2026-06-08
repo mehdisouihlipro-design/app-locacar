@@ -5395,20 +5395,17 @@
       element.innerHTML = header + clientBlock + lineTable + totalsBlock + wordsLine + footer;
 
       const opt = {
-        margin: 8,
+        margin: [10, 10, 10, 10],
         filename: `Facture-${invoice.id}.pdf`,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true },
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
         jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
       };
 
-      try {
-        html2pdf().set(opt).from(element).save();
-      } catch (err) {
-        console.error("Erreur PDF facture:", err);
-        alert("Erreur lors de la generation du PDF: " + (err.message || err));
-      }
+      // Passer l'outerHTML (string) plutôt que l'élément DOM : html2pdf crée lui-même
+      // un div caché dans le body avec la bonne largeur, évitant les bugs de rendu
+      // flexbox/width sur un élément hors-DOM.
+      html2pdf().set(opt).from(element.outerHTML).save();
     }
 
     document.getElementById("addPaymentBtn").addEventListener("click", async () => {
@@ -9326,7 +9323,10 @@
         Periode : <strong>${safe(invoice.periodStart || "-")}</strong> au <strong>${safe(invoice.periodEnd || "-")}</strong> (${days} jour${days > 1 ? "s" : ""})
       `;
 
-      const breakdown = computeTtcFromHt(Number(invoice.amountHt || 0), days);
+      const amountTtcFallback = Number(invoice.amountTnd || invoice.dueAmountTnd || 0);
+      const breakdown = invoice.amountHt
+        ? computeTtcFromHt(Number(invoice.amountHt), days)
+        : computeHtFromTtc(amountTtcFallback, days);
       renderInvoiceEditBreakdown(breakdown, days);
       const s = byId("ieStatus"); s.style.display = "none";
       byId("invoiceEditModal").style.display = "flex";
