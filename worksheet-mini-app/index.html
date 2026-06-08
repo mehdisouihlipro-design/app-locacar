@@ -3966,7 +3966,6 @@
     if (byId("homeCardRevenue")) byId("homeCardRevenue").addEventListener("click", () => openTab("payments"));
 
     byId("fleetBars").addEventListener("click", () => {
-      applyCarsFilter({ status: "", query: "" });
       openTab("cars");
     });
     if (byId("homeCardFleet")) {
@@ -3977,7 +3976,6 @@
     }
 
     byId("alertsBars").addEventListener("click", () => {
-      applyAlertsFilter({ level: "" });
       openTab("alerts");
     });
     if (byId("homeCardAlerts")) {
