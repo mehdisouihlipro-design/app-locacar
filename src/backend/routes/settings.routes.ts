@@ -21,7 +21,11 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 
 router.put('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.patch('/settings?id=eq.1', req.body);
+    // Upsert: la ligne id=1 peut ne pas encore exister (table settings vide au premier
+    // enregistrement) — un simple PATCH sur id=eq.1 ne crée rien et persiste 0 ligne.
+    const result = await global.db.post('/settings?on_conflict=id', { id: 1, ...req.body }, {
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    });
     res.json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
