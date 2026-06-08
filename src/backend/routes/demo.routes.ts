@@ -9,7 +9,7 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
   try {
     const { cars = [], customers = [], contracts = [], invoices = [],
             payments = [], maintenance = [], vignettes = [],
-            reservations = [], insurances = [] } = req.body;
+            reservations = [], insurances = [], leasing = [] } = req.body;
 
     // Delete in reverse FK order
     const tables = [
@@ -47,6 +47,7 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
     await insertMany('vignettes', vignettes);
     await insertMany('reservations', reservations);
     await insertMany('insurances', insurances);
+    await insertMany('leasing_contracts', leasing);
 
     res.json({ success: true, results });
   } catch (err: any) {

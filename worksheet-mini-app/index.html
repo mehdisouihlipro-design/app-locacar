@@ -6415,6 +6415,8 @@
       const mapMaint = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", type: c.type || "", date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, status: c.status || "paye", note: c.note || "", source_key: c.sourceKey || "" });
       const mapVignette = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", fiscal_year: c.fiscalYear || new Date().getFullYear(), amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, due_date: c.dueDate || null, status: c.status || "a_payer" });
       const mapReservation = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente" });
+      const mapLeasing = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", leasing_company: c.lender || "", contract_number: c.contractNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
+      const mapInsurance = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", insurance_company: c.provider || "", policy_number: c.policyNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
 
       try {
         const res = await fetch(`${API_URL}/demo/reset`, {
@@ -6428,6 +6430,8 @@
             maintenance: (state.maintenanceCosts || []).map(mapMaint),
             vignettes: (state.vignettes || []).map(mapVignette),
             reservations: (state.reservations || []).map(mapReservation),
+            leasing: (state.leasingContracts || []).map(mapLeasing),
+            insurances: (state.insurances || []).map(mapInsurance),
           }),
         });
         const data = await res.json();
