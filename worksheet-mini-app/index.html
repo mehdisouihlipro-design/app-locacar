@@ -5296,8 +5296,12 @@
       }
 
       const { contract, car, customer } = getInvoiceContext(invoice);
-      const days = Number(invoice.rentalDays || 0);
-      const breakdown = computeTtcFromHt(Number(invoice.amountHt || 0), days);
+      const days = Number(invoice.rentalDays || (contract && contract.days) || 0);
+      // Si amountHt absent (factures créées avant le calcul HT/TVA), on rétro-calcule depuis amountTnd (TTC)
+      const amountTtcFallback = Number(invoice.amountTnd || invoice.dueAmountTnd || 0);
+      const breakdown = invoice.amountHt
+        ? computeTtcFromHt(Number(invoice.amountHt), days)
+        : computeHtFromTtc(amountTtcFallback, days);
 
       let branding = {};
       try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
@@ -6327,6 +6331,8 @@
       const rateEur = 120;
       const quotientEur = 90;
       const totalCourt = rateEur * 4 * eurToTnd;
+      const bdCourt = computeTtcFromHt(totalCourt, 4);
+      const bdLong = computeTtcFromHt(6500, 30);
       const addMonthsToIsoDate = (isoDate, months) => {
         const d = new Date(`${isoDate}T00:00:00`);
         d.setMonth(d.getMonth() + months);
@@ -6380,60 +6386,41 @@
 
       state.invoices = [
         {
-          id: f1,
-          contractId: ctrCourt,
-          customerName: "Mohamed Trabelsi",
-          amountOriginal: rateEur * 4,
-          currency: "EUR",
-          amountTnd: totalCourt,
-          paidAmountTnd: 0,
-          dueAmountTnd: totalCourt,
+          id: f1, contractId: ctrCourt, customerName: "Mohamed Trabelsi",
+          amountOriginal: rateEur * 4, currency: "EUR",
+          amountTnd: bdCourt.amountTtc, amountHt: bdCourt.amountHt, vatAmount: bdCourt.vatAmount,
+          dailyTaxAmount: bdCourt.dailyTaxAmount, stampDutyAmount: bdCourt.stampDutyAmount,
+          rentalDays: 4, periodStart: today, periodEnd: addDaysToIsoDate(today, 4),
+          paidAmountTnd: 0, dueAmountTnd: bdCourt.amountTtc,
           label: "Location 4 jours Dacia Sandero Stepway",
-          dueDate: addDaysToIsoDate(today, 3),
-          lastReminderAt: "",
-          reminderCount: 0,
+          dueDate: addDaysToIsoDate(today, 3), lastReminderAt: "", reminderCount: 0,
         },
         {
-          id: f2,
-          contractId: ctrLong,
-          customerName: "Tunis Events SARL",
-          amountOriginal: 6500,
-          currency: "TND",
-          amountTnd: 6500,
-          paidAmountTnd: 2000,
-          dueAmountTnd: 4500,
-          label: "Mensualite 1/12",
-          dueDate: addDaysToIsoDate(today, -2),
-          lastReminderAt: "",
-          reminderCount: 0,
+          id: f2, contractId: ctrLong, customerName: "Tunis Events SARL",
+          amountOriginal: 6500, currency: "TND",
+          amountTnd: bdLong.amountTtc, amountHt: bdLong.amountHt, vatAmount: bdLong.vatAmount,
+          dailyTaxAmount: bdLong.dailyTaxAmount, stampDutyAmount: bdLong.stampDutyAmount,
+          rentalDays: 30, periodStart: addDaysToIsoDate(today, -30), periodEnd: today,
+          paidAmountTnd: 2000, dueAmountTnd: bdLong.amountTtc - 2000,
+          label: "Mensualite 1/12", dueDate: addDaysToIsoDate(today, -2), lastReminderAt: "", reminderCount: 0,
         },
         {
-          id: f3,
-          contractId: ctrLong,
-          customerName: "Tunis Events SARL",
-          amountOriginal: 6500,
-          currency: "TND",
-          amountTnd: 6500,
-          paidAmountTnd: 0,
-          dueAmountTnd: 6500,
-          label: "Mensualite 2/12",
-          dueDate: addDaysToIsoDate(today, 7),
-          lastReminderAt: "",
-          reminderCount: 0,
+          id: f3, contractId: ctrLong, customerName: "Tunis Events SARL",
+          amountOriginal: 6500, currency: "TND",
+          amountTnd: bdLong.amountTtc, amountHt: bdLong.amountHt, vatAmount: bdLong.vatAmount,
+          dailyTaxAmount: bdLong.dailyTaxAmount, stampDutyAmount: bdLong.stampDutyAmount,
+          rentalDays: 30, periodStart: today, periodEnd: addDaysToIsoDate(today, 30),
+          paidAmountTnd: 0, dueAmountTnd: bdLong.amountTtc,
+          label: "Mensualite 2/12", dueDate: addDaysToIsoDate(today, 7), lastReminderAt: "", reminderCount: 0,
         },
         {
-          id: f4,
-          contractId: ctrLong,
-          customerName: "Tunis Events SARL",
-          amountOriginal: 6500,
-          currency: "TND",
-          amountTnd: 6500,
-          paidAmountTnd: 0,
-          dueAmountTnd: 6500,
-          label: "Mensualite 3/12",
-          dueDate: addDaysToIsoDate(today, 37),
-          lastReminderAt: "",
-          reminderCount: 0,
+          id: f4, contractId: ctrLong, customerName: "Tunis Events SARL",
+          amountOriginal: 6500, currency: "TND",
+          amountTnd: bdLong.amountTtc, amountHt: bdLong.amountHt, vatAmount: bdLong.vatAmount,
+          dailyTaxAmount: bdLong.dailyTaxAmount, stampDutyAmount: bdLong.stampDutyAmount,
+          rentalDays: 30, periodStart: addDaysToIsoDate(today, 30), periodEnd: addDaysToIsoDate(today, 60),
+          paidAmountTnd: 0, dueAmountTnd: bdLong.amountTtc,
+          label: "Mensualite 3/12", dueDate: addDaysToIsoDate(today, 37), lastReminderAt: "", reminderCount: 0,
         },
       ];
 
