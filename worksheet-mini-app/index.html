@@ -8174,6 +8174,8 @@
           <td style="color:${balance >= 0 ? "var(--ok)" : "var(--danger)"};font-weight:600;">${formatTnd(balance)}</td>
           <td><button data-open-car-finance="${car.id}" class="secondary">Détails</button></td>
         `;
+        tr.style.cursor = "pointer";
+        tr.addEventListener("dblclick", () => openCarFinanceDetail(car.id));
         tbody.appendChild(tr);
       });
       tbody.querySelectorAll("[data-open-car-finance]").forEach((btn) => {
@@ -8313,9 +8315,11 @@
         </tr>
       `).join("") || '<tr><td colspan="8" class="muted">Aucune donnee.</td></tr>';
 
-      renderCarFinanceForYear(Number(yearSelect.value));
-
       byId("carFinanceModal").style.display = "flex";
+      // Le canvas n'a sa largeur definitive qu'apres l'affichage de la modale
+      // (display:flex) et le passage de la mise en page du navigateur ; sans ce
+      // differe, Chart.js dimensionne le graphique sur un conteneur de largeur 0.
+      requestAnimationFrame(() => renderCarFinanceForYear(Number(yearSelect.value)));
     };
 
     byId("carFinanceYear").addEventListener("change", (e) => renderCarFinanceForYear(Number(e.target.value)));
