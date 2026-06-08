@@ -2394,94 +2394,11 @@
     <section id="settings" class="panel">
       <h3>Actions rapides</h3>
 
-      <!-- White-label config -->
-      <div class="card" style="margin-bottom:16px;background:#f8faff;">
-        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Personnalisation (White-label)</h4>
-        <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div>
-            <label>Nom de l'entreprise</label>
-            <input id="companyName" placeholder="Ex: E-Drive Location" />
-          </div>
-          <div>
-            <label>URL du logo</label>
-            <input id="logoUrl" placeholder="https://example.com/logo.png" />
-          </div>
-          <div style="display:flex;align-items:flex-end;gap:8px;">
-            <button id="applyBrandingBtn">Appliquer</button>
-            <div id="logoPreview" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff;">
-              <img id="logoPreviewImg" src="" style="max-width:100%;max-height:100%;display:none;" />
-            </div>
-          </div>
-        </div>
-        <p class="muted" style="font-size:12px;margin:8px 0 0;">Les modifications sont appliquées immédiatement et sauvegardées pour tous les utilisateurs.</p>
+      <p class="muted">Personnalisation, coordonnées légales, règles de facturation (TVA, taxes, timbre) et paramètres financiers sont regroupés dans un écran de paramétrage dédié.</p>
+      <div class="actions" style="margin-bottom:16px;">
+        <button id="openSettingsModalBtn">⚙️ Paramètres de l'agence</button>
       </div>
 
-      <!-- Coordonnees legales (pour entete des factures) -->
-      <div class="card" style="margin-bottom:16px;background:#f8faff;">
-        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Coordonnées légales (en-tête des factures)</h4>
-        <div class="row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
-          <div>
-            <label>Adresse</label>
-            <input id="companyAddress" placeholder="Ex: 18 Av. de l'Independance, Zaghouan 1100" />
-          </div>
-          <div>
-            <label>Telephone (Gsm)</label>
-            <input id="companyPhone" placeholder="Ex: (+216) 98 966 755" />
-          </div>
-          <div>
-            <label>RIB</label>
-            <input id="companyRib" placeholder="Ex: UBCI Zaghouan 11 070 000 1115 002 788 12" />
-          </div>
-          <div>
-            <label>Matricule fiscal / Code TVA</label>
-            <input id="companyTaxId" placeholder="Ex: 1182562/Y/M/A/000" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Parametres de facturation -->
-      <div class="card" style="margin-bottom:16px;background:#f8faff;">
-        <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Paramètres de facturation</h4>
-        <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div>
-            <label>TVA (%)</label>
-            <input id="vatRate" type="number" min="0" step="0.1" value="19" />
-          </div>
-          <div>
-            <label>Taxe par jour de location (TND)</label>
-            <input id="dailyTaxTnd" type="number" min="0" step="0.1" value="2" />
-          </div>
-          <div>
-            <label>Timbre fiscal (TND)</label>
-            <input id="stampDutyTnd" type="number" min="0" step="0.1" value="1" />
-          </div>
-        </div>
-        <p class="muted" style="font-size:12px;margin:8px 0 0;">Utilisés pour calculer le TTC à partir du HT (et inversement) lors de l'édition des factures.</p>
-      </div>
-
-      <!-- Financial settings -->
-      <div class="row">
-        <div>
-          <label>Devise principale</label>
-          <input value="TND" readonly />
-        </div>
-        <div>
-          <label>Taux EUR vers TND</label>
-          <input id="eurToTnd" type="number" min="0.001" step="0.001" value="3.4" />
-        </div>
-        <div>
-          <label>Solde initial tresorerie (TND)</label>
-          <input id="openingCashTnd" type="number" step="0.01" value="0" />
-        </div>
-        <div>
-          <label>Buffer reservations (heures)</label>
-          <input id="reservationBufferHours" type="number" min="0" step="0.5" value="2" />
-        </div>
-        <div>
-          <label>&nbsp;</label>
-          <button id="saveFxBtn" class="secondary">Sauvegarder parametres</button>
-        </div>
-      </div>
       <p class="muted">Tu peux precharger des donnees de demo ou tout vider.</p>
       <div class="actions">
         <button class="secondary" id="seedBtn">Charger donnees demo</button>
@@ -2638,6 +2555,106 @@
           <button id="ieSaveBtn">Enregistrer</button>
           <button id="iePdfBtn" class="secondary">Télécharger PDF</button>
           <button id="ieCloseBtn" class="secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Parametres de l'agence (ecran de parametrage isole) -->
+    <div id="settingsModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(820px,100%);max-height:90vh;overflow:auto;">
+        <h3 style="margin:0 0 16px;">Parametres de l'agence</h3>
+
+        <!-- White-label config -->
+        <div class="card" style="margin-bottom:16px;background:#f8faff;">
+          <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Personnalisation (White-label)</h4>
+          <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+            <div>
+              <label>Nom de l'entreprise</label>
+              <input id="companyName" placeholder="Ex: E-Drive Location" />
+            </div>
+            <div>
+              <label>URL du logo</label>
+              <input id="logoUrl" placeholder="https://example.com/logo.png" />
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:8px;">
+              <div id="logoPreview" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff;">
+                <img id="logoPreviewImg" src="" style="max-width:100%;max-height:100%;display:none;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coordonnees legales (pour entete des factures) -->
+        <div class="card" style="margin-bottom:16px;background:#f8faff;">
+          <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Coordonnées légales (en-tête des factures)</h4>
+          <div class="row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+            <div>
+              <label>Adresse</label>
+              <input id="companyAddress" placeholder="Ex: 18 Av. de l'Independance, Zaghouan 1100" />
+            </div>
+            <div>
+              <label>Telephone (Gsm)</label>
+              <input id="companyPhone" placeholder="Ex: (+216) 98 966 755" />
+            </div>
+            <div>
+              <label>RIB</label>
+              <input id="companyRib" placeholder="Ex: UBCI Zaghouan 11 070 000 1115 002 788 12" />
+            </div>
+            <div>
+              <label>Matricule fiscal / Code TVA</label>
+              <input id="companyTaxId" placeholder="Ex: 1182562/Y/M/A/000" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Parametres de facturation -->
+        <div class="card" style="margin-bottom:16px;background:#f8faff;">
+          <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Paramètres de facturation</h4>
+          <div class="row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+            <div>
+              <label>TVA (%)</label>
+              <input id="vatRate" type="number" min="0" step="0.1" value="19" />
+            </div>
+            <div>
+              <label>Taxe par jour de location (TND)</label>
+              <input id="dailyTaxTnd" type="number" min="0" step="0.1" value="2" />
+            </div>
+            <div>
+              <label>Timbre fiscal (TND)</label>
+              <input id="stampDutyTnd" type="number" min="0" step="0.1" value="1" />
+            </div>
+          </div>
+          <p class="muted" style="font-size:12px;margin:8px 0 0;">Utilisés pour calculer le TTC à partir du HT (et inversement) lors de l'édition des factures.</p>
+        </div>
+
+        <!-- Financial settings -->
+        <div class="card" style="margin-bottom:16px;background:#f8faff;">
+          <h4 style="margin:0 0 12px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Paramètres financiers</h4>
+          <div class="row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+            <div>
+              <label>Devise principale</label>
+              <input value="TND" readonly />
+            </div>
+            <div>
+              <label>Taux EUR vers TND</label>
+              <input id="eurToTnd" type="number" min="0.001" step="0.001" value="3.4" />
+            </div>
+            <div>
+              <label>Solde initial tresorerie (TND)</label>
+              <input id="openingCashTnd" type="number" step="0.01" value="0" />
+            </div>
+            <div>
+              <label>Buffer reservations (heures)</label>
+              <input id="reservationBufferHours" type="number" min="0" step="0.5" value="2" />
+            </div>
+          </div>
+        </div>
+
+        <div id="settingsModalStatus" style="display:none;padding:8px;border-radius:6px;font-size:13px;margin-bottom:8px;"></div>
+
+        <div class="actions">
+          <button id="settingsSaveBtn">Enregistrer</button>
+          <button id="settingsCloseBtn" class="secondary">Fermer</button>
         </div>
       </div>
     </div>
@@ -4562,7 +4579,12 @@
         companyPhone: settingsRow.company_phone || state.settings.companyPhone || "",
         companyRib: settingsRow.company_rib || state.settings.companyRib || "",
         companyTaxId: settingsRow.company_tax_id || state.settings.companyTaxId || "",
+        companyName: settingsRow.company_name || state.settings.companyName || "",
+        logoUrl: settingsRow.logo_url || state.settings.logoUrl || "",
       };
+      if (settingsRow && (settingsRow.company_name || settingsRow.logo_url)) {
+        applyBranding(state.settings.logoUrl, state.settings.companyName);
+      }
 
       if (cars) state.cars = cars.map(c => ({
         id: c.id, plate: c.plate, model: c.model, brand: c.brand || "",
@@ -6971,73 +6993,107 @@
       state.leasingContracts = [];
       state.leasingInstallments = [];
       state.vignettes = [];
-      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" };
+      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "", companyName: "", logoUrl: "" };
       saveAndRender();
     });
 
-    document.getElementById("saveFxBtn").addEventListener("click", () => {
-      const newRate = Number(byId("eurToTnd").value || 3.4);
-      const openingCashTnd = Number(byId("openingCashTnd").value || 0);
-      const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
+    // Ecran de parametrage isole (modale) : valide, met a jour state.settings,
+    // applique le branding et persiste vers Supabase via PUT /settings.
+    // Utilise par les boutons "Enregistrer" ET "Fermer" (toutes les donnees doivent
+    // etre persistees au moment de la sauvegarde OU de la fermeture).
+    async function persistSettingsFromModal() {
+      const companyName = byId("companyName").value.trim();
+      const logoUrl = byId("logoUrl").value.trim();
+      const companyAddress = byId("companyAddress").value.trim();
+      const companyPhone = byId("companyPhone").value.trim();
+      const companyRib = byId("companyRib").value.trim();
+      const companyTaxId = byId("companyTaxId").value.trim();
       const vatRate = Number(byId("vatRate").value || 0);
       const dailyTaxTnd = Number(byId("dailyTaxTnd").value || 0);
       const stampDutyTnd = Number(byId("stampDutyTnd").value || 0);
-      if (newRate <= 0) {
-        alert("Le taux EUR→TND doit etre positif.");
-        return;
-      }
-      if (!Number.isFinite(openingCashTnd)) {
-        alert("Le solde initial de tresorerie est invalide.");
-        return;
-      }
-      if (!Number.isFinite(reservationBufferHours) || reservationBufferHours < 0) {
-        alert("Le buffer des reservations doit etre >= 0.");
-        return;
-      }
-      if (!Number.isFinite(vatRate) || vatRate < 0) {
-        alert("Le taux de TVA doit etre >= 0.");
-        return;
-      }
-      if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) {
-        alert("La taxe par jour doit etre >= 0.");
-        return;
-      }
-      if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) {
-        alert("Le timbre fiscal doit etre >= 0.");
-        return;
-      }
-      state.settings.eurToTnd = newRate;
+      const eurToTnd = Number(byId("eurToTnd").value || 3.4);
+      const openingCashTnd = Number(byId("openingCashTnd").value || 0);
+      const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
+
+      if (eurToTnd <= 0) return { ok: false, message: "❌ Le taux EUR→TND doit etre positif." };
+      if (!Number.isFinite(openingCashTnd)) return { ok: false, message: "❌ Le solde initial de tresorerie est invalide." };
+      if (!Number.isFinite(reservationBufferHours) || reservationBufferHours < 0) return { ok: false, message: "❌ Le buffer des reservations doit etre >= 0." };
+      if (!Number.isFinite(vatRate) || vatRate < 0) return { ok: false, message: "❌ Le taux de TVA doit etre >= 0." };
+      if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) return { ok: false, message: "❌ La taxe par jour doit etre >= 0." };
+      if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) return { ok: false, message: "❌ Le timbre fiscal doit etre >= 0." };
+
+      state.settings.eurToTnd = eurToTnd;
       state.settings.openingCashTnd = openingCashTnd;
       state.settings.reservationBufferHours = reservationBufferHours;
       state.settings.vatRate = vatRate;
       state.settings.dailyTaxTnd = dailyTaxTnd;
       state.settings.stampDutyTnd = stampDutyTnd;
-      state.settings.companyAddress = byId("companyAddress").value.trim();
-      state.settings.companyPhone = byId("companyPhone").value.trim();
-      state.settings.companyRib = byId("companyRib").value.trim();
-      state.settings.companyTaxId = byId("companyTaxId").value.trim();
+      state.settings.companyAddress = companyAddress;
+      state.settings.companyPhone = companyPhone;
+      state.settings.companyRib = companyRib;
+      state.settings.companyTaxId = companyTaxId;
       saveAndRender();
-      const token = localStorage.getItem("locacar-jwt");
-      if (token && API_URL) {
-        fetch(`${API_URL}/settings`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            eur_to_tnd: newRate,
-            opening_cash_tnd: openingCashTnd,
-            reservation_buffer_hours: reservationBufferHours,
-            vat_rate: vatRate,
-            daily_tax_tnd: dailyTaxTnd,
-            stamp_duty_tnd: stampDutyTnd,
-            company_address: state.settings.companyAddress,
-            company_phone: state.settings.companyPhone,
-            company_rib: state.settings.companyRib,
-            company_tax_id: state.settings.companyTaxId,
-          }),
-        }).catch(() => {});
-      }
-      alert("Parametres enregistres. Les calculs de facturation et la regle de buffer reservations sont mis a jour.");
-    });
+      applyBranding(logoUrl, companyName);
+
+      const saved = await apiPut("/settings", {
+        eur_to_tnd: eurToTnd,
+        opening_cash_tnd: openingCashTnd,
+        reservation_buffer_hours: reservationBufferHours,
+        vat_rate: vatRate,
+        daily_tax_tnd: dailyTaxTnd,
+        stamp_duty_tnd: stampDutyTnd,
+        company_address: companyAddress,
+        company_phone: companyPhone,
+        company_rib: companyRib,
+        company_tax_id: companyTaxId,
+        company_name: companyName,
+        logo_url: logoUrl,
+      });
+
+      return { ok: true, message: saved ? "✅ Parametres enregistres et synchronises." : "⚠️ Parametres enregistres localement (synchronisation serveur indisponible)." };
+    }
+
+    function showSettingsModalStatus(message, ok) {
+      const el = byId("settingsModalStatus");
+      if (!el) return;
+      el.style.display = "block";
+      el.textContent = message;
+      el.style.background = ok ? "#dcfce7" : "#fee2e2";
+      el.style.color = ok ? "#166534" : "#b91c1c";
+    }
+
+    if (byId("openSettingsModalBtn")) {
+      byId("openSettingsModalBtn").addEventListener("click", () => {
+        populateSettingsFields();
+        byId("settingsModalStatus").style.display = "none";
+        byId("settingsModal").style.display = "flex";
+      });
+    }
+
+    if (byId("settingsSaveBtn")) {
+      byId("settingsSaveBtn").addEventListener("click", async () => {
+        const result = await persistSettingsFromModal();
+        showSettingsModalStatus(result.message, result.ok);
+      });
+    }
+
+    if (byId("settingsCloseBtn")) {
+      byId("settingsCloseBtn").addEventListener("click", async () => {
+        const result = await persistSettingsFromModal();
+        if (!result.ok) { showSettingsModalStatus(result.message, result.ok); return; }
+        byId("settingsModal").style.display = "none";
+      });
+    }
+
+    if (byId("settingsModal")) {
+      byId("settingsModal").addEventListener("click", async (e) => {
+        if (e.target === byId("settingsModal")) {
+          const result = await persistSettingsFromModal();
+          if (!result.ok) { showSettingsModalStatus(result.message, result.ok); return; }
+          byId("settingsModal").style.display = "none";
+        }
+      });
+    }
 
     function convertToTnd(amount, currency, eurToTnd) {
       if (currency === "TND") return amount;
@@ -7056,6 +7112,10 @@
       byId("companyPhone").value = state.settings.companyPhone || "";
       byId("companyRib").value = state.settings.companyRib || "";
       byId("companyTaxId").value = state.settings.companyTaxId || "";
+      byId("companyName").value = state.settings.companyName || "";
+      byId("logoUrl").value = state.settings.logoUrl || "";
+      const preview = byId("logoPreviewImg");
+      if (preview) { preview.src = byId("logoUrl").value; preview.style.display = byId("logoUrl").value ? "block" : "none"; }
     }
 
     // Regles de facturation : TVA, taxe journaliere et timbre fiscal sont parametrables (Parametres > Facturation).
@@ -8964,25 +9024,6 @@
 
     // Branding
     loadBranding();
-    document.getElementById("applyBrandingBtn").addEventListener("click", () => {
-      const logoUrl = byId("logoUrl").value.trim();
-      const companyName = byId("companyName").value.trim();
-      applyBranding(logoUrl, companyName);
-      // Save to API settings if connected
-      const token = localStorage.getItem("locacar-jwt");
-      if (token && API_URL) {
-        fetch(`${API_URL}/settings`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ logo_url: logoUrl, company_name: companyName }),
-        }).catch(() => {});
-      }
-      const s = document.createElement("span");
-      s.textContent = " ✅ Appliqué"; s.style.color = "#16a34a"; s.style.fontSize = "13px";
-      const btn = byId("applyBrandingBtn");
-      btn.parentNode.appendChild(s);
-      setTimeout(() => s.remove(), 2000);
-    });
 
     // Logo preview on input change
     byId("logoUrl").addEventListener("input", () => {

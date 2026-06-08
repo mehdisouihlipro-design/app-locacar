@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS settings (
   company_phone VARCHAR(50),
   company_rib VARCHAR(50),
   company_tax_id VARCHAR(50),
+  -- Personnalisation (white-label)
+  company_name VARCHAR(120),
+  logo_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
