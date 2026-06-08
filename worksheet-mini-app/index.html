@@ -7022,10 +7022,14 @@
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString("fr-FR")} TND` } } },
             scales: { y: { beginAtZero: true, grid: { color: "#f0f0f0" } }, x: { grid: { display: false } } },
             onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
-            onClick(_, elements) {
+            onClick(e, elements) {
               if (!elements.length) return;
+              const bucket = rev[elements[0].index];
+              if (!bucket) return;
+              e.native?.stopPropagation();
               history.pushState({ tab: "payments" }, "", "#payments");
               switchToTab("payments");
+              applyPaymentsFilter({ method: "", query: bucket.key });
             }
           }
         }));
@@ -7040,10 +7044,11 @@
             responsive: true, cutout: "65%",
             plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
             onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
-            onClick(_, elements) {
+            onClick(e, elements) {
               if (!elements.length) return;
               const label = fleet[elements[0].index]?.label;
               if (!label) return;
+              e.native?.stopPropagation();
               history.pushState({ tab: "cars" }, "", "#cars");
               switchToTab("cars");
               applyCarsFilter({ status: label });
@@ -7060,9 +7065,14 @@
           options: {
             responsive: true, cutout: "65%",
             plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
-            onClick() {
+            onClick(e, elements) {
+              const levelByLabel = { retard: "en_retard", urgent: "urgent", proche: "proche" };
+              const label = elements.length ? alertSeries[elements[0].index]?.label : null;
+              const level = label ? levelByLabel[label] : "";
+              if (label) e.native?.stopPropagation();
               history.pushState({ tab: "alerts" }, "", "#alerts");
               switchToTab("alerts");
+              applyAlertsFilter({ level: level || "" });
             }
           }
         }));
@@ -8893,7 +8903,7 @@
       state.payments
         .filter((p) => {
           const matchesMethod = methodFilter ? p.method === methodFilter : true;
-          const haystack = `${p.id || ""} ${p.invoiceId || ""} ${p.customerName || ""}`.toLowerCase();
+          const haystack = `${p.id || ""} ${p.invoiceId || ""} ${p.customerName || ""} ${p.date || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesMethod && matchesQuery;
         })
@@ -9830,6 +9840,7 @@
         "cars.status": ["dispo", "loue", "maintenance"],
         "customers.type": ["particulier", "entreprise"],
         "contracts.type": ["court", "long", "autre"],
+        "contracts.status": ["actif", "termine", "annule", "brouillon"],
         "contracts.rateCurrency": ["TND", "EUR", "SAR", "CAD", "AED", "USD", "JPY", "KWD", "CHF", "BHD", "CNY", "OMR", "GBP"],
         "contracts.quotientCurrency": ["TND", "EUR", "SAR", "CAD", "AED", "USD", "JPY", "KWD", "CHF", "BHD", "CNY", "OMR", "GBP"],
         "contracts.paymentMoment": ["debut", "fin"],
