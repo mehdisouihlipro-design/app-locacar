@@ -306,6 +306,9 @@
       color: var(--muted);
     }
 
+    .xref { color: #1540c8; text-decoration: none; font-size: inherit; cursor: pointer; }
+    .xref:hover { text-decoration: underline; }
+
     .hidden {
       display: none !important;
     }
@@ -3888,6 +3891,18 @@
       if (byId("maintenanceFilterType")) byId("maintenanceFilterType").value = type;
       if (byId("maintenanceFilterQuery")) byId("maintenanceFilterQuery").value = query;
       renderMaintenance();
+    }
+
+    function goToRecord(tabId, query) {
+      switch (tabId) {
+        case "contracts":    applyContractsFilter({ query }); break;
+        case "invoices":     applyInvoicesFilter({ query }); break;
+        case "customers":    applyCustomersFilter({ query }); break;
+        case "cars":         applyCarsFilter({ query }); break;
+        case "maintenance":  applyMaintenanceFilter({ query }); break;
+        default: break;
+      }
+      openTab(tabId);
     }
 
     function scrollToTreasuryPanel() {
@@ -8419,8 +8434,8 @@
         const pillClass = r.status === "confirmee" ? "dispo" : r.status === "annulee" ? "impaye" : "maintenance";
         tr.innerHTML = `
           <td><a href="#" data-open-reservation="${safe(r.id)}">${safe(r.id)}</a></td>
-          <td>${safe(r.customerName || "-")}</td>
-          <td>${safe(r.carPlate || "-")}</td>
+          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(r.customerName)}">${safe(r.customerName || "-")}</a></td>
+          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(r.carPlate)}">${safe(r.carPlate || "-")}</a></td>
           <td>${safe(r.startDate)} ${safe(r.startTime || "")}</td>
           <td>${safe(r.endDate)} ${safe(r.endTime || "")}</td>
           <td><span class="pill ${pillClass}">${safe(r.status)}</span></td>
@@ -8435,6 +8450,13 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-reservation");
           openRecordEditor("reservations", id);
+        });
+      });
+      tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
 
@@ -9265,10 +9287,13 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("contracts", contract.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a></td>
+          <td>
+            <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a>
+            <div class="small"><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(contract.id)}" title="Voir les factures de ce contrat">Factures →</a></div>
+          </td>
           <td>${safe(contract.type)}</td>
-          <td>${safe(contract.customerName)}</td>
-          <td>${safe(contract.carPlate)}</td>
+          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
+          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(contract.carPlate)}">${safe(contract.carPlate || "-")}</a></td>
           <td>${Number(contract.quotient || 0)} ${contract.quotientCurrency || "TND"}</td>
           <td>${safe(contract.paymentPlan || "-")}</td>
           <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
@@ -9283,6 +9308,13 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-contract");
           openRecordEditor("contracts", id);
+        });
+      });
+      tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
       renderPaginationControls(null, "contracts", total, page, pages);
@@ -9524,8 +9556,8 @@
             <a href="#" data-open-invoice="${safe(invoice.id)}">${safe(invoice.id)}</a>
             <div class="small">${safe(invoice.label || "Facture")}</div>
           </td>
-          <td>${safe(invoice.contractId)}</td>
-          <td>${safe(invoice.customerName)}</td>
+          <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
+          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
           <td>${safe(invoice.dueDate || "-")}</td>
           <td>${Number(invoice.amountTnd).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
@@ -9541,6 +9573,13 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-invoice");
           openRecordEditor("invoices", id);
+        });
+      });
+      tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
       tbody.querySelectorAll("[data-edit-invoice]").forEach((btn) => {
@@ -9672,9 +9711,9 @@
         tr.addEventListener("dblclick", () => openRecordEditor("payments", p.id));
         tr.innerHTML = `
           <td><a href="#" data-open-payment="${safe(p.id)}">${safe(p.id)}</a></td>
-          <td>${safe(p.invoiceId)}</td>
-          <td>${safe(p.contractId)}</td>
-          <td>${safe(p.customerName)}</td>
+          <td><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(p.invoiceId)}">${safe(p.invoiceId || "-")}</a></td>
+          <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(p.contractId)}">${safe(p.contractId || "-")}</a></td>
+          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(p.customerName)}">${safe(p.customerName || "-")}</a></td>
           <td>${Number(p.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${safe(p.method)}</td>
           <td>${safe(p.date)}</td>
@@ -9687,6 +9726,13 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-payment");
           openRecordEditor("payments", id);
+        });
+      });
+      tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
     }
@@ -9727,7 +9773,7 @@
         tr.addEventListener("dblclick", () => openRecordEditor("maintenanceCosts", row.id));
         tr.innerHTML = `
           <td><a href="#" data-open-maintenance="${safe(row.id)}">${safe(row.id)}</a></td>
-          <td>${safe(row.carPlate || "-")}</td>
+          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(row.carPlate)}">${safe(row.carPlate || "-")}</a></td>
           <td>${safe(row.type || "-")}</td>
           <td>${safe(row.date || "-")}</td>
           <td>${Number(row.amountOriginal || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(row.currency || "TND")}</td>
@@ -9747,6 +9793,13 @@
           e.preventDefault();
           e.stopPropagation();
           openRecordEditor("maintenanceCosts", e.target.getAttribute("data-open-maintenance"));
+        });
+      });
+      tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
 
