@@ -39,7 +39,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.patch(`/invoices?id=eq.${req.params.id}`, req.body);
+    const result = await global.db.patch(`/invoices?id=eq.${req.params.id}`, req.body, {
+      headers: { Prefer: 'return=representation' },
+    });
     if (!result.data || result.data.length === 0) return res.status(404).json({ success: false, message: 'Invoice not found' });
     res.json({ success: true, data: result.data[0] });
   } catch (err) {
