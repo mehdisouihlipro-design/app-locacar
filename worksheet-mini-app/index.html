@@ -10915,6 +10915,11 @@
       const compound = `${entity}.${key}`;
       const isCalculated = (calculatedFields[entity] || []).includes(key);
 
+      // L'identifiant est la cle primaire (referencee par d'autres entites) : non modifiable.
+      if (key === "id") {
+        return { control: "input", readOnly: true, inputType: "text" };
+      }
+
       if (lookupMap[compound]) {
         return { control: "select", options: lookupMap[compound], readOnly: isCalculated };
       }
