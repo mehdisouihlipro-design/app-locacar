@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 -- Invoices table
 CREATE TABLE IF NOT EXISTS invoices (
   id VARCHAR(50) PRIMARY KEY,
-  contract_id VARCHAR(50) REFERENCES contracts(id),
+  contract_id VARCHAR(50) REFERENCES contracts(id) ON UPDATE CASCADE,
   customer_name VARCHAR(255),
   amount_original DECIMAL(15, 2),
   currency VARCHAR(3) NOT NULL DEFAULT 'TND',
@@ -168,8 +168,8 @@ CREATE TABLE IF NOT EXISTS invoices (
 -- Payments table
 CREATE TABLE IF NOT EXISTS payments (
   id VARCHAR(50) PRIMARY KEY,
-  invoice_id VARCHAR(50) REFERENCES invoices(id),
-  contract_id VARCHAR(50) REFERENCES contracts(id),
+  invoice_id VARCHAR(50) REFERENCES invoices(id) ON UPDATE CASCADE,
+  contract_id VARCHAR(50) REFERENCES contracts(id) ON UPDATE CASCADE,
   customer_name VARCHAR(255),
   contract_type VARCHAR(20),
   payment_date DATE NOT NULL,
@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS payments (
 -- Collections table
 CREATE TABLE IF NOT EXISTS collections (
   id VARCHAR(50) PRIMARY KEY,
-  invoice_id VARCHAR(50) REFERENCES invoices(id),
+  invoice_id VARCHAR(50) REFERENCES invoices(id) ON UPDATE CASCADE,
   customer_id VARCHAR(50) REFERENCES customers(id),
   amount_requested DECIMAL(15, 2),
   amount_received DECIMAL(15, 2),
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS vignettes (
 CREATE TABLE IF NOT EXISTS inspections (
   id VARCHAR(50) PRIMARY KEY,
   type VARCHAR(20) NOT NULL DEFAULT 'sortie',
-  contract_id VARCHAR(50) REFERENCES contracts(id),
+  contract_id VARCHAR(50) REFERENCES contracts(id) ON UPDATE CASCADE,
   car_id VARCHAR(50) NOT NULL REFERENCES cars(id),
   car_plate VARCHAR(20),
   date DATE NOT NULL,

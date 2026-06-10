@@ -10915,9 +10915,12 @@
       const compound = `${entity}.${key}`;
       const isCalculated = (calculatedFields[entity] || []).includes(key);
 
-      // L'identifiant est la cle primaire (referencee par d'autres entites) : non modifiable.
+      // L'identifiant est la cle primaire (referencee par d'autres entites) : non modifiable,
+      // sauf exception pour les contrats et factures (numero de contrat / numero de facture),
+      // ou la modification est repercutee sur les enregistrements lies (cf. cascadeIdChange).
       if (key === "id") {
-        return { control: "input", readOnly: true, inputType: "text" };
+        const idEditable = entity === "contracts" || entity === "invoices";
+        return { control: "input", readOnly: !idEditable, inputType: "text" };
       }
 
       if (lookupMap[compound]) {
@@ -11093,6 +11096,30 @@
       editorState.isNew = false;
     }
 
+    // Repercute le changement d'Id d'un contrat/facture sur les enregistrements lies en memoire
+    // (les colonnes contract_id/invoice_id en base sont mises a jour via ON UPDATE CASCADE).
+    async function cascadeIdChange(entity, oldId, newId) {
+      if (entity === "contracts") {
+        for (const inv of state.invoices) {
+          let changed = false;
+          if (String(inv.contractId) === String(oldId)) { inv.contractId = newId; changed = true; }
+          if (Array.isArray(inv.lines)) {
+            inv.lines.forEach((l) => {
+              if (String(l.contractId) === String(oldId)) { l.contractId = newId; changed = true; }
+            });
+          }
+          if (changed && ENTITY_API_PUT.invoices) {
+            await apiPut(`${ENTITY_API_PUT.invoices.path}/${inv.id}`, ENTITY_API_PUT.invoices.toApi(inv));
+          }
+        }
+        state.payments.forEach((p) => { if (String(p.contractId) === String(oldId)) p.contractId = newId; });
+        state.inspections.forEach((x) => { if (String(x.contractId) === String(oldId)) x.contractId = newId; });
+      }
+      if (entity === "invoices") {
+        state.payments.forEach((p) => { if (String(p.invoiceId) === String(oldId)) p.invoiceId = newId; });
+      }
+    }
+
     async function saveRecordEditor() {
       const { entity, id } = editorState;
       if (!entity || !id) return;
@@ -11102,6 +11129,8 @@
 
       const record = collection.find((r) => String(r.id) === String(id));
       if (!record) return;
+
+      const oldId = record.id;
 
       const fields = byId("recordEditorBody").querySelectorAll("[data-field-key]");
       fields.forEach((field) => {
@@ -11121,6 +11150,26 @@
       });
 
       applyDerivedFields(entity, record);
+
+      const idChanged = (entity === "contracts" || entity === "invoices") && String(record.id) !== String(oldId);
+      if (idChanged) {
+        const newId = String(record.id || "").trim();
+        if (!newId) {
+          alert("L'Id ne peut pas etre vide.");
+          record.id = oldId;
+          return;
+        }
+        if (collection.some((r) => r !== record && String(r.id) === newId)) {
+          alert(`L'Id "${newId}" est deja utilise.`);
+          record.id = oldId;
+          return;
+        }
+        if (!confirm(`Modification exceptionnelle de l'Id "${oldId}" -> "${newId}".\nLes references associees (factures, paiements, etats des lieux) seront mises a jour. Continuer ?`)) {
+          record.id = oldId;
+          return;
+        }
+        record.id = newId;
+      }
 
       if (entity === "reservations") {
         const startAt = toReservationDateTime(record.startDate, record.startTime, true);
@@ -11148,7 +11197,18 @@
 
       const apiEntry = !editorState.isNew && ENTITY_API_PUT[entity];
       if (apiEntry) {
-        await apiPut(`${apiEntry.path}/${record.id}`, apiEntry.toApi(record));
+        if (idChanged) {
+          const result = await apiPut(`${apiEntry.path}/${oldId}`, { ...apiEntry.toApi(record), id: record.id });
+          if (!result) {
+            alert("Erreur: impossible de modifier l'Id (verifiez la connexion a la base de donnees).");
+            record.id = oldId;
+            return;
+          }
+          await cascadeIdChange(entity, oldId, record.id);
+          editorState.id = record.id;
+        } else {
+          await apiPut(`${apiEntry.path}/${record.id}`, apiEntry.toApi(record));
+        }
       }
 
       editorState.isNew = false;

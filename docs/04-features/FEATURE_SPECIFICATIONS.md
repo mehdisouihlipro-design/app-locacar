@@ -1156,6 +1156,19 @@ Un double-clic sur une ligne de tableau (Contrats, Factures, Voitures, Clients, 
 
 **Limitation connue** : pour les entités sans route `PUT`, une édition via la modale générique ne survit pas à un rechargement (les données reviennent à l'état de la base). Pour rendre ces écrans éditables, il faut ajouter les routes `PUT /:id` correspondantes côté backend (`src/backend/routes/`) puis enregistrer ces entités dans la table `ENTITY_API_PUT` (`worksheet-mini-app/index.html`).
 
+### 8.1 Modification exceptionnelle de l'Id (numéro de contrat / numéro de facture)
+
+Le champ `id` est en lecture seule pour toutes les entités, **sauf** `contracts` et `invoices` où il représente le numéro de contrat / numéro de facture et peut être modifié exceptionnellement.
+
+Lorsque l'utilisateur modifie cet Id et confirme :
+1. Validation : nouvel Id non vide et non utilisé par un autre enregistrement.
+2. Confirmation explicite (`confirm()`) car l'opération est irréversible et impacte plusieurs tables.
+3. Appel `PUT /contracts/:ancienId` ou `PUT /invoices/:ancienId` avec `id: nouvelId` dans le corps — la base met à jour la clé primaire.
+4. Grâce aux contraintes `ON UPDATE CASCADE` (cf. `migrations/2026-06-10_cascade_id_rename.sql`), les colonnes `contract_id`/`invoice_id` des tables `invoices`, `payments`, `inspections`, `collections` sont mises à jour automatiquement en base.
+5. Côté front, `cascadeIdChange()` répercute ce changement sur `state.invoices[].contractId`/`lines[].contractId`, `state.payments`, `state.inspections` (et persiste à nouveau les factures dont les `lines` référencent l'ancien Id).
+
+**Pré-requis** : exécuter `migrations/2026-06-10_cascade_id_rename.sql` dans l'éditeur SQL Supabase avant d'utiliser cette fonctionnalité (sinon la modification de l'Id échoue avec une violation de clé étrangère si des factures/paiements/états des lieux y font référence).
+
 ---
 
 **Document Version**: 1.0  
