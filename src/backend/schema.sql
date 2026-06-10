@@ -159,6 +159,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   rental_days INTEGER DEFAULT 0,
   period_start DATE,
   period_end DATE,
+  -- Lignes de facture multi-contrat/multi-vehicule (1 ligne = 1 contrat + 1 voiture, taxe journaliere par ligne)
+  lines JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

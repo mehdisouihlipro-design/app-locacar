@@ -293,6 +293,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   rental_days INTEGER DEFAULT 0,
   period_start DATE,
   period_end DATE,
+  -- Lignes de facture multi-contrat/multi-vehicule (1 ligne = 1 contrat + 1 voiture, taxe journaliere par ligne)
+  lines JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -306,12 +308,13 @@ CREATE TABLE IF NOT EXISTS invoices (
 - `annulee`: Cancelled
 
 **Ventilation HT/TTC** (calculée automatiquement à la génération de la facture, voir `Paramètres → Paramètres de facturation` pour les taux) :
-- `amount_ht`: Montant hors taxes (le tarif du contrat)
-- `vat_amount`: Montant de la TVA (`amount_ht × vat_rate / 100`)
-- `daily_tax_amount`: Taxe journalière (`rental_days × daily_tax_tnd`)
-- `stamp_duty_amount`: Timbre fiscal (montant fixe `stamp_duty_tnd`)
-- `rental_days`, `period_start`, `period_end`: Durée et période facturée (ligne DU/AU/Nb.j du document imprimé)
+- `amount_ht`: Montant hors taxes (le tarif du contrat, somme des lignes pour une facture multi-lignes)
+- `vat_amount`: Montant de la TVA (somme des `vat_amount` de chaque ligne, `ligne.amount_ht × vat_rate / 100`)
+- `daily_tax_amount`: Taxe journalière (somme des `daily_tax_amount` de chaque ligne, `ligne.days × daily_tax_tnd` — donc calculée **par véhicule/par ligne**)
+- `stamp_duty_amount`: Timbre fiscal (montant fixe `stamp_duty_tnd`, appliqué **une seule fois pour toute la facture**, jamais par ligne)
+- `rental_days`, `period_start`, `period_end`: Durée totale (somme des jours de toutes les lignes) et période globale (min/max des périodes des lignes)
 - `amount_tnd` reste le montant **TTC** total dû/encaissé : `amount_ht + vat_amount + daily_tax_amount + stamp_duty_amount`
+- `lines`: tableau JSON des lignes de facture, chaque élément = `{ contractId, carPlate, designation, amountOriginal, currency, amountHt, vatAmount, dailyTaxAmount, days, periodStart, periodEnd, lineTtc }`. Une facture créée avant cette fonctionnalité (ou facture mono-ligne classique) a `lines = []` ; le PDF retombe alors sur les champs `contract_id`/`amount_ht`/`rental_days`/`period_start`/`period_end` au niveau facture.
 
 ### PAYMENTS
 Records individual payment transactions.

@@ -802,23 +802,25 @@ TVA            = Montant_HT × taux_TVA / 100
 
 `amountTnd` (et `dueAmountTnd`/`paidAmountTnd`) continuent de représenter le montant **TTC** dû — aucune autre partie de l'application (relances, trésorerie, rapprochement de paiements, KPIs) n'a besoin d'être modifiée. La ventilation est stockée séparément sur la facture : `amountHt`, `vatAmount`, `dailyTaxAmount`, `stampDutyAmount`, ainsi que `rentalDays`, `periodStart`, `periodEnd` (période facturée, utilisés pour la ligne DU/AU/Nb.j du document imprimé).
 
+Pour une **facture multi-lignes** (voir 4.1.7), `computeLineBreakdown(amountHt, days)` applique la même logique TVA/taxe journalière **par ligne** (1 ligne = 1 contrat + 1 véhicule), sans timbre fiscal. Les totaux de la facture (`amountHt`, `vatAmount`, `dailyTaxAmount`, `amountTnd`) sont la somme des lignes, plus le timbre fiscal ajouté **une seule fois** au niveau de la facture.
+
 **4.1.6 Édition et impression de facture**
 
 Depuis l'onglet **Factures**, le bouton **"Facture"** ouvre une modale qui permet de :
 - consulter le détail (contrat, client, véhicule, période facturée) ;
-- modifier le montant **HT** ou le montant **TTC** — l'autre valeur et la ventilation complète (TVA / taxe journalière / timbre / total TTC) se recalculent en direct, dans les deux sens ;
+- modifier le montant **HT** ou le montant **TTC** global — l'autre valeur et la ventilation complète (TVA / taxe journalière / timbre / total TTC) se recalculent en direct, dans les deux sens ;
 - visualiser le montant en toutes lettres ("Arrêtée la présente facture à la somme de … dinars") ;
 - **Enregistrer** la ventilation choisie (persistée via `PUT /invoices/:id` → Supabase) ;
-- **Télécharger le PDF** de la facture, généré via `html2pdf` à partir d'un gabarit reproduisant le format papier de l'agence : en-tête (logo, nom société, adresse, téléphone, RIB, matricule fiscal — issus du white-label et des `Paramètres de facturation`), bloc client, ligne de prestation (Contrat | Désignation | Immatriculation | DU | AU | Nb.j | Prix HT | TVA | Prix TTC), bloc de totaux (Total HT / TVA / Taxe journalière / Timbre / Total TTC) et montant en toutes lettres.
+- **Télécharger le PDF** de la facture : `generateInvoicePdf` ouvre une nouvelle fenêtre (`window.open`) contenant un gabarit HTML autonome reproduisant le format papier de l'agence (en-tête avec logo/nom société/adresse/téléphone/RIB/matricule fiscal issus du white-label et des `Paramètres de facturation`, bloc client, tableau des lignes de prestation, bloc de totaux, montant en toutes lettres) avec un bouton "Imprimer / Enregistrer en PDF" qui déclenche `window.print()`.
 
-**4.1.7 Création manuelle de facture**
+**4.1.7 Création manuelle de facture multi-lignes**
 
-En plus de la génération automatique depuis les contrats, l'onglet **Factures** propose un bouton **"Nouvelle facture"** qui ouvre un formulaire permettant de créer une facture libre (extras, prestations hors-contrat, régularisations, etc.) :
+En plus de la génération automatique depuis les contrats, l'onglet **Factures** propose un bouton **"Nouvelle facture"** qui ouvre un formulaire permettant de créer une facture libre (extras, prestations hors-contrat, régularisations, location de plusieurs véhicules sur une même facture, etc.) :
 - **Client** (obligatoire) — liste de `state.customers` ;
-- **Contrat** (optionnel) — liste filtrée sur les contrats du client sélectionné, ou "Aucun (facture libre)" pour une facture sans contrat ;
-- **Libellé**, **Montant HT**, **Devise**, **Nombre de jours** (utilisé pour la taxe journalière et la ligne DU/AU/Nb.j du PDF), **Début de période** et **Date d'échéance**.
+- **Libellé**, **Devise**, **Date d'échéance** (communs à toute la facture) ;
+- une ou plusieurs **lignes de facturation** (bouton "+ Ajouter une ligne"), chacune avec : **Contrat (véhicule)** (optionnel — liste filtrée sur les contrats du client sélectionné, ou "Aucun (ligne libre)"), **Début de période**, **Nombre de jours** et **Montant HT**.
 
-À la création, le montant HT est converti en TND si nécessaire (`convertToTnd`), la ventilation HT/TVA/taxe journalière/timbre est calculée via `computeTtcFromHt` (mêmes règles paramétrables que pour les factures automatiques), la facture est persistée via `POST /invoices` (mêmes champs `amount_ht`/`vat_amount`/`daily_tax_amount`/`stamp_duty_amount`/`rental_days`/`period_start`/`period_end`) puis ajoutée à `state.invoices`. Elle apparaît ensuite dans le tableau et peut être éditée/imprimée comme toute autre facture (voir 4.1.6) — `getInvoiceContext` et `generateInvoicePdf` gèrent l'absence de contrat/véhicule (affichage "-").
+À la création, pour chaque ligne : le montant HT est converti en TND si nécessaire (`convertToTnd`), puis `computeLineBreakdown(amountHt, days)` calcule la TVA et la taxe journalière **de cette ligne** (1 ligne = 1 contrat + 1 véhicule, taxe journalière par véhicule). Les lignes sont stockées telles quelles dans le champ `lines` (JSON) de la facture. Les totaux de la facture sont la somme des `amountHt`/`vatAmount`/`dailyTaxAmount` de toutes les lignes, plus le timbre fiscal ajouté une seule fois (`amount_tnd` = somme + timbre). `rental_days`/`period_start`/`period_end` au niveau facture représentent respectivement la somme des jours et la période globale (min/max) de toutes les lignes. La facture est persistée via `POST /invoices` (champs `amount_ht`/`vat_amount`/`daily_tax_amount`/`stamp_duty_amount`/`rental_days`/`period_start`/`period_end`/`lines`) puis ajoutée à `state.invoices`. Elle apparaît ensuite dans le tableau et peut être éditée/imprimée comme toute autre facture (voir 4.1.6) ; `generateInvoicePdf` détecte la présence de `lines` et affiche une ligne du tableau de prestations par élément (sinon, retombe sur l'affichage mono-ligne historique basé sur `contractId`/`amountHt`/`rentalDays`).
 
 #### API Endpoints
 

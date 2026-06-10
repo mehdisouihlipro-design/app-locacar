@@ -387,6 +387,11 @@ LocaCar is a comprehensive car rental management system designed for small-to-me
   - `Timbre fiscal` = montant fixe pour toute la location (par défaut : 1 TND, paramétrable)
   - `Montant_TTC = montant_HT + TVA + Taxe_journalière + Timbre` — c'est ce montant TTC qui constitue le `amount_tnd` facturé/dû au client
   - Le sens inverse (TTC → HT) est disponible pour ré-éditer une facture à partir d'un montant TTC cible
+- BR15bis: Facture multi-lignes (1 ligne = 1 contrat + 1 véhicule) :
+  - Une facture peut contenir plusieurs lignes, chacune liée à un contrat et un véhicule différents
+  - Pour chaque ligne : `TVA_ligne = HT_ligne × taux_TVA / 100` et `Taxe_journalière_ligne = nb_jours_ligne × taxe_par_jour` (la taxe journalière est donc calculée **par véhicule/par ligne**, pas globalement)
+  - Le `Timbre fiscal` reste un montant fixe appliqué **une seule fois pour toute la facture** (pas par ligne)
+  - Les totaux de la facture (`amount_ht`, `vat_amount`, `daily_tax_amount`, `amount_tnd`) sont la somme des lignes + le timbre fiscal une seule fois
 
 ### 6.3 Fleet Rules
 - BR10: Vehicle must pass inspection every 6 months
