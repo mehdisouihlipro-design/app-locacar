@@ -6984,14 +6984,14 @@
       const token = localStorage.getItem("locacar-jwt");
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
-      const mapCar = c => ({ id: c.id, plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible") });
-      const mapCustomer = c => ({ id: c.id, name: c.name, phone: c.phone || "", email: c.email || "" });
-      const mapContract = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", contract_date: c.contractDate || today, type: c.type || "court", days: c.days || 0, months: c.months || 0, rate: c.rate || 0, rate_currency: c.rateCurrency || "TND", quotient: c.quotient || 0, quotient_currency: c.quotientCurrency || "TND", quotient_tnd: c.quotientTnd || 0, total_amount_original: c.totalAmountOriginal || 0, total_amount_tnd: c.totalAmountTnd || 0, payment_moment: c.paymentMoment || "", payment_plan: c.paymentPlan || "", status: c.status === "actif" ? "active" : (c.status || "active") });
-      const mapInvoice = c => ({ id: c.id, contract_id: c.contractId || null, customer_name: c.customerName || "", amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, paid_amount_tnd: c.paidAmountTnd || 0, due_amount_tnd: c.dueAmountTnd || 0, label: c.label || "", due_date: c.dueDate || today, status: c.status || "en_attente", reminder_count: c.reminderCount || 0, amount_ht: c.amountHt || 0, vat_amount: c.vatAmount || 0, daily_tax_amount: c.dailyTaxAmount || 0, stamp_duty_amount: c.stampDutyAmount || 0, rental_days: c.rentalDays || 0, period_start: c.periodStart || null, period_end: c.periodEnd || null });
+      const mapCar = c => ({ id: c.id, ...mapCarToApi(c) });
+      const mapCustomer = c => ({ id: c.id, ...mapCustomerToApi(c) });
+      const mapContract = c => ({ id: c.id, ...mapContractToApi(c) });
+      const mapInvoice = c => ({ id: c.id, ...mapInvoiceToApi(c) });
       const mapPayment = c => ({ id: c.id, invoice_id: c.invoiceId || null, contract_id: c.contractId || null, customer_name: c.customerName || "", contract_type: c.contractType || "", payment_date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, method: c.method || "" });
       const mapMaint = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", type: c.type || "", date: c.date || today, amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, status: c.status || "paye", note: c.note || "", source_key: c.sourceKey || "" });
       const mapVignette = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", fiscal_year: c.fiscalYear || new Date().getFullYear(), amount_original: c.amountOriginal || 0, currency: c.currency || "TND", amount_tnd: c.amountTnd || 0, due_date: c.dueDate || null, status: c.status || "a_payer" });
-      const mapReservation = c => ({ id: c.id, customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente" });
+      const mapReservation = c => ({ id: c.id, ...mapReservationToApi(c) });
       const mapLeasing = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", leasing_company: c.lender || "", contract_number: c.contractNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
       const mapInsurance = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", insurance_company: c.provider || "", policy_number: c.policyNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
 
@@ -7226,6 +7226,63 @@
       if (currency === "EUR") return amount * eurToTnd;
       return amount;
     }
+
+    // Mappage etat (camelCase) -> API/Supabase (snake_case), reutilise pour la sync globale
+    // (syncStateToAPI) et pour la persistance des editions via la modale generique (saveRecordEditor).
+    function mapContractToApi(c) {
+      return {
+        customer_id: c.customerId, car_id: c.carId,
+        customer_name: c.customerName || "", car_plate: c.carPlate || "",
+        contract_date: c.contractDate || today,
+        type: c.type || "court",
+        days: c.days || 0, months: c.months || 0,
+        rate: c.rate || 0, rate_currency: c.rateCurrency || "TND",
+        quotient: c.quotient || 0, quotient_currency: c.quotientCurrency || "TND",
+        quotient_tnd: c.quotientTnd || 0,
+        total_amount_original: c.totalAmountOriginal || 0,
+        total_amount_tnd: c.totalAmountTnd || 0,
+        payment_moment: c.paymentMoment || "", payment_plan: c.paymentPlan || "",
+        status: c.status === "actif" ? "active" : (c.status || "active"),
+      };
+    }
+
+    function mapInvoiceToApi(c) {
+      return {
+        contract_id: c.contractId || null,
+        customer_name: c.customerName || "",
+        amount_original: c.amountOriginal || 0, currency: c.currency || "TND",
+        amount_tnd: c.amountTnd || 0, paid_amount_tnd: c.paidAmountTnd || 0,
+        due_amount_tnd: c.dueAmountTnd || 0,
+        label: c.label || "", due_date: c.dueDate || today,
+        status: c.status || "en_attente",
+        reminder_count: c.reminderCount || 0,
+        amount_ht: c.amountHt || 0, vat_amount: c.vatAmount || 0,
+        daily_tax_amount: c.dailyTaxAmount || 0, stamp_duty_amount: c.stampDutyAmount || 0,
+        rental_days: c.rentalDays || 0, period_start: c.periodStart || null, period_end: c.periodEnd || null,
+        lines: c.lines || [],
+      };
+    }
+
+    function mapCarToApi(c) {
+      return { plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible") };
+    }
+
+    function mapCustomerToApi(c) {
+      return { name: c.name, phone: c.phone || "", email: c.email || "" };
+    }
+
+    function mapReservationToApi(c) {
+      return { customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente" };
+    }
+
+    // Entites editables via la modale generique (openRecordEditor) qui disposent d'une route PUT /:id
+    const ENTITY_API_PUT = {
+      contracts: { path: "/contracts", toApi: mapContractToApi },
+      invoices: { path: "/invoices", toApi: mapInvoiceToApi },
+      cars: { path: "/cars", toApi: mapCarToApi },
+      customers: { path: "/customers", toApi: mapCustomerToApi },
+      reservations: { path: "/reservations", toApi: mapReservationToApi },
+    };
 
     function populateSettingsFields() {
       byId("eurToTnd").value = state.settings.eurToTnd;
@@ -10835,7 +10892,7 @@
 
       const calculatedFields = {
         contracts: ["quotientTnd", "totalAmountOriginal", "totalAmountTnd", "paymentPlan", "customerName", "carPlate"],
-        invoices: ["amountTnd", "paidAmountTnd", "dueAmountTnd"],
+        invoices: ["amountTnd", "paidAmountTnd", "dueAmountTnd", "lines"],
         payments: ["amountTnd", "contractType"],
         maintenanceCosts: ["amountTnd", "carPlate"],
         reservations: ["customerName", "carPlate"],
@@ -11002,7 +11059,7 @@
         } else {
           const input = document.createElement("input");
           input.type = config.inputType || "text";
-          input.value = value === undefined || value === null ? "" : String(value);
+          input.value = value === undefined || value === null ? "" : (typeof value === "object" ? JSON.stringify(value) : String(value));
           control = input;
         }
 
@@ -11082,6 +11139,11 @@
           if (idx >= 0) collection[idx].id = savedMntE.id;
           editorState.id = savedMntE.id;
         }
+      }
+
+      const apiEntry = !editorState.isNew && ENTITY_API_PUT[entity];
+      if (apiEntry) {
+        await apiPut(`${apiEntry.path}/${record.id}`, apiEntry.toApi(record));
       }
 
       editorState.isNew = false;

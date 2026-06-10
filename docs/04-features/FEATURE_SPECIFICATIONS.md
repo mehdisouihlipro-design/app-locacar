@@ -1137,6 +1137,27 @@ Manage multiple agencies (owned and subcontractor) with commission and cost-shar
 
 ---
 
+## 8. Édition générique des enregistrements (modale double-clic)
+
+### Description
+Un double-clic sur une ligne de tableau (Contrats, Factures, Voitures, Clients, Réservations, Paiements, Maintenance, Assurances, Leasing, Vignettes, etc.) ouvre une modale générique (`openRecordEditor`/`saveRecordEditor`) qui permet d'éditer les champs de l'enregistrement. Les champs calculés (totaux, montants TND dérivés, `lines` des factures, etc.) sont affichés en lecture seule.
+
+### Persistance (conforme à la règle CLAUDE.md)
+À l'enregistrement (`saveRecordEditor`), en plus de la mise à jour de `state` + `localStorage`, l'app effectue un `PUT` vers l'API backend pour les entités qui disposent d'une route `PUT /:id` :
+
+| Entité | Route API | Statut |
+|---|---|---|
+| `contracts` | `PUT /contracts/:id` | ✅ Persisté |
+| `invoices` | `PUT /invoices/:id` | ✅ Persisté (inclut `lines`) |
+| `cars` | `PUT /cars/:id` | ✅ Persisté |
+| `customers` | `PUT /customers/:id` | ✅ Persisté |
+| `reservations` | `PUT /reservations/:id` | ✅ Persisté |
+| `payments`, `maintenanceCosts`, `vignettes`, `leasingContracts`, `insurances`, `insuranceInstallments`, `leasingInstallments` | aucune route `PUT` | ⚠️ Édition non persistée en base (seulement locale) |
+
+**Limitation connue** : pour les entités sans route `PUT`, une édition via la modale générique ne survit pas à un rechargement (les données reviennent à l'état de la base). Pour rendre ces écrans éditables, il faut ajouter les routes `PUT /:id` correspondantes côté backend (`src/backend/routes/`) puis enregistrer ces entités dans la table `ENTITY_API_PUT` (`worksheet-mini-app/index.html`).
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: May 2026  
 **Next Review**: June 2026
