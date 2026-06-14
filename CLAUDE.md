@@ -9,6 +9,7 @@ Après **chaque modification** de code, mettre à jour la documentation correspo
 - `docs/03-data-model/SCHEMA_REFERENCE.md` — si le schéma DB change
 - `docs/04-features/FEATURE_SPECIFICATIONS.md` — si une feature est ajoutée ou modifiée
 - `docs/05-api/API_REFERENCE.md` — si les endpoints API changent
+- `USER_GUIDE.md` — si l'expérience utilisateur change (nouvel écran, nouveau bouton/action, changement de parcours, FAQ/troubleshooting impactés) ; régénérer ensuite `USER_GUIDE.pdf` à partir du `.md` mis à jour
 
 ### Persistance des données (règle absolue)
 Aucun écran ne doit fonctionner uniquement avec des données locales/temporaires (état JS, localStorage). **Tout écran doit lire et écrire via l'API backend → Supabase** :

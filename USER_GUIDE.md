@@ -1,6 +1,6 @@
 # 📖 Guide d'Utilisation Complet - E-Drive Gestion Locative
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** Juin 2026  
 **Application:** LocaCar - Gestion Multi-Agences de Location de Véhicules
 
@@ -23,6 +23,7 @@
 13. [Rentabilité par Véhicule](#rentabilité-par-véhicule)
 14. [Alertes & Notifications](#alertes--notifications)
 15. [Paramètres](#paramètres)
+16. [Édition des Fiches & Navigation](#édition-des-fiches--navigation)
 
 ---
 
@@ -42,7 +43,8 @@
 ✅ Tracking GPS  
 ✅ **Prévisions de trésorerie 365 jours**  
 ✅ Système d'alertes avancé  
-✅ Persistance localStorage + Supabase optionnel  
+✅ Authentification multi-utilisateur (rôles agent/admin/manager)  
+✅ Persistance cloud via Supabase (toutes les données passent par l'API backend)  
 
 ---
 
@@ -53,14 +55,15 @@
 https://web-production-b4967.up.railway.app
 ```
 
-### Connexion (Optionnel)
-- Cliquez sur **"Se Connecter"** pour synchroniser avec Supabase
-- Laissez vide pour utiliser mode **hors ligne** (localStorage)
+### Connexion (obligatoire)
+- Saisissez votre **email** et votre **mot de passe**, puis cliquez **"Se connecter"**
+- Toutes les données sont stockées sur Supabase (cloud) via l'API backend — il n'existe pas de mode "hors ligne"
+- Une fois connecté, le bouton **"Se déconnecter"** apparaît et votre email/rôle s'affichent en haut de l'écran
 
 ### Premier Lancement
-1. Les données de démonstration se chargent automatiquement
-2. Vous verrez plusieurs véhicules, clients et contrats pré-configurés
-3. Vous pouvez commencer à créer des locations immédiatement
+1. Au login, l'application charge automatiquement toutes les données existantes (véhicules, clients, contrats, factures...) depuis l'API
+2. Si la base est vide, le bouton **"Charger données demo"** (page d'accueil) précharge un jeu de données de démonstration
+3. Vous pouvez ensuite commencer à créer des locations immédiatement
 
 ---
 
@@ -182,6 +185,26 @@ https://web-production-b4967.up.railway.app
 - Location court terme = 1 facture
 - Location long terme = 1 facture/mois
 - Statut: `non_payee` → `partiellement_payee` → `payee`
+
+#### Créer une Facture Manuelle
+1. Cliquer **"Nouvelle facture"** pour afficher le formulaire
+2. Renseigner :
+   - **Client**
+   - **Libellé** (ex: "Facture additionnelle")
+   - **Devise**
+   - **Date d'échéance**
+   - **RIB** : choisir le compte bancaire affiché sur la facture — **RIB n°1** ou **RIB n°2** (le RIB n°2 n'apparaît que s'il est configuré dans Paramètres → Coordonnées légales, voir section [Paramètres](#paramètres)). Le RIB choisi est **figé** sur la facture, même si les coordonnées bancaires sont modifiées plus tard dans les paramètres.
+3. **Lignes de facturation** (1 ligne = 1 contrat/véhicule) :
+   - Pour chaque ligne : contrat (véhicule associé), date de début de période, nombre de jours, montant HT
+   - Cliquer **"+ Ajouter une ligne"** pour facturer plusieurs contrats/véhicules sur la même facture
+   - La taxe journalière (paramétrable en Paramètres, ex: 2 dt/jour) est calculée **par ligne** ; le timbre fiscal n'est compté **qu'une seule fois** pour toute la facture
+4. Cliquer **"Créer facture"**
+
+#### Modifier / Imprimer une Facture
+- Double-clic sur une facture pour ouvrir sa fiche détaillée (voir [Édition des Fiches & Navigation](#édition-des-fiches--navigation)), ou utiliser la modale dédiée d'édition/impression :
+  - Ajuster le montant HT ou TTC (calcul automatique de la TVA, de la taxe journalière et du timbre fiscal dans l'autre sens)
+  - Bouton **"Télécharger PDF"** : ouvre un aperçu imprimable de la facture (impression/export PDF via le navigateur), avec le RIB sélectionné à la création
+  - Bouton **"Enregistrer"** : sauvegarde les modifications
 
 #### Colonnes
 | Col | Signification |
@@ -533,20 +556,53 @@ En cliquant sur **"Détails"**, une fenêtre s'ouvre avec :
 
 ## Paramètres
 
-### Onglet: Paramètres
+### Accès : bouton "⚙️ Paramètres de l'agence"
+Les paramètres ne sont pas un onglet séparé : ils s'ouvrent dans une **fenêtre dédiée** depuis le bouton **"⚙️ Paramètres de l'agence"** (page Accueil). La fermeture de cette fenêtre (bouton "Fermer" ou croix **×** en haut à droite) enregistre automatiquement les modifications.
 
-#### Devises & Conversion
-- **Devise de Base:** TND (Dinar Tunisien)
-- **Taux EUR → TND:** Défini localement (ex: 3.4)
-- **Devises Acceptées:** 13 options (EUR, USD, GBP, JPY, CAD, CHF, AED, SAR, KWD, BHD, CNY, OMR)
+#### Personnalisation (White-label)
+- **Nom de l'entreprise** : affiché dans l'en-tête de l'application et sur les factures
+- **URL du logo** : remplace le logo par défaut
 
-#### Trésorerie Initiale
-- **Solde Ouverture:** Solde initial en TND
-- Utilisé pour calcul prévisionnel
+#### Coordonnées légales (en-tête des factures)
+- **Adresse**, **Téléphone (Gsm)**, **Matricule fiscal / Code TVA**
+- **RIB n°1** : libellé + numéro de compte (compte bancaire principal, utilisé par défaut sur les factures)
+- **RIB n°2** (optionnel) : libellé + numéro de compte — un second compte bancaire, sélectionnable au cas par cas à la création de chaque facture (voir [Factures & Paiements](#factures--paiements))
 
-#### Sauvegarde
-- **Local:** Données dans localStorage (navigateur)
-- **Supabase (optionnel):** Connecter pour sync cloud
+#### Paramètres de facturation
+- **TVA (%)**, **Taxe par jour de location (TND)**, **Timbre fiscal (TND)** — utilisés pour les conversions HT ↔ TTC des factures
+
+#### Paramètres financiers
+- **Devise principale** : TND (Dinar Tunisien, fixe)
+- **Taux EUR → TND** : utilisé pour convertir tous les montants en EUR
+- **Solde initial trésorerie (TND)** : point de départ des prévisions à 365 jours
+- **Buffer réservations (heures)** : marge minimale appliquée entre deux réservations du même véhicule
+
+#### Devises Acceptées
+13 devises disponibles sur les contrats/factures : EUR, USD, GBP, JPY, CAD, CHF, AED, SAR, KWD, BHD, CNY, OMR, TND
+
+---
+
+## Édition des Fiches & Navigation
+
+### Modale d'édition générique (double-clic)
+Un double-clic sur une ligne de tableau (Contrats, Factures, Voitures, Clients, Réservations, Paiements, Maintenance, Assurances, Leasing, Vignettes, États des lieux...) ouvre une fenêtre d'édition détaillée :
+- Tous les champs de l'enregistrement sont affichés et modifiables
+- Les champs calculés (totaux, montants convertis en TND, lignes de facture...) sont affichés en lecture seule (grisés)
+- Les champs à choix contraint (ex: statut, RIB de la facture) sont présentés sous forme de **liste déroulante**, avec les mêmes options qu'à la création
+- **Traçabilité** : "Créé par"/"Créé le" et "Modifié par"/"Modifié le" sont affichés en lecture seule, avec le nom de l'utilisateur ayant créé/modifié la fiche
+- Cliquer **"Enregistrer"** pour sauvegarder (persisté en base), ou **"Annuler"** / la croix **×** en haut à droite pour fermer sans enregistrer
+
+### Croix de fermeture (×)
+Chaque fenêtre détail de l'application (édition générique, paramètres, détail utilisateur, édition facture, changement de mot de passe, détail état des lieux, bilan financier véhicule) affiche une croix **×** en haut à droite pour la fermer rapidement, en complément du bouton "Fermer"/"Annuler" en bas.
+
+### Navigation croisée entre fiches (liens cliquables)
+Dans les tableaux, certains champs (client, véhicule, contrat, facture...) apparaissent comme des **liens cliquables** (soulignés au survol) : cliquer dessus bascule vers l'onglet correspondant avec une recherche/filtre déjà appliqué sur l'élément concerné — par exemple, cliquer sur le nom d'un client depuis un contrat ouvre l'onglet Clients filtré sur ce client.
+
+### Indicateurs et graphiques cliquables
+Comme indiqué en page d'accueil, les KPI, listes et graphiques (tableau de bord, rentabilité, trésorerie...) sont cliquables et renvoient vers l'écran de détail correspondant, avec le même filtre déjà appliqué.
+
+### Modification exceptionnelle du numéro de contrat/facture
+Le numéro (identifiant) d'un contrat ou d'une facture peut être modifié depuis la modale d'édition générique. La modification est automatiquement répercutée sur tous les enregistrements liés (factures, paiements, états des lieux...).
 
 ---
 
@@ -581,23 +637,20 @@ En cliquant sur **"Détails"**, une fenêtre s'ouvre avec :
 
 ## ❓ FAQ
 
-### Q: Comment migrer de local vers Supabase?
-**A:** Allez dans Paramètres → Connexion Supabase → Entrez identifiants → Cliquer "Charger du cloud"
-
 ### Q: Peux-tu payer une facture partiellement?
-**A:** Oui! Entrez montant < restant dû. Facture passe en "partiellement payée".
+**A:** Oui! Entrez un montant inférieur au restant dû. La facture passe en "partiellement payée".
 
-### Q: Comment exporter les données?
-**A:** Download depuis localStorage (Dev Tools > Application > localStorage > locacar-mini-v3) ou export Supabase.
+### Q: Comment savoir qui a créé/modifié une fiche?
+**A:** Ouvrez la fiche en double-clic : les champs "Créé par"/"Créé le" et "Modifié par"/"Modifié le" sont affichés en lecture seule en bas de la fenêtre.
+
+### Q: Comment choisir le RIB affiché sur une facture?
+**A:** À la création de la facture, sélectionnez "RIB n°1" ou "RIB n°2" dans le champ RIB (RIB n°2 doit avoir été configuré au préalable dans Paramètres → Coordonnées légales). Le choix est figé sur la facture, modifiable ensuite via sa fiche détaillée.
 
 ### Q: Les signatures et photos sont-elles cryptées?
-**A:** Non, elles sont en base64. Pour production, activez HTTPS + chiffrement Supabase RLS.
+**A:** Elles sont stockées en base64 dans Supabase. Pour la production, activez HTTPS et les policies RLS Supabase.
 
-### Q: Quelle est la limite de stockage?
-**A:** localStorage ~5-10MB. Après, basculez sur Supabase pour illimité.
-
-### Q: Comment réinitialiser les données?
-**A:** Dev Tools > Application > localStorage > Supprimer "locacar-mini-v3" > Refresh.
+### Q: Comment recharger des données de démonstration?
+**A:** Depuis la page d'accueil, cliquer sur **"Charger données demo"**.
 
 ---
 
@@ -608,21 +661,22 @@ En cliquant sur **"Détails"**, une fenêtre s'ouvre avec :
 2. Vérifier votre connexion internet
 3. Essayer un rafraîchissement forcé (`Ctrl+F5`) pour vider le cache du navigateur
 
-### Problème: Données disparues après refresh
-1. Vérifier localStorage activé (pas mode incognito)
-2. Vérifier "locacar-mini-v3" présent en DevTools
+### Problème: Données disparues / non sauvegardées après refresh
+1. Vérifier que vous êtes bien connecté (email et rôle visibles en haut de l'écran)
+2. Vérifier qu'aucun message d'erreur d'API ne s'affiche après une création/modification
+3. Rafraîchir la page (`F5`) — les données sont rechargées depuis Supabase via l'API
 
 ### Problème: Analyse IA ne fonctionne pas
-1. Vérifier ANTHROPIC_API_KEY définie
+1. Vérifier ANTHROPIC_API_KEY définie côté serveur
 2. Vérifier deux EDL avec photos sélectionnées
 3. Vérifier connexion internet
 
-### Problème: PDFs ne génèrent pas
-1. Vérifier html2pdf.js chargé (console, pas d'erreur 404)
-2. Vérifier photos < 10MB
-3. Essayer autre navigateur
+### Problème: PDFs (factures / états des lieux) ne génèrent pas
+1. Vérifier qu'aucune fenêtre popup n'est bloquée par le navigateur (le PDF s'ouvre via une fenêtre d'impression)
+2. Vérifier photos < 10MB (états des lieux)
+3. Essayer un autre navigateur
 
 ---
 
 **Dernière mise à jour:** Juin 2026  
-**Prochaines évolutions:** Factures récurrentes, API mobile, Dashboard temps réel
+**Prochaines évolutions:** Tri et filtre génériques sur toutes les grilles, Factures récurrentes, Dashboard temps réel
