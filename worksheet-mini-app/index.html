@@ -1573,6 +1573,10 @@
             <label>Date d'echeance</label>
             <input id="invoiceDueDate" type="date" />
           </div>
+          <div>
+            <label>RIB (coordonnees bancaires)</label>
+            <select id="invoiceRib"></select>
+          </div>
         </div>
 
         <p class="small" style="margin-top:10px;">Lignes de facturation (1 ligne = 1 contrat/voiture). La taxe de <span id="invoiceLinesDailyTaxLabel">2</span> dt/jour est calculee par ligne, le timbre fiscal une seule fois pour la facture.</p>
@@ -2596,12 +2600,24 @@
               <input id="companyPhone" placeholder="Ex: (+216) 98 966 755" />
             </div>
             <div>
-              <label>RIB</label>
+              <label>Matricule fiscal / Code TVA</label>
+              <input id="companyTaxId" placeholder="Ex: 1182562/Y/M/A/000" />
+            </div>
+            <div>
+              <label>Libelle RIB 1</label>
+              <input id="companyRibLabel" placeholder="Ex: RIB" />
+            </div>
+            <div>
+              <label>RIB 1</label>
               <input id="companyRib" placeholder="Ex: UBCI Zaghouan 11 070 000 1115 002 788 12" />
             </div>
             <div>
-              <label>Matricule fiscal / Code TVA</label>
-              <input id="companyTaxId" placeholder="Ex: 1182562/Y/M/A/000" />
+              <label>Libelle RIB 2 (optionnel)</label>
+              <input id="companyRib2Label" placeholder="Ex: RIB 2" />
+            </div>
+            <div>
+              <label>RIB 2 (optionnel)</label>
+              <input id="companyRib2" placeholder="Ex: BIAT Zaghouan 08 123 000 0000 002 788 55" />
             </div>
           </div>
         </div>
@@ -4570,12 +4586,17 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow] = await Promise.all([
+      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
         apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
+        apiGet("/users"),
       ]);
+
+      // BR23 : annuaire des utilisateurs pour resoudre created_by/updated_by en noms lisibles
+      // (apiGet renvoie null si role non-admin -> state.users reste [], resolveUserName retombe sur l'ID)
+      if (usersRows) state.users = usersRows.map(u => ({ id: u.id, name: u.full_name || u.email, email: u.email }));
 
       if (settingsRow) state.settings = {
         ...state.settings,
@@ -4588,7 +4609,10 @@
         stampDutyTnd: Number(settingsRow.stamp_duty_tnd ?? state.settings.stampDutyTnd ?? 1),
         companyAddress: settingsRow.company_address || state.settings.companyAddress || "",
         companyPhone: settingsRow.company_phone || state.settings.companyPhone || "",
+        companyRibLabel: settingsRow.company_rib_label || state.settings.companyRibLabel || "",
         companyRib: settingsRow.company_rib || state.settings.companyRib || "",
+        companyRib2Label: settingsRow.company_rib_2_label || state.settings.companyRib2Label || "",
+        companyRib2: settingsRow.company_rib_2 || state.settings.companyRib2 || "",
         companyTaxId: settingsRow.company_tax_id || state.settings.companyTaxId || "",
         companyName: settingsRow.company_name || state.settings.companyName || "",
         logoUrl: settingsRow.logo_url || state.settings.logoUrl || "",
@@ -4603,11 +4627,15 @@
         // Normalize: "disponible" → "dispo" to match internal app values
         status: c.status === "disponible" ? "dispo" : (c.status || "dispo"),
         gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
+        createdAt: c.created_at || "", createdBy: c.created_by || null,
+        updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
 
       if (customers) state.customers = customers.map(c => ({
         id: c.id, name: c.name, phone: c.phone || "", email: c.email || "",
         address: c.address || "", type: c.type || "particulier",
+        createdAt: c.created_at || "", createdBy: c.created_by || null,
+        updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
 
       if (contracts) state.contracts = contracts.map(c => ({
@@ -4622,6 +4650,8 @@
         totalAmountTnd: c.total_amount_tnd || 0,
         paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
         status: c.status || "active",
+        createdAt: c.created_at || "", createdBy: c.created_by || null,
+        updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
 
       if (invoices) state.invoices = invoices.map(i => ({
@@ -4635,6 +4665,9 @@
         dailyTaxAmount: i.daily_tax_amount || 0, stampDutyAmount: i.stamp_duty_amount || 0,
         rentalDays: i.rental_days || 0, periodStart: i.period_start || "", periodEnd: i.period_end || "",
         lines: i.lines || [],
+        rib: i.rib || "", ribLabel: i.rib_label || "",
+        createdAt: i.created_at || "", createdBy: i.created_by || null,
+        updatedAt: i.updated_at || "", updatedBy: i.updated_by || null,
       }));
 
       if (payments) state.payments = payments.map(p => ({
@@ -4643,6 +4676,8 @@
         date: p.payment_date || "", amountOriginal: p.amount_original || 0,
         currency: p.currency || "TND", amountTnd: p.amount_tnd || 0,
         method: p.method || "",
+        createdAt: p.created_at || "", createdBy: p.created_by || null,
+        updatedAt: p.updated_at || "", updatedBy: p.updated_by || null,
       }));
 
       if (maintenance) state.maintenanceCosts = maintenance.map(m => ({
@@ -4651,6 +4686,8 @@
         amountOriginal: m.amount_original || 0, currency: m.currency || "TND",
         amountTnd: m.amount_tnd || 0, status: m.status || "paye",
         note: m.note || "", sourceKey: m.source_key || "",
+        createdAt: m.created_at || "", createdBy: m.created_by || null,
+        updatedAt: m.updated_at || "", updatedBy: m.updated_by || null,
       }));
 
       if (vignettes) state.vignettes = vignettes.map(v => ({
@@ -4659,6 +4696,8 @@
         amountOriginal: v.amount_original || 0, currency: v.currency || "TND",
         amountTnd: v.amount_tnd || 0, dueDate: v.due_date || "",
         status: v.status || "a_payer",
+        createdAt: v.created_at || "", createdBy: v.created_by || null,
+        updatedAt: v.updated_at || "", updatedBy: v.updated_by || null,
       }));
 
       if (leasingContracts) state.leasingContracts = leasingContracts.map(l => ({
@@ -4669,6 +4708,8 @@
         startDate: l.start_date || "", endDate: l.end_date || "",
         attachmentName: l.attachment_name || "", attachmentType: l.attachment_type || "",
         attachmentData: l.attachment_data || "",
+        createdAt: l.created_at || "", createdBy: l.created_by || null,
+        updatedAt: l.updated_at || "", updatedBy: l.updated_by || null,
       }));
 
       if (insurances) state.insurances = insurances.map(i => ({
@@ -4679,6 +4720,8 @@
         startDate: i.start_date || "", endDate: i.end_date || "",
         attachmentName: i.attachment_name || "", attachmentType: i.attachment_type || "",
         attachmentData: i.attachment_data || "",
+        createdAt: i.created_at || "", createdBy: i.created_by || null,
+        updatedAt: i.updated_at || "", updatedBy: i.updated_by || null,
       }));
 
       if (reservations) state.reservations = reservations.map(r => ({
@@ -4687,6 +4730,8 @@
         startDate: r.start_date || "", startTime: r.start_time || "09:00",
         endDate: r.end_date || "", endTime: r.end_time || "18:00",
         status: r.status || "en_attente",
+        createdAt: r.created_at || "", createdBy: r.created_by || null,
+        updatedAt: r.updated_at || "", updatedBy: r.updated_by || null,
       }));
     }
 
@@ -4997,6 +5042,9 @@
         const label = byId("invoiceLabel").value.trim() || "Facture manuelle";
         const currency = byId("invoiceCurrency").value || "TND";
         const dueDate = byId("invoiceDueDate").value || addDaysToIsoDate(today, 7);
+        const ribChoice = byId("invoiceRib") ? byId("invoiceRib").value : "1";
+        const rib = ribChoice === "2" ? state.settings.companyRib2 : state.settings.companyRib;
+        const ribLabel = ribChoice === "2" ? (state.settings.companyRib2Label || "RIB 2") : (state.settings.companyRibLabel || "RIB");
 
         const customer = state.customers.find((c) => c.id === customerId);
         if (!customer) {
@@ -5074,6 +5122,8 @@
           due_date: dueDate,
           status: "en_attente",
           reminder_count: 0,
+          rib,
+          rib_label: ribLabel,
         });
         if (savedInv && savedInv.id) invId = savedInv.id;
 
@@ -5098,6 +5148,8 @@
           dueDate,
           lastReminderAt: "",
           reminderCount: 0,
+          rib,
+          ribLabel,
         });
 
         byId("invoiceLegacyForm").style.display = "none";
@@ -5476,7 +5528,11 @@
               <h1 style="font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
               <p style="font-size:9px;color:#4d6a97;margin-top:2px;">LOCATION DE VOITURES</p>
               ${settings.companyAddress ? `<p style="font-size:9px;color:#4d6a97;">${safe(settings.companyAddress)}</p>` : ""}
-              ${(settings.companyPhone || settings.companyRib) ? `<p style="font-size:9px;color:#4d6a97;">${settings.companyPhone ? "Tel: " + safe(settings.companyPhone) : ""}${settings.companyRib ? " &middot; RIB: " + safe(settings.companyRib) : ""}</p>` : ""}
+              ${(() => {
+                const rib = invoice.rib || settings.companyRib;
+                const ribLabel = invoice.rib ? (invoice.ribLabel || "RIB") : (settings.companyRibLabel || "RIB");
+                return (settings.companyPhone || rib) ? `<p style="font-size:9px;color:#4d6a97;">${settings.companyPhone ? "Tel: " + safe(settings.companyPhone) : ""}${rib ? " &middot; " + safe(ribLabel) + ": " + safe(rib) : ""}</p>` : "";
+              })()}
               ${settings.companyTaxId ? `<p style="font-size:9px;color:#4d6a97;">Matricule fiscal: ${safe(settings.companyTaxId)}</p>` : ""}
             </td>
           </tr>
@@ -7119,7 +7175,7 @@
       state.leasingContracts = [];
       state.leasingInstallments = [];
       state.vignettes = [];
-      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "", companyName: "", logoUrl: "" };
+      state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRibLabel: "RIB", companyRib: "", companyRib2Label: "RIB 2", companyRib2: "", companyTaxId: "", companyName: "", logoUrl: "" };
       saveAndRender();
     });
 
@@ -7132,7 +7188,10 @@
       const logoUrl = byId("logoUrl").value.trim();
       const companyAddress = byId("companyAddress").value.trim();
       const companyPhone = byId("companyPhone").value.trim();
+      const companyRibLabel = byId("companyRibLabel").value.trim();
       const companyRib = byId("companyRib").value.trim();
+      const companyRib2Label = byId("companyRib2Label").value.trim();
+      const companyRib2 = byId("companyRib2").value.trim();
       const companyTaxId = byId("companyTaxId").value.trim();
       const vatRate = Number(byId("vatRate").value || 0);
       const dailyTaxTnd = Number(byId("dailyTaxTnd").value || 0);
@@ -7156,7 +7215,10 @@
       state.settings.stampDutyTnd = stampDutyTnd;
       state.settings.companyAddress = companyAddress;
       state.settings.companyPhone = companyPhone;
+      state.settings.companyRibLabel = companyRibLabel;
       state.settings.companyRib = companyRib;
+      state.settings.companyRib2Label = companyRib2Label;
+      state.settings.companyRib2 = companyRib2;
       state.settings.companyTaxId = companyTaxId;
       saveAndRender();
       applyBranding(logoUrl, companyName);
@@ -7170,7 +7232,10 @@
         stamp_duty_tnd: stampDutyTnd,
         company_address: companyAddress,
         company_phone: companyPhone,
+        company_rib_label: companyRibLabel,
         company_rib: companyRib,
+        company_rib_2_label: companyRib2Label,
+        company_rib_2: companyRib2,
         company_tax_id: companyTaxId,
         company_name: companyName,
         logo_url: logoUrl,
@@ -7221,6 +7286,14 @@
       });
     }
 
+    // BR23 : resout un id utilisateur (created_by/updated_by) en nom lisible via state.users
+    // (chargee uniquement pour les admins) ; retombe sur l'ID brut si introuvable.
+    function resolveUserName(userId) {
+      if (!userId) return "-";
+      const user = (state.users || []).find(u => u.id === userId);
+      return user ? user.name : userId;
+    }
+
     function convertToTnd(amount, currency, eurToTnd) {
       if (currency === "TND") return amount;
       if (currency === "EUR") return amount * eurToTnd;
@@ -7260,6 +7333,7 @@
         daily_tax_amount: c.dailyTaxAmount || 0, stamp_duty_amount: c.stampDutyAmount || 0,
         rental_days: c.rentalDays || 0, period_start: c.periodStart || null, period_end: c.periodEnd || null,
         lines: c.lines || [],
+        rib: c.rib || "", rib_label: c.ribLabel || "",
       };
     }
 
@@ -7293,7 +7367,10 @@
       byId("stampDutyTnd").value = state.settings.stampDutyTnd ?? 1;
       byId("companyAddress").value = state.settings.companyAddress || "";
       byId("companyPhone").value = state.settings.companyPhone || "";
+      byId("companyRibLabel").value = state.settings.companyRibLabel || "";
       byId("companyRib").value = state.settings.companyRib || "";
+      byId("companyRib2Label").value = state.settings.companyRib2Label || "";
+      byId("companyRib2").value = state.settings.companyRib2 || "";
       byId("companyTaxId").value = state.settings.companyTaxId || "";
       byId("companyName").value = state.settings.companyName || "";
       byId("logoUrl").value = state.settings.logoUrl || "";
@@ -7418,7 +7495,7 @@
     function load() {
       try {
         const raw = localStorage.getItem(KEY);
-        const defaultSettings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" };
+        const defaultSettings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRibLabel: "RIB", companyRib: "", companyRib2Label: "RIB 2", companyRib2: "", companyTaxId: "" };
         
         if (!raw) {
           return {
@@ -7435,6 +7512,7 @@
             leasingInstallments: [],
             vignettes: [],
             inspections: [],
+            users: [],
             settings: defaultSettings,
           };
         }
@@ -7598,6 +7676,7 @@
               signatureClientData: i.signatureClientData || "",
             };
           }),
+          users: parsed.users || [],
           settings,
         };
       } catch (_) {
@@ -7615,7 +7694,8 @@
           leasingInstallments: [],
           vignettes: [],
           inspections: [],
-          settings: { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRib: "", companyTaxId: "" },
+          users: [],
+          settings: { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRibLabel: "RIB", companyRib: "", companyRib2Label: "RIB 2", companyRib2: "", companyTaxId: "" },
         };
       }
     }
@@ -9469,6 +9549,21 @@
         opt.textContent = `${c.name} (${c.phone})`;
         customerSelect.appendChild(opt);
       });
+
+      const ribSelect = byId("invoiceRib");
+      if (ribSelect) {
+        ribSelect.innerHTML = "";
+        const opt1 = document.createElement("option");
+        opt1.value = "1";
+        opt1.textContent = `${state.settings.companyRibLabel || "RIB"}${state.settings.companyRib ? " - " + state.settings.companyRib : ""}`;
+        ribSelect.appendChild(opt1);
+        if (state.settings.companyRib2) {
+          const opt2 = document.createElement("option");
+          opt2.value = "2";
+          opt2.textContent = `${state.settings.companyRib2Label || "RIB 2"} - ${state.settings.companyRib2}`;
+          ribSelect.appendChild(opt2);
+        }
+      }
     }
 
     function renderContracts() {
@@ -10923,6 +11018,12 @@
         return { control: "input", readOnly: !idEditable, inputType: "text" };
       }
 
+      // BR23 : piste d'audit, toujours en lecture seule (alimentee par le backend
+      // a partir de l'utilisateur authentifie, cf. stampCreate/stampUpdate)
+      if (["createdAt", "updatedAt", "createdBy", "updatedBy"].includes(key)) {
+        return { control: "input", readOnly: true, inputType: "text" };
+      }
+
       if (lookupMap[compound]) {
         return { control: "select", options: lookupMap[compound], readOnly: isCalculated };
       }
@@ -11067,7 +11168,11 @@
         } else {
           const input = document.createElement("input");
           input.type = config.inputType || "text";
-          input.value = value === undefined || value === null ? "" : (typeof value === "object" ? JSON.stringify(value) : String(value));
+          if (key === "createdBy" || key === "updatedBy") {
+            input.value = resolveUserName(value);
+          } else {
+            input.value = value === undefined || value === null ? "" : (typeof value === "object" ? JSON.stringify(value) : String(value));
+          }
           control = input;
         }
 

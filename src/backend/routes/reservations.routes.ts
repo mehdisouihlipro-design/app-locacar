@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { stampCreate, stampUpdate } from '../utils/audit';
 
 const router = Router();
 
@@ -26,11 +27,11 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.post('/reservations', {
+    const result = await global.db.post('/reservations', stampCreate({
       ...req.body,
       id: req.body.id || uuidv4(),
       status: req.body.status || 'en_attente'
-    }, { headers: { Prefer: 'resolution=merge-duplicates' } });
+    }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
@@ -39,7 +40,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.patch(`/reservations?id=eq.${req.params.id}`, req.body, {
+    const result = await global.db.patch(`/reservations?id=eq.${req.params.id}`, stampUpdate(req.body, req), {
       headers: { Prefer: 'return=representation' },
     });
     if (!result.data || result.data.length === 0) return res.status(404).json({ success: false, message: 'Reservation not found' });

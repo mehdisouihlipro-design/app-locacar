@@ -1171,6 +1171,166 @@ Lorsque l'utilisateur modifie cet Id et confirme :
 
 ---
 
+## 9. Évolutions V2 — Vers une version professionnelle
+
+> Spécification du prochain lot de fonctionnalités, à développer après validation. Référentiel métier : `docs/01-specifications/BMAD.md` section 6.5 (BR18-BR27). Référentiel schéma : `docs/03-data-model/SCHEMA_REFERENCE.md` section "Évolutions V2".
+
+### 9.0 Checklists transversales (règles absolues CLAUDE.md) — à appliquer à chaque entité/écran V2
+
+Les deux règles absolues du projet (`CLAUDE.md`) s'appliquent à **toute** nouvelle entité et **tout** nouvel écran/KPI/graphique introduits par les sections 9.1-9.11. Avant de considérer une feature V2 comme terminée, vérifier systématiquement les deux checklists suivantes.
+
+**Checklist persistance (par entité : `contract_lines`, `invoice_lines`, `quotes`, `quote_lines`, et toute nouvelle entité future)**
+1. **Chargement** : l'entité est chargée par `loadDataFromAPI` (pas de dépendance au seed démo local uniquement).
+2. **Écriture** : les formulaires de création/édition écrivent via `apiPost`/`apiPut`/`upsertMany` vers l'endpoint correspondant (`docs/05-api/API_REFERENCE.md`), puis mettent à jour `state` localement.
+3. **Démo** : l'entité est incluse dans `syncStateToAPI` et dans la route `/demo/reset` (bouton "Charger données démo").
+
+| Entité | Chargement (`loadDataFromAPI`) | Écriture (formulaires) | `syncStateToAPI` / `/demo/reset` |
+|---|---|---|---|
+| `contract_lines` | À ajouter (avec `contracts`) | Formulaire "+ Ajouter une ligne" (9.3) | À ajouter |
+| `invoice_lines` | À ajouter (avec `invoices`) | Auto-remplissage + édition (9.4) | À ajouter |
+| `quotes` | À ajouter | Écran Devis (9.10) | À ajouter |
+| `quote_lines` | À ajouter (avec `quotes`) | Écran Devis (9.10) | À ajouter |
+
+**Checklist navigation cliquable (par nouvel écran/KPI/graphique)**
+Chaque pile/carte statistique (KPI), liste et graphique doit être cliquable et renvoyer vers l'écran détaillé **avec le même filtre déjà appliqué** (pattern `onClick` + `switchToTab`/`openTab` + filtre pré-rempli, déjà en place sur les graphiques du dashboard). Exemples pour les écrans V2 :
+
+| Widget source | Cible cliquable |
+|---|---|
+| KPI "Contrats actifs" (dashboard) | `#contracts` filtré `status=active` |
+| Cellule "Nombre de véhicules" sur une ligne de la grille Contrats (9.3) | Détail du contrat → pavé `contract_lines` |
+| Graphique de rentabilité par véhicule (existant) | Détail du véhicule, filtré sur la période du graphique |
+| Future KPI "Devis en attente" (dashboard) | `#quotes` filtré `status=envoye` |
+| Future KPI "Devis expirant bientôt" | `#quotes` filtré `status=envoye` + tri par `validity_date` croissant |
+| Ligne `contract_lines` au statut `resilie` (9.9) | Détail de la réservation associée (`reservations.contract_line_id`) |
+
+### 9.1 Contrat : montant HT ⇄ TTC (BR18)
+
+Sur le formulaire d'une ligne de contrat (`contract_lines`), deux champs liés **Montant HT** et **Montant TTC** :
+- Modifier l'un recalcule l'autre via `computeContractTtcFromHt(amountHt)` / `computeContractHtFromTtc(amountTtc)`, avec `TTC = HT × (1 + vatRate / 100)`.
+- À la différence du calcul de facture (BR15bis), **aucune taxe journalière ni timbre fiscal** n'entre dans ce calcul — ces composantes restent propres à la facturation.
+- `rate` (tarif HT par jour ou par mois) reste le champ pivot : `amount_ht = rate × jours` (ou `× mois`). Saisir directement `amount_ttc` recalcule `rate` en conséquence.
+- Les totaux de l'entête contrat (`total_amount_ht`, `total_vat_amount`, `total_amount_ttc`) sont recalculés à chaque ajout/modification/suppression de ligne = somme des lignes.
+- **TVA non négative** : le champ "TVA (%)" du formulaire Paramètres → Paramètres de facturation refuse toute valeur négative (validation côté formulaire), en complément de la contrainte `CHECK (vat_rate >= 0)` côté base (`settings`, cf. SCHEMA_REFERENCE.md).
+
+### 9.2 Contrôle de chevauchement véhicule (BR19)
+
+À la création ou modification d'une ligne de contrat (véhicule + période), le contrôle est appliqué à **trois niveaux** :
+
+1. **UI (frontend)** : recherche d'un chevauchement de période pour le même `car_id` parmi (a) les autres `contract_lines` au statut `active` (les lignes `brouillon`, `termine`, `annule`, `resilie` sont **exclues** du contrôle), et (b) les `reservations` actives liées (BR25). En cas de conflit, message d'erreur **affiché en rouge, inline dans le formulaire** (pas une `alert()`), par exemple :
+   > ⚠ Le véhicule {plaque} est déjà engagé du {date_début} au {date_fin} sur le contrat {id_contrat} (ligne {n}). Choisissez une autre période ou un autre véhicule.
+   L'enregistrement de la ligne est bloqué jusqu'à résolution du conflit. Généralise la fonction existante `findReservationConflict` pour couvrir aussi `contract_lines`.
+2. **Backend** : `POST`/`PUT /contract-lines` exécutent la même recherche de chevauchement côté serveur avant d'écrire en base, et renvoient une erreur 409 avec un message exploitable par le frontend si un conflit est détecté (le contrôle UI seul ne suffit pas — un client malveillant ou un appel API direct pourrait le contourner).
+3. **Base de données** : la contrainte `EXCLUDE` `excl_contract_lines_car_period` (extension `btree_gist`, cf. SCHEMA_REFERENCE.md), limitée aux lignes `status = 'active'`, rejette l'écriture en cas de conflit même en présence d'accès concurrents (deux requêtes simultanées passant les niveaux 1 et 2). Le backend traduit l'erreur PostgreSQL `23P01` (exclusion violation) en la même réponse 409 que le niveau 2.
+
+Les lignes de contrat au statut `brouillon` (contrat non confirmé, 9.3) ne sont soumises à **aucun** de ces trois niveaux ; le contrôle s'applique dès le passage `brouillon → active`.
+
+### 9.3 Contrat entête + lignes (BR20)
+
+**Écran liste "Contrats" (`#contracts`)**
+- Une ligne de tableau = un contrat (entête) : Id, Client, Date, Type, Statut, **Total HT**, **Total TTC**, Nombre de véhicules (= nb de `contract_lines`).
+- Double-clic sur une ligne → ouvre l'écran de détail (modale ou panneau plein écran, sur le modèle de `#carFinanceModal`) :
+  - **Pavé haut (entête)** : client, date du contrat, type (court/long), statut, mode/plan de paiement, notes, totaux HT/TVA/TTC (lecture seule, calculés).
+  - **Pavé bas (lignes)** : grille `contract_lines` avec colonnes Véhicule (plaque + modèle), Période (début/fin), Jours/Mois, Tarif HT, Montant HT, TVA, Montant TTC, Statut, Actions (Résilier — 9.9, Supprimer la ligne).
+  - Bouton "+ Ajouter une ligne" : sélection véhicule + période + tarif HT, avec contrôle de chevauchement en direct (9.2) et calcul HT⇄TTC (9.1).
+- **Migration** : les contrats existants (mono-véhicule) sont convertis en 1 entête (sans champs véhicule) + 1 ligne `contract_lines` reprenant les champs véhicule/période/tarif actuels.
+
+**Statut `brouillon` et transition automatique `active → termine`**
+- Un contrat créé au statut `contracts.status = 'brouillon'` a toutes ses `contract_lines` créées avec `status = 'brouillon'` : ces lignes ne sont pas soumises au contrôle de chevauchement (9.2/BR19) ni à la réservation automatique (9.8/BR25), et n'apparaissent pas comme "engagées" dans le planning de disponibilité des véhicules.
+- Bouton "Confirmer le contrat" : passe `contracts.status` de `brouillon` à `active`, et bascule toutes ses `contract_lines` de `brouillon` à `active`. Ce passage déclenche alors, pour chaque ligne, le contrôle 9.2/BR19 (si conflit, la confirmation est bloquée ligne par ligne avec le message d'erreur rouge inline habituel) puis la recherche/création de réservation (9.8/BR25).
+- **Transition automatique `active → termine`** : à l'affichage de la grille `contract_lines` (liste Contrats ou détail), toute ligne `status = 'active'` dont `period_end < aujourd'hui` est affichée avec le statut `termine` (badge), sans écriture immédiate en base. Le statut est persisté (`UPDATE contract_lines SET status = 'termine'`) à la prochaine action effectuée sur la ligne (résiliation, modification, génération de facture) — même mécanisme que l'expiration automatique des devis (9.10/BR27).
+
+### 9.4 Facture entête + lignes, auto-remplissage depuis un contrat (BR21)
+
+- `invoices.lines` (JSONB, BR15bis) est remplacé par la table relationnelle `invoice_lines` (mêmes champs + `contract_line_id`).
+- Sur le formulaire de création/édition de facture, le sélecteur "Contrat" référence un **contrat entête**. Dès qu'un contrat est sélectionné :
+  - Le système crée automatiquement **une ligne de facture par ligne de ce contrat** (`contract_lines`), pré-remplie avec véhicule, immatriculation, période, montant HT (`contract_lines.amount_ht`).
+  - L'utilisateur peut ensuite modifier ou supprimer ces lignes générées avant validation (ex. facturation d'une période partielle, ou montant ajusté après résiliation anticipée, cf. 9.9).
+- Le calcul par ligne reste celui de BR15bis : TVA et taxe journalière (2dt/jour) par ligne ; timbre fiscal une seule fois pour la facture entière (entête).
+- `generateInvoicePdf` est mis à jour pour lire `invoice_lines` (avec repli sur `invoices.lines` pour les factures existantes non migrées).
+- **Facture sans ligne interdite (BR21)** : le bouton "Enregistrer" du formulaire facture est désactivé (ou affiche une erreur rouge inline) si `invoice_lines` est vide — message : « Une facture doit contenir au moins une ligne. ». Le backend (`POST`/`PUT /invoices` et `/rpc/create_invoice_with_lines`, 9.11) applique le même contrôle et renvoie une erreur 400 si la liste de lignes est vide, pour empêcher la création via appel API direct.
+
+### 9.5 Sélection du RIB à la facturation (BR22) — ✅ Implémenté (Phase 1A)
+
+- **Paramètres → Paramètres de facturation** : le RIB existant devient "RIB n°1" (`company_rib` + libellé optionnel `company_rib_label`) ; ajout d'un "RIB n°2" optionnel (`company_rib_2` + libellé optionnel `company_rib_2_label`). Champs `companyRibLabel`, `companyRib2`, `companyRib2Label` dans la modale Paramètres, persistés via `PUT /settings`.
+- **Formulaire de création de facture** (`#invoiceLegacyForm`) : sélecteur "RIB" (`#invoiceRib`, RIB n°1 / RIB n°2, affichant le libellé s'il est renseigné), pré-sélectionné sur le RIB n°1. L'option "RIB n°2" n'apparaît que si `companyRib2` est configuré (peuplée par `renderInvoiceFormOptions()`).
+- La valeur choisie est figée sur la facture (`invoices.rib` / `invoices.rib_label`) au moment de la création (`addInvoiceBtn`) et imprimée dans le PDF (`generateInvoicePdf`), indépendamment d'une modification ultérieure des paramètres.
+
+### 9.6 Traçabilité création/modification (BR23) — ✅ Implémenté (Phase 1A)
+
+- Toutes les tables métier reçoivent `created_by`/`updated_by` (FK `users.id`), renseignés par le backend depuis l'utilisateur authentifié (`req.user.id`, middleware JWT existant) sur chaque `POST`/`PUT`, via le helper `src/backend/utils/audit.ts` (`stampCreate`/`stampUpdate`).
+- `loadDataFromAPI()` charge `state.users` (annuaire `id`/nom/email, réservé aux admins via `GET /users`) et mappe `createdAt`/`createdBy`/`updatedAt`/`updatedBy` sur chaque entité (`cars`, `customers`, `contracts`, `invoices`, `payments`, `maintenanceCosts`, `vignettes`, `leasingContracts`, `insurances`, `reservations`).
+- Dans l'éditeur générique (`openRecordEditor`), `created_by`/`updated_by`/`created_at`/`updated_at` sont affichés en lecture seule (`getEditorFieldConfig`) ; `created_by`/`updated_by` sont résolus en nom d'utilisateur via `resolveUserName()` (repli sur l'id brut si `state.users` est vide ou si l'utilisateur n'est pas trouvé) plutôt que d'afficher l'id brut.
+
+### 9.7 Tri et filtre génériques sur toutes les grilles (BR24)
+
+Nouveau comportement appliqué à chaque tableau de l'application (Contrats, Factures, Voitures, Clients, Réservations, Paiements, Maintenance, etc.) :
+
+- **Tri** : clic sur l'en-tête de colonne → tri ascendant ; second clic sur la même colonne → tri descendant ; un indicateur visuel (▲/▼) indique la colonne et le sens actifs. Tri effectué côté client sur les données déjà chargées dans `state`.
+- **Filtre** : une ligne de filtres sous les en-têtes, avec un champ texte par colonne (ou une liste déroulante pour les colonnes à valeurs énumérées comme `status`). Les filtres sont cumulatifs (ET logique entre colonnes), insensibles à la casse, et effectuent une recherche partielle pour les champs texte.
+- **Tri par défaut** : à l'ouverture d'un écran, les données sont triées par `created_at` décroissant (le plus récent en premier), conformément à BR23. L'utilisateur peut re-trier sur n'importe quelle colonne.
+- **État** : l'état de tri/filtre par écran est conservé en mémoire pendant la session (`state.ui.tableState[entityKey] = { sortKey, sortDir, filters }`), sans persistance obligatoire en base.
+- **Implémentation** : fonction utilitaire générique `renderSortableFilterableTable(containerEl, entityKey, columns, rows, rowRenderer)`, réutilisée par chaque fonction `render<Entity>()` existante.
+
+### 9.8 Réservation liée à une ligne de contrat — recherche ou création (BR25)
+
+À la création d'une ligne de contrat `active` (ou à la confirmation `brouillon → active`, 9.3), le système exécute la séquence suivante :
+
+1. **Création de la ligne** : `contract_lines` est insérée avec `reservation_id = NULL`.
+2. **Recherche** d'une réservation existante pour le même `car_id` couvrant exactement la même période (`period_start`/`period_end`) :
+   - **Trouvée** (ex. le client avait déjà une réservation pour ce véhicule/cette période) → elle est liée à la ligne : `reservations.contract_line_id = contract_lines.id` et `contract_lines.reservation_id = reservations.id`. Aucune nouvelle réservation n'est créée.
+   - **Non trouvée** → une nouvelle réservation est créée : `reservations.status = 'confirmee'`, `start_date`/`end_date` = `period_start`/`period_end` de la ligne, `start_time`/`end_time` par défaut (`09:00`/`18:00`), liée via `reservations.contract_line_id`. **Cas particulier** : si une réservation existe pour ce véhicule mais à des dates différentes (chevauchant partiellement), ses dates sont corrigées (`start_date`/`end_date`) pour correspondre exactement à la période de la ligne de contrat, plutôt que de créer un doublon.
+3. **Mise à jour** : `contract_lines.reservation_id` est renseigné avec l'id de la réservation retenue (existante liée, ou nouvellement créée/corrigée).
+
+Cette réservation alimente le contrôle de chevauchement (9.2/BR19) ainsi que les écrans existants de planning/disponibilité des véhicules. Si la ligne de contrat est supprimée avant validation définitive du contrat, la réservation associée — uniquement si elle a été créée par cette règle (pas une réservation préexistante simplement liée) — est supprimée également. Toute la séquence ci-dessus est exécutée dans la transaction `create_contract_with_lines` (9.11) pour rester atomique avec la création de la ligne.
+
+### 9.9 Résiliation anticipée d'une ligne de contrat (BR26)
+
+Sur la grille des lignes de contrat (9.3), bouton **"Résilier"** disponible pour toute ligne active (`status = 'active'`) :
+
+1. Demande la date de fin effective (`actual_end_date`), avec validation `period_start ≤ actual_end_date ≤ period_end` ; si `actual_end_date < aujourd'hui`, demande confirmation explicite (résiliation rétroactive).
+2. Met à jour `contract_lines.status = 'resilie'` et `contract_lines.actual_end_date`.
+3. Met à jour `contracts.status = 'resilie'` si c'est la dernière ligne active du contrat à être résiliée (sinon le contrat reste `active`, seule la ligne change de statut).
+4. Met à jour la réservation liée (`reservations.contract_line_id`) :
+   - si `actual_end_date < period_end` (en avance) : `reservations.end_date = actual_end_date` (raccourcie) ;
+   - si `actual_end_date < aujourd'hui` (rétroactif) : `reservations.status = 'annulee'`.
+5. Le véhicule redevient disponible/réservable à partir du lendemain de `actual_end_date`.
+6. Recalcule `amount_ht`/`vat_amount`/`amount_ttc` de la ligne au prorata de la durée réelle (`actual_end_date - period_start + 1` jours) ; ce montant ajusté est repris par la prochaine ligne de facture générée pour ce contrat (9.4).
+
+### 9.10 Devis entête + lignes, PDF, validation et conversion en contrat (BR27)
+
+**Écran liste "Devis" (`#quotes`)**
+- Nouvel onglet, sur le modèle de l'écran Contrats (9.3) : une ligne de tableau = un devis (entête) : Id, Client, Date du devis, Date de validité, Statut, Total HT, Total TTC, Nombre de véhicules. Tri/filtre génériques (9.7), tri par défaut sur `created_at` décroissant (BR23).
+- Double-clic → écran de détail identique au contrat (9.3) : pavé haut = entête (client, date, date de validité, statut, notes, totaux HT/TVA/TTC en lecture seule), pavé bas = grille `quote_lines` (Véhicule, Période, Jours/Mois, Tarif HT, Montant HT, TVA, Montant TTC, Actions : Supprimer la ligne).
+- Bouton "+ Ajouter une ligne" : sélection véhicule + période + tarif HT, avec calcul HT⇄TTC (9.1). **Pas de contrôle de chevauchement (9.2/BR19)** à ce stade : un devis ne réserve pas le véhicule (BR27).
+- **Date de validité obligatoire** : le champ "Date de validité" (`validity_date`, `NOT NULL`) est pré-rempli à la création avec `quote_date + 30 jours`, modifiable par l'utilisateur ; le formulaire bloque l'enregistrement si le champ est vidé. Un devis `envoye` dont `validity_date < aujourd'hui` est affiché avec le statut `expire` (calculé à l'affichage, persisté à la prochaine action — même mécanisme que la transition `active → termine` des lignes de contrat, 9.3).
+
+**Export PDF**
+- Bouton "Télécharger PDF" (sur le modèle de `generateInvoicePdf`/9.4) : génère un document "Devis" reprenant le même gabarit que le contrat (en-tête agence : logo, nom, adresse, RIB, matricule fiscal ; informations client ; tableau des lignes avec véhicule/immatriculation/période/jours/montants HT-TVA-TTC ; totaux), avec en plus la **date de validité** affichée en évidence. Destiné à être envoyé au client par email/impression.
+
+**Validation et conversion en contrat**
+- Bouton "Valider" sur un devis au statut `brouillon` ou `envoye` :
+  1. Confirmation explicite (`confirm()`) — opération irréversible.
+  2. Appel à `/rpc/validate_quote` (9.11) : création d'un nouveau contrat (entête `contracts` + une `contract_lines` par `quote_lines`), avec les mêmes valeurs (client, périodes, tarifs, ventilation HT/TVA/TTC), dans une transaction unique.
+  3. Application normale du contrôle de chevauchement (9.2/BR19) sur ces nouvelles lignes — si conflit (à n'importe quel des 3 niveaux), la transaction est annulée (rollback complet), la validation échoue avec le même message d'erreur rouge inline, le devis reste non validé.
+  4. Si OK : création automatique des réservations (9.8/BR25) pour chaque ligne de contrat créée, dans la même transaction.
+  5. `quotes.status = 'valide'`, `quotes.converted_contract_id = <id du nouveau contrat>` ; le devis devient lecture seule (toute action d'édition/suppression de lignes est désactivée).
+  6. L'écran bascule sur le contrat nouvellement créé (ou affiche un lien "Voir le contrat {id}").
+- Boutons "Marquer comme envoyé" (`envoye`) et "Refuser" (`refuse`) disponibles pour le suivi commercial ; un devis dont `validity_date < aujourd'hui` et non encore validé passe automatiquement à `expire` à l'affichage de la liste (calcul côté client, sans tâche planifiée, persisté à la prochaine action — cf. ci-dessus).
+
+### 9.11 Atomicité des opérations entête + lignes (BR20bis)
+
+Trois opérations métier sont multi-tables et doivent être **atomiques** (tout ou rien) : la création d'un contrat avec ses lignes (9.3/BR20), la création d'une facture avec ses lignes (9.4/BR21), et la validation d'un devis avec conversion en contrat (9.10/BR27). Elles sont implémentées via des **fonctions PostgreSQL exposées en RPC par PostgREST** (`docs/03-data-model/SCHEMA_REFERENCE.md`, section "Fonctions RPC") :
+
+| Fonction RPC | Appelée par | Rôle |
+|---|---|---|
+| `create_contract_with_lines` | Bouton "Enregistrer" du formulaire Contrat (9.3), et par `validate_quote` | Crée l'entête `contracts` + toutes les `contract_lines` ; pour chaque ligne `active`, exécute la séquence réservation (9.8/BR25) ; applique le contrôle BR19 (9.2). Rollback complet en cas d'échec sur une ligne. |
+| `create_invoice_with_lines` | Bouton "Enregistrer" du formulaire Facture (9.4) | Crée l'entête `invoices` + toutes les `invoice_lines` ; refuse (erreur 400) si aucune ligne (9.4/BR21). |
+| `validate_quote` | Bouton "Valider" d'un devis (9.10) | Marque le devis `valide`, appelle `create_contract_with_lines` avec les `quote_lines` converties, renseigne `quotes.converted_contract_id`. Rollback complet (devis reste non validé) si la création du contrat échoue (ex. conflit BR19). |
+
+Le backend (`src/backend/routes/`) appelle ces fonctions via `POST /rpc/<nom_fonction>` au lieu d'enchaîner plusieurs `INSERT`/`UPDATE` séparés, ce qui évite les états intermédiaires incohérents (ex. entête créée sans ses lignes, ou ligne de contrat sans réservation) en cas d'erreur ou d'accès concurrent. Voir `docs/05-api/API_REFERENCE.md` section 13 pour les endpoints correspondants.
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: May 2026  
 **Next Review**: June 2026

@@ -16,10 +16,17 @@ CREATE TABLE IF NOT EXISTS settings (
   company_address TEXT,
   company_phone VARCHAR(50),
   company_rib VARCHAR(50),
+  company_rib_label VARCHAR(120),
+  -- BR22 : second RIB
+  company_rib_2 VARCHAR(50),
+  company_rib_2_label VARCHAR(120),
   company_tax_id VARCHAR(50),
   -- Personnalisation (white-label)
   company_name VARCHAR(120),
   logo_url TEXT,
+  -- Piste d'audit (pas de FK : la table users est creee apres settings)
+  created_by VARCHAR(50),
+  updated_by VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -61,6 +68,9 @@ CREATE TABLE IF NOT EXISTS customers (
   country VARCHAR(100),
   id_number VARCHAR(50),
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -88,6 +98,9 @@ CREATE TABLE IF NOT EXISTS cars (
   gps_lng DECIMAL(11, 8),
   gps_speed INTEGER DEFAULT 0,
   gps_updated_at TIMESTAMP,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -105,6 +118,9 @@ CREATE TABLE IF NOT EXISTS reservations (
   end_time VARCHAR(5) NOT NULL DEFAULT '18:00',
   status VARCHAR(20) NOT NULL DEFAULT 'en_attente',
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -131,6 +147,9 @@ CREATE TABLE IF NOT EXISTS contracts (
   payment_plan VARCHAR(100),
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -161,6 +180,12 @@ CREATE TABLE IF NOT EXISTS invoices (
   period_end DATE,
   -- Lignes de facture multi-contrat/multi-vehicule (1 ligne = 1 contrat + 1 voiture, taxe journaliere par ligne)
   lines JSONB DEFAULT '[]'::jsonb,
+  -- BR22 : RIB choisi (fige depuis settings.company_rib ou company_rib_2 au moment de la creation)
+  rib VARCHAR(50),
+  rib_label VARCHAR(120),
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -179,6 +204,9 @@ CREATE TABLE IF NOT EXISTS payments (
   method VARCHAR(50),
   reference VARCHAR(100),
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -193,6 +221,9 @@ CREATE TABLE IF NOT EXISTS collections (
   status VARCHAR(20) NOT NULL DEFAULT 'en_cours',
   collection_date DATE,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -210,6 +241,9 @@ CREATE TABLE IF NOT EXISTS maintenance_costs (
   status VARCHAR(20) NOT NULL DEFAULT 'paye',
   note TEXT,
   source_key VARCHAR(100),
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -232,6 +266,9 @@ CREATE TABLE IF NOT EXISTS insurances (
   attachment_type VARCHAR(50),
   attachment_data BYTEA,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -247,6 +284,9 @@ CREATE TABLE IF NOT EXISTS insurance_installments (
   status VARCHAR(20) NOT NULL DEFAULT 'a_payer',
   paid_date DATE,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -268,6 +308,9 @@ CREATE TABLE IF NOT EXISTS leasing_contracts (
   attachment_type VARCHAR(50),
   attachment_data BYTEA,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -283,6 +326,9 @@ CREATE TABLE IF NOT EXISTS leasing_installments (
   status VARCHAR(20) NOT NULL DEFAULT 'a_payer',
   paid_date DATE,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -303,6 +349,9 @@ CREATE TABLE IF NOT EXISTS vignettes (
   attachment_type VARCHAR(50),
   attachment_data BYTEA,
   notes TEXT,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -325,6 +374,9 @@ CREATE TABLE IF NOT EXISTS inspections (
   global_score DECIMAL(3, 2),
   signature_agent_data BYTEA,
   signature_client_data BYTEA,
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -340,6 +392,9 @@ CREATE TABLE IF NOT EXISTS inspection_details (
   photo_type VARCHAR(50),
   photo_data BYTEA,
   media_ref VARCHAR(100),
+  -- Piste d'audit
+  created_by VARCHAR(50) REFERENCES users(id),
+  updated_by VARCHAR(50) REFERENCES users(id),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

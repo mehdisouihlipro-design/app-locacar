@@ -400,10 +400,53 @@ LocaCar is a comprehensive car rental management system designed for small-to-me
 - BR13: GPS tracking: Mandatory for vehicles > $20,000
 
 ### 6.4 User Rules
-- BR14: User must belong to exactly one agency
-- BR15: User role determines module access
-- BR16: Password reset required every 90 days
-- BR17: Two-factor authentication for admin users
+- BR28: User must belong to exactly one agency
+- BR29: User role determines module access
+- BR30: Password reset required every 90 days
+- BR31: Two-factor authentication for admin users
+
+> **Renumérotation (audit spec V2)** : ces règles portaient auparavant les numéros BR14-BR17, en collision avec BR15 (Calcul HT⇄TTC, section 6.2) qui est référencée par BR18. Elles ont été renumérotées en BR28-BR31 pour lever toute ambiguïté.
+
+### 6.5 Évolutions V2 — Vers une version professionnelle
+
+Lot de règles métier pour la prochaine version (spécification, développement à suivre). Détails techniques dans `docs/03-data-model/SCHEMA_REFERENCE.md` (section "Évolutions V2") et `docs/04-features/FEATURE_SPECIFICATIONS.md` (section 9).
+
+> **Suivi d'implémentation — Phase 1A (terminée)** : BR22 (second RIB) et BR23 (traçabilité création/modification) sont **✅ implémentées** (DB, backend, frontend, documentation). BR18-21 et BR24-31 restent à l'état de spécification cible, à planifier dans les phases suivantes (1B, 2, 3, 4).
+
+- **BR18 — Contrat HT ⇄ TTC** : chaque ligne de contrat affiche un montant HT et un montant TTC liés bidirectionnellement (modifier l'un recalcule l'autre), avec `TTC = HT × (1 + taux_TVA / 100)`. À la différence de la facture (BR15/BR15bis), le TTC du contrat **n'inclut pas** la taxe journalière ni le timbre fiscal : ces deux composantes restent calculées uniquement au moment de la facturation, par ligne de facture. Le `rate` (tarif HT par jour/mois) reste le champ pivot. Le taux de TVA (`settings.vat_rate`) ne peut pas être négatif : une contrainte `CHECK (vat_rate >= 0)` en base et une validation côté formulaire rejettent toute valeur négative.
+
+- **BR19 — Contrôle de chevauchement véhicule** : un véhicule ne peut figurer sur deux lignes de contrat actives (statut ≠ `annule`/`termine`/`resilie`) avec chevauchement de période. Le contrôle s'exécute à la création ET à la modification d'une ligne de contrat (comparaison aux autres lignes de contrat et aux réservations actives du même véhicule, cf. BR25), et est appliqué à **trois niveaux** pour rester fiable même en cas d'accès concurrents :
+  1. **UI** : message d'erreur inline visible en rouge, précisant le véhicule, le contrat et la période en conflit ; l'enregistrement est bloqué côté formulaire.
+  2. **Backend** : `POST`/`PUT /contract-lines` revalident le chevauchement côté serveur avant toute écriture (le contrôle frontend seul n'est pas suffisant).
+  3. **Base de données** : contrainte `EXCLUDE` PostgreSQL (extension `btree_gist`) sur `contract_lines (car_id, daterange(period_start, period_end))`, limitée aux lignes `status = 'active'`, comme garde-fou ultime contre les accès concurrents.
+
+  Les lignes de contrat au statut `brouillon` (cf. BR20) sont exclues de ce contrôle aux trois niveaux.
+
+- **BR20 — Contrat = entête + lignes** : un contrat est désormais composé d'une entête (`contracts` : client, date, type, statut, infos de paiement, totaux agrégés) et d'une ou plusieurs lignes (`contract_lines` : véhicule, période, durée, tarif, ventilation HT/TVA/TTC, statut). Les totaux de l'entête sont la somme des lignes. Les contrats existants (mono-véhicule) sont migrés en 1 entête + 1 ligne.
+
+  Statuts possibles d'une `contract_line` : `brouillon` (créée avec un contrat à l'état `brouillon` — n'est pas encore engageante, exclue du contrôle BR19 et de la réservation automatique BR25), `active`, `termine`, `resilie`, `annule`. Lorsqu'un contrat passe de `brouillon` à `active` (confirmation), ses lignes passent également à `active`, ce qui déclenche alors BR19 et BR25. Une ligne `active` dont `period_end < date du jour` est affichée comme `termine` (transition calculée à l'affichage) ; ce statut est persisté en base à la prochaine action effectuée sur la ligne (même mécanisme que l'expiration des devis, cf. BR27).
+
+- **BR20bis — Atomicité des opérations entête + lignes** : la création (et la mise à jour structurelle) d'un contrat avec ses lignes (BR20), d'une facture avec ses lignes (BR21), ainsi que la validation d'un devis avec conversion en contrat (BR27), sont des opérations multi-tables qui doivent être atomiques (tout ou rien). Elles sont implémentées via des fonctions PostgreSQL (`create_contract_with_lines`, `create_invoice_with_lines`, `validate_quote`), exécutées dans une transaction et exposées au backend via PostgREST (`/rpc/...`). En cas d'échec sur une ligne, l'ensemble de l'opération est annulé (rollback) : aucune entête orpheline n'est créée.
+
+- **BR21 — Facture = entête + lignes, auto-remplissage depuis un contrat** : une facture est composée d'une entête (`invoices`) et de lignes (`invoice_lines`, qui remplacent à terme la colonne `lines` JSONB introduite par BR15bis). Lorsqu'une ligne de facture est associée à un contrat (entête), le système génère automatiquement une ligne de facture par ligne de ce contrat (`contract_lines`), pré-remplie avec véhicule/période/montant HT, modifiable avant enregistrement. Le calcul reste celui de BR15bis (TVA et taxe journalière par ligne, timbre fiscal une seule fois pour la facture). Une facture doit comporter **au moins une ligne** (`invoice_lines`) : si la liste de lignes est vide, l'enregistrement est bloqué avec le message d'erreur « Une facture doit contenir au moins une ligne. ».
+
+- **BR22 — Sélection du RIB à la facturation** — ✅ **Implémenté (Phase 1A)** : l'agence peut enregistrer jusqu'à 2 RIB (RIB n°1 = `company_rib` existant + libellé optionnel, RIB n°2 = `company_rib_2` + libellé optionnel). À la création d'une facture, l'utilisateur choisit le RIB à afficher sur le document ; la valeur choisie est figée sur la facture (`invoices.rib`/`invoices.rib_label`) et n'est pas affectée par une modification ultérieure des paramètres.
+
+- **BR23 — Traçabilité création/modification et tri par défaut** — ✅ **Implémenté (Phase 1A)** : toutes les tables métier disposent de `created_at`/`updated_at` (existant) ainsi que de `created_by`/`updated_by` (référence `users.id`), renseignés automatiquement par le backend à partir de l'utilisateur authentifié (JWT) sur chaque création/modification. Par défaut, tous les écrans listent les enregistrements triés par `created_at` décroissant (le plus récent en premier).
+
+- **BR24 — Tri et filtre génériques** : chaque grille de l'application permet de trier (clic sur l'en-tête de colonne, ascendant/descendant) et de filtrer (saisie par colonne) sur n'importe quel champ affiché, côté client, sans rechargement serveur.
+
+- **BR25 — Réservation liée à une ligne de contrat (recherche ou création)** : à la création (ou à la confirmation `brouillon → active`, cf. BR20) d'une ligne de contrat `active`, le système recherche une réservation existante pour le même véhicule (`car_id`) couvrant la même période (`period_start`/`period_end`) :
+  - si une réservation correspondante existe déjà (ex. réservation préalable du client) → elle est simplement liée à la ligne de contrat (`contract_lines.reservation_id` ↔ `reservations.contract_line_id`), sans création ni duplication ;
+  - sinon → une nouvelle réservation est créée aux dates de la ligne de contrat (statut `confirmee`), ou une réservation existante mais à des dates différentes est corrigée pour correspondre exactement à la période de la ligne de contrat.
+
+  Ordre des opérations : la ligne de contrat (`contract_lines`) est créée en premier, sans `reservation_id` ; la recherche/création/correction de réservation est effectuée ensuite ; enfin `contract_lines.reservation_id` est mis à jour avec l'identifiant de la réservation retenue. Cette réservation alimente le contrôle BR19. Si la ligne de contrat est supprimée avant validation, la réservation associée (si elle a été créée par cette règle) est supprimée également.
+
+- **BR26 — Résiliation anticipée d'une ligne de contrat** : une ligne de contrat active peut être résiliée avant son terme (statut `resilie` + `actual_end_date`, avec `period_start ≤ actual_end_date ≤ period_end`). La résiliation libère automatiquement la réservation associée (raccourcie à `actual_end_date` ou annulée si la date est passée), rend le véhicule disponible/réservable à partir du lendemain de `actual_end_date`, et recalcule le montant HT/TTC de la ligne au prorata de la durée réelle pour la prochaine facturation.
+
+- **BR27 — Devis (entête + lignes), validation et conversion en contrat** : un devis (`quotes`/`quote_lines`) reprend la structure entête + lignes du contrat (BR20) — un client, une ou plusieurs lignes véhicule/période/tarif avec ventilation HT/TVA/TTC (BR18) — et peut être exporté en PDF avec les mêmes informations que le contrat (coordonnées agence/client, lignes détaillées, totaux HT/TVA/TTC), pour envoi au client, avec en plus une **date de validité**. **Correction** : tant qu'il n'est pas validé, un devis ne bloque **pas** de véhicule — il n'est **pas** soumis au contrôle de chevauchement (BR19) et ne déclenche **pas** de réservation automatique (BR25), pour ne pas immobiliser un véhicule sur un simple devis non confirmé. Statuts : `brouillon`, `envoye`, `valide`, `refuse`, `expire`. La **validation** d'un devis (`valide`) déclenche la création automatique d'un contrat (entête `contracts` + lignes `contract_lines`) reprenant les données du devis ; ce nouveau contrat est alors soumis normalement au contrôle de chevauchement (BR19) et à la réservation automatique (BR25). Le devis validé est associé au contrat créé via `quotes.converted_contract_id` et devient lecture seule (non modifiable, non re-convertible).
+
+  La **date de validité** (`validity_date`) est **obligatoire** (`NOT NULL`) : à la création du devis, l'application propose par défaut `quote_date + 30 jours` (valeur par défaut applicative, et non une valeur par défaut de colonne SQL), modifiable par l'utilisateur. La transition `envoye → expire` lorsque `validity_date < date du jour` suit le même mécanisme de transition calculée à l'affichage / persistée à la prochaine action que pour les lignes de contrat (BR20).
 
 ---
 

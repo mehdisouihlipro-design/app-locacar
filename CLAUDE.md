@@ -30,8 +30,8 @@ Chaque pile/carte statistique (KPI), liste et graphique de l'application doit ê
 ## Démarrer en local
 
 ```bash
-# App worksheet (port 3000)
-node serve.js
+# App worksheet (port 3000) — API_URL requis pour que le frontend trouve le backend
+API_URL=http://localhost:3001/api/v1 node serve.js
 
 # Backend API (port 3001)
 npm run backend:dev
@@ -41,6 +41,8 @@ npm run backend:dev
 
 - `SUPABASE_URL` — URL du projet Supabase
 - `SUPABASE_ANON_KEY` — clé anonyme Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` — clé service_role Supabase (contourne RLS). **Sans elle, le backend retombe sur la clé anon et tous les écritures (`POST`/`PUT`/`PATCH` Supabase) échouent en 401 à cause des policies RLS** — à ajouter dans `.env` local en plus de Railway
+- `API_URL` — URL de base de l'API backend vue par le frontend (ex. `http://localhost:3001/api/v1`), injectée par `serve.js` via `window._API_URL`. Sans elle, la connexion échoue avec "API_URL non configuré"
 - `JWT_SECRET` — secret JWT pour l'API backend
 - `ANTHROPIC_API_KEY` — (optionnel) pour l'analyse de dommages IA
 - `PORT` — injecté automatiquement par Railway en production

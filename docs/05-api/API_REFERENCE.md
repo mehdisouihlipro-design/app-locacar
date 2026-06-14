@@ -676,6 +676,52 @@ X-RateLimit-Reset: 1620000000
 
 ---
 
+## 13. Évolutions V2 (endpoints prévus)
+
+> Spécification — endpoints à créer pour le lot d'évolutions V2 (cf. `docs/01-specifications/BMAD.md` 6.5, `docs/03-data-model/SCHEMA_REFERENCE.md` "Évolutions V2", `docs/04-features/FEATURE_SPECIFICATIONS.md` section 9). Suivent le même format de réponse passthrough PostgREST que les endpoints existants (`{ success, data }`).
+>
+> **✅ Phase 1A (BR22/BR23, implémenté)** : les 3 puces "BR22"/"BR23" du bloc "Champs ajoutés aux endpoints existants" ci-dessous sont en production (`POST /invoices` accepte `rib`/`ribLabel`, `PUT /settings` accepte `companyRibLabel`/`companyRib2`/`companyRib2Label`, et toutes les routes `POST`/`PUT` renseignent `created_by`/`updated_by`). Le reste de cette section (endpoints `contract-lines`, `invoice-lines`, `quotes`, RPC, BR18-21/24-27) reste à l'état de spécification cible.
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| GET/POST | `/contract-lines` | Lister / créer une ligne de contrat (`contract_lines`). `POST` (et `PUT` ci-dessous) exécutent côté backend le contrôle de chevauchement BR19 (niveau 2) avant écriture — pas seulement côté frontend. |
+| GET/PUT/DELETE | `/contract-lines/:id` | Lire / modifier / supprimer une ligne de contrat. `PUT` revalide BR19 (niveau 2) si `car_id`/`period_start`/`period_end` changent. |
+| POST | `/contract-lines/:id/terminate` | Résiliation anticipée d'une ligne (BR26) : body `{ actualEndDate }` — met à jour la ligne, le statut du contrat et la réservation liée |
+| GET/POST | `/invoice-lines` | Lister / créer une ligne de facture (`invoice_lines`, remplace `invoices.lines`) |
+| GET/PUT/DELETE | `/invoice-lines/:id` | Lire / modifier / supprimer une ligne de facture |
+| GET | `/contracts/:id/lines` | Lister les lignes d'un contrat (pour l'écran détail entête + lignes, BR20) |
+| GET | `/invoices/:id/lines` | Lister les lignes d'une facture (BR21) |
+| GET/POST | `/quotes` | Lister / créer un devis (entête `quotes`, BR27) |
+| GET/PUT/DELETE | `/quotes/:id` | Lire / modifier / supprimer un devis (modification/suppression impossibles si `status = 'valide'`) |
+| GET | `/quotes/:id/lines` | Lister les lignes d'un devis |
+| GET/POST | `/quote-lines` | Lister / créer une ligne de devis (`quote_lines`) |
+| GET/PUT/DELETE | `/quote-lines/:id` | Lire / modifier / supprimer une ligne de devis |
+| GET | `/quotes/:id/pdf` | Générer le PDF du devis (même gabarit que le contrat + date de validité) |
+| POST | `/quotes/:id/validate` | Valide le devis (BR27) — appelle `/rpc/validate_quote` côté backend ; crée le contrat + `contract_lines` correspondants (contrôle de chevauchement BR19 + réservations BR25), renseigne `quotes.converted_contract_id` et `quotes.status = 'valide'` |
+
+### Endpoints RPC (atomicité entête + lignes, BR20bis)
+
+> Fonctions PostgreSQL exposées via PostgREST (`POST /rpc/<nom_fonction>`), appelées par le backend pour garantir l'atomicité des opérations entête + lignes. Voir `docs/02-architecture/ARCHITECTURE.md` 12.4 et `docs/03-data-model/SCHEMA_REFERENCE.md` "Fonctions RPC".
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/rpc/create_contract_with_lines` | Body : `{ contract, lines[] }`. Crée l'entête `contracts` + les `contract_lines` en une transaction ; pour chaque ligne `active`, exécute la séquence réservation (BR25) et le contrôle BR19. Utilisé par l'écran Contrats (9.3) et par `validate_quote`. |
+| POST | `/rpc/create_invoice_with_lines` | Body : `{ invoice, lines[] }`. Crée l'entête `invoices` + les `invoice_lines` en une transaction ; renvoie une erreur 400 si `lines` est vide (BR21 : « Une facture doit contenir au moins une ligne. »). |
+| POST | `/rpc/validate_quote` | Body : `{ quoteId }`. Marque le devis `valide`, appelle `create_contract_with_lines` avec les `quote_lines` converties, renseigne `quotes.converted_contract_id`. Rollback complet (devis non modifié) en cas d'échec. |
+
+**Champs ajoutés aux endpoints existants** :
+- `POST /reservations` : accepte désormais `contractLineId` (FK `contract_lines.id`, BR25), renseigné automatiquement à la création d'une ligne de contrat.
+- `POST /invoices` : accepte `rib`/`ribLabel` (BR22, copie figée du RIB choisi). **✅ Implémenté (Phase 1A)**.
+- `PUT /settings` : accepte `companyRibLabel`, `companyRib2`, `companyRib2Label` (second RIB, BR22 — **✅ Implémenté Phase 1A**). `vatRate` est rejeté (400) si négatif (BR18, contrainte `chk_vat_rate_non_negative` — toujours à l'état de spécification cible).
+- Toutes les routes `POST`/`PUT` existantes : renseignent désormais `created_by`/`updated_by` à partir de `req.user.id` (BR23). **✅ Implémenté (Phase 1A)**.
+
+**Codes d'erreur ajoutés** :
+- `409 Conflict` — réponse standard pour tout conflit de chevauchement véhicule/période (BR19, niveaux 2 et 3). Corps : `{ success: false, error: "vehicle_overlap", message: "...", conflict: { carId, contractId, lineId, periodStart, periodEnd } }`.
+- Lorsque le conflit provient de la contrainte `EXCLUDE` PostgreSQL `excl_contract_lines_car_period` (niveau 3, code PostgreSQL `23P01` — exclusion violation), le backend intercepte cette erreur et la traduit dans le même format `409 vehicle_overlap` ci-dessus, plutôt que de renvoyer une erreur 500 brute.
+- `400 Bad Request` avec `{ success: false, error: "empty_invoice", message: "Une facture doit contenir au moins une ligne." }` pour `POST /invoices` / `/rpc/create_invoice_with_lines` sans `invoice_lines`.
+
+---
+
 **Document Version**: 1.0.0  
 **Last Updated**: May 2026  
 **Next Review**: June 2026

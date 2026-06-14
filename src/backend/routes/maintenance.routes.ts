@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { stampCreate } from '../utils/audit';
 
 const router = Router();
 
@@ -16,11 +17,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.post('/maintenance_costs', {
+    const result = await global.db.post('/maintenance_costs', stampCreate({
       ...req.body,
       id: req.body.id || uuidv4(),
       status: req.body.status || 'paye'
-    }, { headers: { Prefer: 'resolution=merge-duplicates' } });
+    }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: result.data[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

@@ -650,6 +650,36 @@ main (production)
 
 ---
 
+## 12. Évolutions V2 — Vers une version professionnelle
+
+> Spécification (cf. `docs/01-specifications/BMAD.md` 6.5, `docs/03-data-model/SCHEMA_REFERENCE.md` "Évolutions V2", `docs/04-features/FEATURE_SPECIFICATIONS.md` section 9). Patrons architecturaux ajoutés au socle existant, à implémenter lors du développement V2.
+
+### 12.1 Patron entête + lignes (header/detail)
+
+Les entités `contracts` et `invoices` passent d'un modèle "ligne unique" à un modèle **entête + lignes** : une table d'entête (`contracts`/`invoices`) référencée par une table de lignes (`contract_lines`/`invoice_lines`), une ligne = un véhicule/une prestation. Ce patron remplace le stockage JSONB ad-hoc (`invoices.lines`) par des tables relationnelles, et sert de modèle standard pour toute future entité "document avec lignes" (ex. devis).
+
+### 12.2 Composant de grille générique (tri/filtre)
+
+Toutes les listes de l'app (`render<Entity>()`) s'appuient sur un composant générique `renderSortableFilterableTable` : tri par colonne (clic en-tête), filtre par colonne, tri par défaut sur `created_at DESC`. Ce composant devient le standard pour tout nouvel écran liste.
+
+### 12.3 Traçabilité (audit)
+
+Chaque route `POST`/`PUT` du backend (`src/backend/routes/`) renseigne désormais `created_by`/`updated_by` à partir de `req.user.id` (middleware JWT `AuthRequest` existant) avant transmission à Supabase. Convention à appliquer à toute nouvelle table métier.
+
+### 12.4 Atomicité des opérations entête + lignes (RPC PostgreSQL)
+
+Le patron entête + lignes (12.1) introduit des opérations qui écrivent dans plusieurs tables en une seule action utilisateur : créer un contrat avec ses lignes (et, pour chaque ligne, rechercher/créer/corriger une réservation, BR25), créer une facture avec ses lignes, ou valider un devis (création d'un contrat complet à partir du devis). Un enchaînement de plusieurs `INSERT`/`UPDATE` via PostgREST depuis le backend n'est **pas atomique** : une erreur en cours de séquence (ex. conflit BR19 sur la 2e ligne d'un contrat à 3 lignes) laisserait une entête orpheline ou des lignes partielles.
+
+**Mécanisme retenu** : ces opérations sont implémentées comme des **fonctions PostgreSQL** (`LANGUAGE plpgsql`, `SECURITY INVOKER`), chacune exécutée dans une transaction unique par PostgreSQL, et exposées au backend via l'API RPC de PostgREST (`POST /rpc/<nom_fonction>`, déjà utilisée pour Supabase).
+
+- `create_contract_with_lines(p_contract, p_lines)` — crée l'entête `contracts` + les `contract_lines`, exécute la séquence réservation BR25 par ligne, applique le contrôle BR19 ; rollback complet en cas d'échec.
+- `create_invoice_with_lines(p_invoice, p_lines)` — crée l'entête `invoices` + les `invoice_lines` ; refuse si `p_lines` est vide (BR21).
+- `validate_quote(p_quote_id)` — passe le devis à `valide`, appelle `create_contract_with_lines` avec les lignes converties, renseigne `quotes.converted_contract_id` ; rollback complet (devis non modifié) en cas d'échec.
+
+Le backend (`src/backend/routes/contracts.routes.ts`, `invoices.routes.ts`, `quotes.routes.ts`) appelle ces fonctions via le client PostgREST/Supabase au lieu d'enchaîner des écritures multi-tables. Signatures et logique détaillées dans `docs/03-data-model/SCHEMA_REFERENCE.md` (section "Fonctions RPC — atomicité entête + lignes") et endpoints dans `docs/05-api/API_REFERENCE.md` section 13.
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: May 2026  
 **Next Review**: June 2026

@@ -1,6 +1,7 @@
 // src/backend/routes/settings.routes.ts
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { stampUpdate } from '../utils/audit';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     // Upsert: la ligne id=1 peut ne pas encore exister (table settings vide au premier
     // enregistrement) — un simple PATCH sur id=eq.1 ne crée rien et persiste 0 ligne.
-    const result = await global.db.post('/settings?on_conflict=id', { id: 1, ...req.body }, {
+    const result = await global.db.post('/settings?on_conflict=id', stampUpdate({ id: 1, ...req.body }, req), {
       headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     });
     res.json({ success: true, data: result.data[0] });

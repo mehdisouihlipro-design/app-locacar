@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { stampCreate } from '../utils/audit';
 
 const router = Router();
 
@@ -43,16 +44,16 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const { checklistDetails, ...inspectionBody } = req.body;
     const inspectionId = inspectionBody.id || uuidv4();
 
-    const result = await global.db.post('/inspections', {
+    const result = await global.db.post('/inspections', stampCreate({
       ...inspectionBody,
       id: inspectionId
-    });
+    }, req));
 
     // Insert checklist details
     if (checklistDetails && typeof checklistDetails === 'object') {
       for (const [pointKey, detail] of Object.entries(checklistDetails)) {
         const d = detail as any;
-        await global.db.post('/inspection_details', {
+        await global.db.post('/inspection_details', stampCreate({
           id: `detail-${inspectionId}-${pointKey}`,
           inspection_id: inspectionId,
           point_key: pointKey,
@@ -61,7 +62,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
           photo_name: d.photo?.name || '',
           photo_type: d.photo?.type || '',
           media_ref: d.photo?.mediaRef || ''
-        });
+        }, req));
       }
     }
 
