@@ -10975,6 +10975,12 @@
           .filter((c) => c.status === "dispo" || c.id === currentValue)
           .map((c) => ({ value: c.id, label: `${c.id} - ${c.plate} (${c.model})` })),
         "invoices.contractId": state.contracts.map((c) => ({ value: c.id, label: `${c.id} - ${c.customerName}` })),
+        // BR22 : meme choix RIB1/RIB2 qu'a la creation de facture (#invoiceRib),
+        // pour une coherence creation <-> edition sur un meme champ.
+        "invoices.rib": [
+          { value: state.settings.companyRib || "", label: `${state.settings.companyRibLabel || "RIB"} - ${state.settings.companyRib || ""}` },
+          ...(state.settings.companyRib2 ? [{ value: state.settings.companyRib2, label: `${state.settings.companyRib2Label || "RIB 2"} - ${state.settings.companyRib2}` }] : []),
+        ],
         "payments.invoiceId": state.invoices.map((i) => ({ value: i.id, label: `${i.id} - ${i.customerName}` })),
         "payments.contractId": state.contracts.map((c) => ({ value: c.id, label: `${c.id} - ${c.customerName}` })),
         "reservations.customerId": state.customers.map((c) => ({ value: c.id, label: `${c.id} - ${c.name}` })),
@@ -10987,7 +10993,7 @@
 
       const calculatedFields = {
         contracts: ["quotientTnd", "totalAmountOriginal", "totalAmountTnd", "paymentPlan", "customerName", "carPlate"],
-        invoices: ["amountTnd", "paidAmountTnd", "dueAmountTnd", "lines"],
+        invoices: ["amountTnd", "paidAmountTnd", "dueAmountTnd", "lines", "ribLabel"],
         payments: ["amountTnd", "contractType"],
         maintenanceCosts: ["amountTnd", "carPlate"],
         reservations: ["customerName", "carPlate"],
@@ -11063,6 +11069,15 @@
         record.amountTnd = convertToTnd(record.amountOriginal, record.currency || "TND", state.settings.eurToTnd);
         record.dueAmountTnd = Math.max(0, record.amountTnd - record.paidAmountTnd);
         if (!record.dueDate) record.dueDate = addDaysToIsoDate(today, 15);
+
+        // BR22 : le libelle du RIB suit le RIB choisi dans l'editeur (select RIB1/RIB2).
+        // Si la valeur ne correspond a aucun des deux RIB actuels (RIB figé d'une
+        // facture ancienne, parametres modifies depuis), on conserve le libelle existant.
+        if (state.settings.companyRib2 && record.rib === state.settings.companyRib2) {
+          record.ribLabel = state.settings.companyRib2Label || "RIB 2";
+        } else if (record.rib === state.settings.companyRib) {
+          record.ribLabel = state.settings.companyRibLabel || "RIB";
+        }
       }
 
       if (entity === "payments") {
@@ -11132,6 +11147,10 @@
 
       const record = collection.find((r) => String(r.id) === String(id));
       if (!record) return;
+
+      // Rafraichit les champs calcules/derives (ex. invoices.ribLabel selon invoices.rib)
+      // avant affichage, pour que l'editeur montre des valeurs a jour et coherentes.
+      applyDerivedFields(entity, record);
 
       editorState.entity = entity;
       editorState.id = id;

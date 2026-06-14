@@ -20,6 +20,13 @@ Aucun écran ne doit fonctionner uniquement avec des données locales/temporaire
 ### Navigation cliquable depuis les widgets (règle absolue)
 Chaque pile/carte statistique (KPI), liste et graphique de l'application doit être cliquable et renvoyer vers l'écran contenant les données détaillées **avec le même filtre déjà appliqué** (ex. cliquer sur "Contrats actifs" → onglet Contrats filtré sur statut=actif ; cliquer sur une barre du graphique de rentabilité par véhicule → détail de ce véhicule). S'inspirer du pattern déjà en place sur les graphiques du dashboard (`onClick` + `switchToTab`/`openTab` + filtre pré-rempli).
 
+### Cohérence des contrôles de saisie (règle absolue)
+Un même champ doit utiliser **le même type de contrôle à la création et dans l'éditeur générique de détail/édition** (`openRecordEditor`). Si un champ est une liste de choix contrainte (select) dans le formulaire de création, il doit rester un select avec les mêmes options dans l'éditeur générique — jamais retomber en saisie libre (`input` texte).
+- Repère pour appliquer cette règle : dans `getEditorFieldConfig`, ajouter l'entrée `"<entity>.<champ>"` au `lookupMap` avec les mêmes options que le `<select>` du formulaire de création.
+- Si un champ dérivé (ex. libellé associé au choix) doit rester synchronisé avec ce choix, l'ajouter à `calculatedFields` (lecture seule dans l'éditeur) et calculer sa valeur dans `applyDerivedFields`.
+- Pour les enregistrements existants dont la valeur figée ne correspond plus aux options actuelles (paramètres modifiés depuis), `openRecordEditor` réinjecte automatiquement la valeur stockée comme option supplémentaire — ne pas la perdre.
+- Exemple appliqué : `invoices.rib`/`invoices.ribLabel` (sélecteur RIB1/RIB2, cf. BR22) utilisent désormais le même sélecteur qu'à la création de facture (`#invoiceRib`).
+
 ## Architecture rapide
 
 - **App principale** : `worksheet-mini-app/index.html` + `serve.js` (port 3000)
