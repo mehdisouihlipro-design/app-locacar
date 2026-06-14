@@ -11183,6 +11183,19 @@
             if (String(opt.value) === String(value)) option.selected = true;
             select.appendChild(option);
           });
+          // BR22 : le libelle du RIB doit refleter immediatement le RIB choisi,
+          // sans attendre l'enregistrement (cf. applyDerivedFields a la sauvegarde).
+          if (entity === "invoices" && key === "rib") {
+            select.addEventListener("change", () => {
+              const ribLabelInput = body.querySelector('[data-field-key="ribLabel"]');
+              if (!ribLabelInput) return;
+              if (state.settings.companyRib2 && select.value === state.settings.companyRib2) {
+                ribLabelInput.value = state.settings.companyRib2Label || "RIB 2";
+              } else if (select.value === state.settings.companyRib) {
+                ribLabelInput.value = state.settings.companyRibLabel || "RIB";
+              }
+            });
+          }
           control = select;
         } else {
           const input = document.createElement("input");
