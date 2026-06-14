@@ -384,6 +384,7 @@
     }
 
     .modal-card {
+      position: relative;
       width: min(900px, 100%);
       max-height: 90vh;
       overflow: auto;
@@ -391,6 +392,27 @@
       border-radius: 12px;
       border: 1px solid var(--line);
       padding: 16px;
+    }
+
+    .modal-close-x {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 30px;
+      height: 30px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 6px;
+      z-index: 1;
+    }
+
+    .modal-close-x:hover {
+      background: #f1f5f9;
+      color: #1e293b;
     }
 
     .editor-grid {
@@ -2456,6 +2478,7 @@
 
     <div id="recordEditorModal" class="modal" aria-hidden="true">
       <div class="modal-card">
+        <button type="button" class="modal-close-x" data-close-target="cancelRecordBtn" aria-label="Fermer">&times;</button>
         <h3 id="recordEditorTitle">Modifier la fiche</h3>
         <div id="recordEditorBody" class="editor-grid"></div>
         <div class="actions">
@@ -2493,6 +2516,7 @@
     <!-- Modal détail utilisateur -->
     <div id="userDetailModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(480px,100%);max-height:90vh;overflow:auto;">
+        <button type="button" class="modal-close-x" data-close-target="udCloseBtn" aria-label="Fermer">&times;</button>
         <h3 id="userDetailTitle" style="margin:0 0 16px;">Détail utilisateur</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div><label>Email</label><input id="udEmail" type="email" style="width:100%;" /></div>
@@ -2529,6 +2553,7 @@
     <!-- Modal édition / impression de facture -->
     <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(640px,100%);max-height:90vh;overflow:auto;">
+        <button type="button" class="modal-close-x" data-close-target="ieCloseBtn" aria-label="Fermer">&times;</button>
         <h3 style="margin:0 0 16px;">Facture <span id="ieNumber"></span></h3>
         <div id="ieInfo" class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px;"></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -2565,6 +2590,7 @@
     <!-- Modal Parametres de l'agence (ecran de parametrage isole) -->
     <div id="settingsModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(820px,100%);max-height:90vh;overflow:auto;">
+        <button type="button" class="modal-close-x" data-close-target="settingsCloseBtn" aria-label="Fermer">&times;</button>
         <h3 style="margin:0 0 16px;">Parametres de l'agence</h3>
 
         <!-- White-label config -->
@@ -2677,6 +2703,7 @@
     <!-- Modal changement de mon mot de passe -->
     <div id="changePasswordModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(400px,100%);">
+        <button type="button" class="modal-close-x" data-close-target="cpCloseBtn" aria-label="Fermer">&times;</button>
         <h3 style="margin:0 0 16px;">Changer mon mot de passe</h3>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div><label>Mot de passe actuel</label><input id="cpCurrent" type="password" style="width:100%;" /></div>
@@ -2693,6 +2720,7 @@
 
     <div id="inspectionDetailModal" class="modal" aria-hidden="true">
       <div class="modal-card" style="width:min(1100px,100%);">
+        <button type="button" class="modal-close-x" data-close-target="closeInspectionDetailBtn" aria-label="Fermer">&times;</button>
         <h3 id="inspectionDetailTitle">Detail etat des lieux</h3>
         <div class="row">
           <div>
@@ -2783,7 +2811,8 @@
 
     <div id="carFinanceModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(1100px,100%);max-height:90vh;overflow:auto;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <button type="button" class="modal-close-x" data-close-target="carFinanceCloseBtn" aria-label="Fermer">&times;</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-right:32px;">
           <h3 id="carFinanceTitle" style="margin:0;">Bilan financier</h3>
           <div style="display:flex;align-items:center;gap:8px;">
             <label for="carFinanceYear" style="margin:0;">Année</label>
@@ -4257,6 +4286,16 @@
     byId("saveRecordBtn").addEventListener("click", saveRecordEditor);
     byId("recordEditorModal").addEventListener("click", (e) => {
       if (e.target.id === "recordEditorModal") closeRecordEditor();
+    });
+
+    // Croix de fermeture en haut a droite de chaque ecran detail (modal) :
+    // delegue vers le bouton de fermeture existant (Annuler/Fermer) pour
+    // conserver son comportement (closeRecordEditor, persistance settings, etc.).
+    document.querySelectorAll(".modal-close-x").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = byId(btn.getAttribute("data-close-target"));
+        if (target) target.click();
+      });
     });
 
     function getSupabaseConfig() {

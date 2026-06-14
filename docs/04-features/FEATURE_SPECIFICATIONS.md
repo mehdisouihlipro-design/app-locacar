@@ -1142,6 +1142,9 @@ Manage multiple agencies (owned and subcontractor) with commission and cost-shar
 ### Description
 Un double-clic sur une ligne de tableau (Contrats, Factures, Voitures, Clients, Réservations, Paiements, Maintenance, Assurances, Leasing, Vignettes, etc.) ouvre une modale générique (`openRecordEditor`/`saveRecordEditor`) qui permet d'éditer les champs de l'enregistrement. Les champs calculés (totaux, montants TND dérivés, `lines` des factures, etc.) sont affichés en lecture seule.
 
+### Fermeture des écrans détails (croix en haut à droite)
+Chaque écran détail/modal de l'application (`recordEditorModal`, `userDetailModal`, `invoiceEditModal`, `settingsModal`, `changePasswordModal`, `inspectionDetailModal`, `carFinanceModal`) affiche une croix `×` en haut à droite (`.modal-close-x`), en plus du bouton "Fermer"/"Annuler" existant. La croix délègue vers le bouton de fermeture existant de la modale (via `data-close-target`), afin de conserver son comportement (ex. `closeRecordEditor`, persistance des paramètres pour `settingsModal`).
+
 ### Persistance (conforme à la règle CLAUDE.md)
 À l'enregistrement (`saveRecordEditor`), en plus de la mise à jour de `state` + `localStorage`, l'app effectue un `PUT` vers l'API backend pour les entités qui disposent d'une route `PUT /:id` :
 
