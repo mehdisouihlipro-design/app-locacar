@@ -1,6 +1,6 @@
 # 📖 Guide d'Utilisation Complet - E-Drive Gestion Locative
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** Juin 2026  
 **Application:** LocaCar - Gestion Multi-Agences de Location de Véhicules
 
@@ -600,6 +600,12 @@ Dans les tableaux, certains champs (client, véhicule, contrat, facture...) appa
 
 ### Indicateurs et graphiques cliquables
 Comme indiqué en page d'accueil, les KPI, listes et graphiques (tableau de bord, rentabilité, trésorerie...) sont cliquables et renvoient vers l'écran de détail correspondant, avec le même filtre déjà appliqué.
+
+### Tri et filtre par colonne (NEW!)
+Tous les tableaux de l'application (Voitures, Clients, Contrats, Factures, Recouvrement, Paiements, Maintenance, Réservations, États des lieux, Alertes, Assurances, Leasing, Vignettes, GPS, Utilisateurs, Rentabilité, Prévision de trésorerie...) disposent désormais :
+- **Tri par en-tête** : cliquer sur le titre d'une colonne trie le tableau par cette colonne (ordre croissant) ; cliquer une seconde fois inverse l'ordre (décroissant). Un indicateur **▲**/**▼** s'affiche sur la colonne triée.
+- **Ligne de filtres** : juste sous les en-têtes, chaque colonne dispose d'un champ de saisie (filtre texte partiel, insensible à la casse) ou d'une liste déroulante (pour les colonnes à valeurs fixes comme le statut). Plusieurs filtres peuvent être combinés simultanément.
+- Le tri et les filtres par colonne sont conservés tant que la page reste ouverte, mais ne sont pas sauvegardés au rechargement.
 
 ### Modification exceptionnelle du numéro de contrat/facture
 Le numéro (identifiant) d'un contrat ou d'une facture peut être modifié depuis la modale d'édition générique. La modification est automatiquement répercutée sur tous les enregistrements liés (factures, paiements, états des lieux...).

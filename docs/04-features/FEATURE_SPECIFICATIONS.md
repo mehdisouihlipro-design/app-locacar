@@ -1265,15 +1265,19 @@ Les lignes de contrat au statut `brouillon` (contrat non confirmé, 9.3) ne sont
 - `loadDataFromAPI()` charge `state.users` (annuaire `id`/nom/email, réservé aux admins via `GET /users`) et mappe `createdAt`/`createdBy`/`updatedAt`/`updatedBy` sur chaque entité (`cars`, `customers`, `contracts`, `invoices`, `payments`, `maintenanceCosts`, `vignettes`, `leasingContracts`, `insurances`, `reservations`).
 - Dans l'éditeur générique (`openRecordEditor`), `created_by`/`updated_by`/`created_at`/`updated_at` sont affichés en lecture seule (`getEditorFieldConfig`) ; `created_by`/`updated_by` sont résolus en nom d'utilisateur via `resolveUserName()` (repli sur l'id brut si `state.users` est vide ou si l'utilisateur n'est pas trouvé) plutôt que d'afficher l'id brut.
 
-### 9.7 Tri et filtre génériques sur toutes les grilles (BR24)
+### 9.7 Tri et filtre génériques sur toutes les grilles (BR24) — ✅ Implémenté (Phase 1B)
 
-Nouveau comportement appliqué à chaque tableau de l'application (Contrats, Factures, Voitures, Clients, Réservations, Paiements, Maintenance, etc.) :
+Comportement appliqué aux ~19 grilles principales de l'application (Voitures, Clients, Contrats, Factures, Recouvrement, Paiements, Maintenance, Réservations, États des lieux, Alertes, Assurances + échéances, Leasing + échéances, Vignettes, GPS, Utilisateurs, Rentabilité, Prévision de trésorerie) :
 
-- **Tri** : clic sur l'en-tête de colonne → tri ascendant ; second clic sur la même colonne → tri descendant ; un indicateur visuel (▲/▼) indique la colonne et le sens actifs. Tri effectué côté client sur les données déjà chargées dans `state`.
-- **Filtre** : une ligne de filtres sous les en-têtes, avec un champ texte par colonne (ou une liste déroulante pour les colonnes à valeurs énumérées comme `status`). Les filtres sont cumulatifs (ET logique entre colonnes), insensibles à la casse, et effectuent une recherche partielle pour les champs texte.
-- **Tri par défaut** : à l'ouverture d'un écran, les données sont triées par `created_at` décroissant (le plus récent en premier), conformément à BR23. L'utilisateur peut re-trier sur n'importe quelle colonne.
-- **État** : l'état de tri/filtre par écran est conservé en mémoire pendant la session (`state.ui.tableState[entityKey] = { sortKey, sortDir, filters }`), sans persistance obligatoire en base.
-- **Implémentation** : fonction utilitaire générique `renderSortableFilterableTable(containerEl, entityKey, columns, rows, rowRenderer)`, réutilisée par chaque fonction `render<Entity>()` existante.
+- **Tri** : clic sur l'en-tête de colonne (`th.sortable`, surligné au survol) → tri ascendant ; second clic sur la même colonne → tri descendant ; un indicateur visuel (▲/▼, `span.sort-indicator`) signale la colonne et le sens actifs. Tri effectué côté client sur les données déjà chargées dans `state`.
+- **Filtre** : une ligne `tr.filter-row` insérée sous les en-têtes, avec un champ texte par colonne (recherche partielle insensible à la casse) ou une liste déroulante (`<select>`, option "Tous") pour les colonnes à valeurs énumérées (ex. `status`, `mode`, `role`, colonne "Etat" calculée). Les filtres sont cumulatifs (ET logique entre colonnes) et s'appliquent en plus des filtres existants (recherche globale / filtre statut du haut de page).
+- **Tri par défaut** : si aucune colonne n'est triée, l'ordre par défaut existant est conservé (généralement `created_at` décroissant côté API, conformément à BR23, ou l'ordre métier propre à l'écran — ex. échéances classées par date d'échéance).
+- **État** : l'état de tri/filtre par grille est conservé en mémoire pendant la session uniquement, dans `dashboardFilters[entityKey].sort = { key, dir }` et `dashboardFilters[entityKey].columnFilters = {}` — sans persistance en base.
+- **Implémentation** (`worksheet-mini-app/index.html`) :
+  - `getColumnValue(row, col)`, `compareValues(a, b, type)` (types `"number"`, `"date"`, `"string"` avec tri local `fr` numérique), `getTableState(entityKey)` (initialisation paresseuse de `sort`/`columnFilters`).
+  - `applySortAndColumnFilters(rows, entityKey, columns)` : applique les filtres par colonne puis le tri ; appelée dans chaque `render<Entity>()` juste avant la pagination/itération.
+  - `setupSortableTable(table, entityKey, columns, renderFn)` : initialise une fois par table (`headRow.dataset.sortableInit`) les en-têtes cliquables + indicateurs et injecte la ligne de filtres ; appelée pour les 19 grilles depuis `setupAllSortableTables()`.
+  - Chaque grille définit un tableau `const <ENTITY>_COLUMNS = [...]` (ordre = ordre des `<th>`), avec `sortType`, `filterType: "select"` + `options` pour les colonnes énumérées, `accessor` pour les colonnes calculées (ex. `contracts.totalTnd`/`dueTnd`, `invoices.status`, `rentabilite.revenue`/`expenses`/`balance`), et `sortable: false`/`filterable: false` pour les colonnes d'actions.
 
 ### 9.8 Réservation liée à une ligne de contrat — recherche ou création (BR25)
 

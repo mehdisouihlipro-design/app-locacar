@@ -257,6 +257,25 @@
       letter-spacing: 0.03em;
     }
 
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background: #eef2ff; }
+    th.sortable .sort-indicator { margin-left: 4px; opacity: .35; font-size: 10px; }
+    th.sortable.sort-active .sort-indicator { opacity: 1; }
+    tr.filter-row th {
+      background: #fff;
+      padding: 4px 6px;
+      text-transform: none;
+      font-weight: 400;
+    }
+    tr.filter-row input, tr.filter-row select {
+      width: 100%;
+      font-size: 12px;
+      padding: 3px 5px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
     .pill {
       display: inline-flex;
       padding: 2px 8px;
@@ -4225,6 +4244,93 @@
       const safePage = Math.min(page, pages - 1);
       if (_pages[tab] !== safePage) _pages[tab] = safePage;
       return { items: arr.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE), page: safePage, pages, total };
+    }
+
+    // ── Tri/filtre generiques par colonne (BR24) ────────────────────────
+    function getColumnValue(row, col) {
+      return col.accessor ? col.accessor(row) : row[col.key];
+    }
+    function compareValues(a, b, type) {
+      if (type === "number") return (Number(a) || 0) - (Number(b) || 0);
+      if (type === "date") return (new Date(a || 0).getTime() || 0) - (new Date(b || 0).getTime() || 0);
+      return String(a ?? "").localeCompare(String(b ?? ""), "fr", { numeric: true, sensitivity: "base" });
+    }
+    function getTableState(entityKey) {
+      const f = dashboardFilters[entityKey] || (dashboardFilters[entityKey] = {});
+      if (!f.sort) f.sort = { key: null, dir: "asc" };
+      if (!f.columnFilters) f.columnFilters = {};
+      return f;
+    }
+    function applySortAndColumnFilters(rows, entityKey, columns) {
+      const { sort, columnFilters } = getTableState(entityKey);
+      let result = rows.filter((row) => columns.every((col) => {
+        const val = columnFilters[col.key];
+        if (!val) return true;
+        const cell = getColumnValue(row, col);
+        if (col.filterType === "select") return String(cell ?? "") === val;
+        return String(cell ?? "").toLowerCase().includes(String(val).toLowerCase());
+      }));
+      if (sort.key) {
+        const col = columns.find((c) => c.key === sort.key);
+        if (col) {
+          result = [...result].sort((a, b) => {
+            const cmp = compareValues(getColumnValue(a, col), getColumnValue(b, col), col.sortType || "string");
+            return sort.dir === "desc" ? -cmp : cmp;
+          });
+        }
+      }
+      return result;
+    }
+    function setupSortableTable(table, entityKey, columns, renderFn) {
+      if (!table) return;
+      const headRow = table.querySelector("thead tr");
+      if (!headRow || headRow.dataset.sortableInit) return;
+      headRow.dataset.sortableInit = "1";
+      const ths = Array.from(headRow.children);
+      const filterRow = document.createElement("tr");
+      filterRow.className = "filter-row";
+      ths.forEach((th, i) => {
+        const col = columns[i];
+        if (!col) { filterRow.appendChild(document.createElement("th")); return; }
+        if (col.sortable !== false) {
+          th.classList.add("sortable");
+          th.dataset.sortKey = col.key;
+          const indicator = document.createElement("span");
+          indicator.className = "sort-indicator";
+          indicator.textContent = "⇕";
+          th.appendChild(indicator);
+          th.addEventListener("click", () => {
+            const tState = getTableState(entityKey);
+            if (tState.sort.key === col.key) tState.sort.dir = tState.sort.dir === "asc" ? "desc" : "asc";
+            else { tState.sort.key = col.key; tState.sort.dir = "asc"; }
+            ths.forEach((h) => {
+              h.classList.remove("sort-active");
+              const ind = h.querySelector(".sort-indicator");
+              if (ind) ind.textContent = "⇕";
+            });
+            th.classList.add("sort-active");
+            indicator.textContent = tState.sort.dir === "asc" ? "▲" : "▼";
+            renderFn();
+          });
+        }
+        const fth = document.createElement("th");
+        if (col.filterable !== false) {
+          if (col.filterType === "select") {
+            const sel = document.createElement("select");
+            sel.innerHTML = '<option value="">Tous</option>' + (col.options || []).map((o) => `<option value="${safe(o)}">${safe(o)}</option>`).join("");
+            sel.addEventListener("change", () => { getTableState(entityKey).columnFilters[col.key] = sel.value; renderFn(); });
+            fth.appendChild(sel);
+          } else {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "Filtrer...";
+            input.addEventListener("input", () => { getTableState(entityKey).columnFilters[col.key] = input.value; renderFn(); });
+            fth.appendChild(input);
+          }
+        }
+        filterRow.appendChild(fth);
+      });
+      headRow.parentElement.appendChild(filterRow);
     }
 
     function renderPaginationControls(containerId, tab, total, page, pages) {
@@ -8249,6 +8355,15 @@
       return { months, years };
     }
 
+    const TREASURY_FORECAST_COLUMNS = [
+      { key: "date", sortType: "date" },
+      { key: "inflow", sortType: "number", accessor: (p) => Number(p.inflowTnd || 0) },
+      { key: "outflow", sortType: "number", accessor: (p) => Number(p.outflowTnd || 0) },
+      { key: "delta", sortType: "number", accessor: (p) => Number(p.deltaTnd || 0) },
+      { key: "cash", sortType: "number", accessor: (p) => Number(p.cashTnd || 0) },
+      { key: "etat", filterType: "select", options: ["negatif", "ok"], accessor: (p) => (Number(p.cashTnd || 0) < 0 ? "negatif" : "ok") },
+    ];
+
     function renderTreasuryForecastTable(snapshot) {
       const tbody = byId("treasuryForecastTable");
       if (!tbody) return;
@@ -8262,7 +8377,7 @@
         return;
       }
 
-      points.forEach((p) => {
+      applySortAndColumnFilters(points, "treasuryForecast", TREASURY_FORECAST_COLUMNS).forEach((p) => {
         const tr = document.createElement("tr");
         const inflow = Number(p.inflowTnd || 0);
         const outflow = Number(p.outflowTnd || 0);
@@ -8625,12 +8740,27 @@
         .join(" | ") + (photos.length > 3 ? ` <span class="small">+${photos.length - 3}</span>` : "");
     }
 
+    const INSPECTIONS_COLUMNS = [
+      { key: "id" },
+      { key: "type", filterType: "select", options: ["entree", "sortie"] },
+      { key: "date", sortType: "date" },
+      { key: "carPlate" },
+      { key: "contractId" },
+      { key: "odometerKm", sortType: "number" },
+      { key: "fuelLevel" },
+      { key: "conditionNote" },
+      { key: "checklistSummary", accessor: (r) => getInspectionChecklistSummary(r.checklistDetails || r.checklist || {}) },
+      { key: "photos", sortable: false, filterable: false },
+      { key: "observation" },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderInspections() {
       const tbody = byId("inspectionsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const rows = [...state.inspections].sort((a, b) => `${b.date || ""} ${b.time || ""}`.localeCompare(`${a.date || ""} ${a.time || ""}`));
+      const rows = applySortAndColumnFilters([...state.inspections].sort((a, b) => `${b.date || ""} ${b.time || ""}`.localeCompare(`${a.date || ""} ${a.time || ""}`)), "inspections", INSPECTIONS_COLUMNS);
 
       rows.forEach((r) => {
         const tr = document.createElement("tr");
@@ -8701,19 +8831,29 @@
       });
     }
 
+    const RESERVATIONS_COLUMNS = [
+      { key: "id" },
+      { key: "customerName" },
+      { key: "carPlate" },
+      { key: "startDate", sortType: "date" },
+      { key: "endDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["en_attente", "confirmee", "annulee", "terminee"] },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderReservationsTable() {
       const tbody = byId("reservationsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
       const statusFilter = dashboardFilters.reservations.status;
-      const rows = [...state.reservations]
+      const rows = applySortAndColumnFilters([...state.reservations]
         .filter((r) => {
           if (!statusFilter) return true;
           if (statusFilter === "active") return r.status === "en_attente" || r.status === "confirmee";
           return r.status === statusFilter;
         })
-        .sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b));
+        .sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b)), "reservations", RESERVATIONS_COLUMNS);
       rows.forEach((r) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -9083,6 +9223,14 @@
       }
     }
 
+    const CARS_COLUMNS = [
+      { key: "plate" },
+      { key: "model" },
+      { key: "agency" },
+      { key: "status", filterType: "select", options: ["dispo", "loue", "maintenance"] },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderCars() {
       const tbody = byId("carsTable");
       tbody.innerHTML = "";
@@ -9094,7 +9242,8 @@
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesStatus && matchesQuery;
         });
-      const { items, page, pages, total } = paginateArray(filtered, "cars");
+      const sorted = applySortAndColumnFilters(filtered, "cars", CARS_COLUMNS);
+      const { items, page, pages, total } = paginateArray(sorted, "cars");
       items.forEach((car) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -9135,11 +9284,26 @@
       renderPaginationControls(null, "cars", total, page, pages);
     }
 
+    const RENTABILITE_COLUMNS = [
+      { key: "plate" },
+      { key: "model" },
+      { key: "revenue", sortType: "number", accessor: (car) => getCarFinancialLedger(car.id).years.reduce((sum, y) => sum + y.revenue, 0) },
+      { key: "expenses", sortType: "number", accessor: (car) => getCarFinancialLedger(car.id).years.reduce((sum, y) => sum + y.totalExpenses, 0) },
+      { key: "balance", sortType: "number", accessor: (car) => {
+          const ledger = getCarFinancialLedger(car.id);
+          const revenue = ledger.years.reduce((sum, y) => sum + y.revenue, 0);
+          const expenses = ledger.years.reduce((sum, y) => sum + y.totalExpenses, 0);
+          return revenue - expenses;
+        } },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderRentabilite() {
       const tbody = byId("rentabiliteTable");
       if (!tbody) return;
       tbody.innerHTML = "";
-      const { items, page, pages, total } = paginateArray(state.cars, "rentabilite");
+      const sorted = applySortAndColumnFilters(state.cars, "rentabilite", RENTABILITE_COLUMNS);
+      const { items, page, pages, total } = paginateArray(sorted, "rentabilite");
       items.forEach((car) => {
         const ledger = getCarFinancialLedger(car.id);
         const revenue = ledger.years.reduce((sum, y) => sum + y.revenue, 0);
@@ -9168,6 +9332,15 @@
       renderPaginationControls(null, "rentabilite", total, page, pages);
     }
 
+    const USERS_COLUMNS = [
+      { key: "email" },
+      { key: "full_name", accessor: (u) => u.full_name || "" },
+      { key: "role", filterType: "select", options: ["agent", "admin", "manager"] },
+      { key: "is_active", filterType: "select", options: ["Oui", "Non"], accessor: (u) => (u.is_active ? "Oui" : "Non") },
+      { key: "created_at", sortType: "date" },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     async function renderUsers() {
       const tbody = byId("usersTable");
       if (!tbody) return;
@@ -9177,7 +9350,8 @@
         tbody.innerHTML = '<tr><td colspan="6" class="muted">Accès refusé ou erreur (admin requis).</td></tr>';
         return;
       }
-      tbody.innerHTML = users.map(u => `
+      const rows = applySortAndColumnFilters(users, "users", USERS_COLUMNS);
+      tbody.innerHTML = rows.map(u => `
         <tr class="clickable-row" onclick="openUserDetail('${u.id}')" style="cursor:pointer;">
           <td>${u.email}</td>
           <td>${u.full_name || '-'}</td>
@@ -9440,6 +9614,14 @@
       } catch (err) { status.textContent = `Erreur: ${err.message}`; }
     });
 
+    const CUSTOMERS_COLUMNS = [
+      { key: "name" },
+      { key: "phone" },
+      { key: "email" },
+      { key: "type", filterType: "select", options: ["particulier", "entreprise"] },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderCustomers() {
       const tbody = byId("customersTable");
       tbody.innerHTML = "";
@@ -9451,7 +9633,8 @@
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesType && matchesQuery;
         });
-      const { items, page, pages, total } = paginateArray(filtered, "customers");
+      const sorted = applySortAndColumnFilters(filtered, "customers", CUSTOMERS_COLUMNS);
+      const { items, page, pages, total } = paginateArray(sorted, "customers");
       items.forEach((customer) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -9605,6 +9788,18 @@
       }
     }
 
+    const CONTRACTS_COLUMNS = [
+      { key: "id" },
+      { key: "type", filterType: "select", options: ["court", "long", "autre"] },
+      { key: "customerName" },
+      { key: "carPlate" },
+      { key: "quotient", sortType: "number" },
+      { key: "paymentPlan" },
+      { key: "totalTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).totalTnd },
+      { key: "dueTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).dueTnd },
+      { key: "status", filterType: "select", options: ["actif", "termine", "annule", "brouillon"] },
+    ];
+
     function renderContracts() {
       const tbody = byId("contractsTable");
       tbody.innerHTML = "";
@@ -9616,7 +9811,8 @@
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesType && matchesQuery;
         });
-      const { items, page, pages, total } = paginateArray(filtered, "contracts");
+      const sorted = applySortAndColumnFilters(filtered, "contracts", CONTRACTS_COLUMNS);
+      const { items, page, pages, total } = paginateArray(sorted, "contracts");
       items.forEach((contract) => {
         const totals = getContractTotals(contract.id);
         const tr = document.createElement("tr");
@@ -9866,12 +10062,24 @@
       alert(`Notification preparee pour ${firstCustomerName}. ${extraGroups} autre(s) client(s) en retard${missingEmailCount > 0 ? `, ${missingEmailCount} sans email` : ""}.`);
     }
 
+    const INVOICES_COLUMNS = [
+      { key: "id" },
+      { key: "contractId" },
+      { key: "customerName" },
+      { key: "dueDate", sortType: "date" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "paidAmountTnd", sortType: "number" },
+      { key: "dueAmountTnd", sortType: "number" },
+      { key: "status", filterType: "select", options: ["paye", "partiel", "impaye"], accessor: (i) => getInvoiceStatusInfo(i).label },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderInvoices() {
       const tbody = byId("invoicesTable");
       tbody.innerHTML = "";
       const statusFilter = dashboardFilters.invoices.status;
       const query = String(dashboardFilters.invoices.query || "").trim().toLowerCase();
-      state.invoices
+      const filtered = state.invoices
         .filter((invoice) => {
           const statusInfo = getInvoiceStatusInfo(invoice);
           const statusLabel = statusInfo.label;
@@ -9879,7 +10087,8 @@
           const haystack = `${invoice.id || ""} ${invoice.contractId || ""} ${invoice.customerName || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesStatus && matchesQuery;
-        })
+        });
+      applySortAndColumnFilters(filtered, "invoices", INVOICES_COLUMNS)
         .forEach((invoice) => {
         const statusInfo = getInvoiceStatusInfo(invoice);
         const statusClass = statusInfo.css;
@@ -9932,6 +10141,18 @@
       });
     }
 
+    const COLLECTIONS_COLUMNS = [
+      { key: "id", accessor: (r) => r.invoice.id },
+      { key: "customerName", accessor: (r) => r.invoice.customerName },
+      { key: "email", accessor: (r) => r.email },
+      { key: "dueDate", sortType: "date", accessor: (r) => r.invoice.dueDate },
+      { key: "daysLeft", sortType: "number", accessor: (r) => r.daysLeft },
+      { key: "dueAmountTnd", sortType: "number", accessor: (r) => Number(r.invoice.dueAmountTnd || 0) },
+      { key: "collectionStatus", filterType: "select", options: ["en_retard", "du_aujourdhui", "a_venir"], accessor: (r) => r.collectionStatus },
+      { key: "notif", accessor: (r) => r.invoice.lastReminderAt ? `${r.invoice.lastReminderAt} (${Number(r.invoice.reminderCount || 1)}x)` : "-" },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderCollections() {
       const tbody = byId("collectionsTable");
       if (!tbody) return;
@@ -9940,7 +10161,7 @@
       const statusFilter = dashboardFilters.collections.status;
       const query = String(dashboardFilters.collections.query || "").trim().toLowerCase();
 
-      const rows = state.invoices
+      const rows = applySortAndColumnFilters(state.invoices
         .filter((invoice) => Number(invoice.dueAmountTnd || 0) > 0)
         .map((invoice) => {
           const email = getInvoiceCustomerEmail(invoice);
@@ -9954,7 +10175,7 @@
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesStatus && matchesQuery;
         })
-        .sort((a, b) => a.daysLeft - b.daysLeft);
+        .sort((a, b) => a.daysLeft - b.daysLeft), "collections", COLLECTIONS_COLUMNS);
 
       rows.forEach(({ invoice, email, daysLeft, collectionStatus }) => {
         const tr = document.createElement("tr");
@@ -10029,18 +10250,29 @@
         });
     }
 
+    const PAYMENTS_COLUMNS = [
+      { key: "id" },
+      { key: "invoiceId" },
+      { key: "contractId" },
+      { key: "customerName" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "method", filterType: "select", options: ["especes", "virement", "carte", "cheque"] },
+      { key: "date", sortType: "date" },
+    ];
+
     function renderPayments() {
       const tbody = byId("paymentsTable");
       tbody.innerHTML = "";
       const methodFilter = dashboardFilters.payments.method;
       const query = String(dashboardFilters.payments.query || "").trim().toLowerCase();
-      state.payments
+      const filtered = state.payments
         .filter((p) => {
           const matchesMethod = methodFilter ? p.method === methodFilter : true;
           const haystack = `${p.id || ""} ${p.invoiceId || ""} ${p.customerName || ""} ${p.date || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesMethod && matchesQuery;
-        })
+        });
+      applySortAndColumnFilters(filtered, "payments", PAYMENTS_COLUMNS)
         .forEach((p) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -10078,6 +10310,18 @@
       });
     }
 
+    const MAINTENANCE_COLUMNS = [
+      { key: "id" },
+      { key: "carPlate" },
+      { key: "type" },
+      { key: "date", sortType: "date" },
+      { key: "amountOriginal", sortType: "number" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "status", filterType: "select", options: ["paye", "a_payer"] },
+      { key: "note" },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderMaintenance() {
       const tbody = byId("maintenanceTable");
       if (!tbody) return;
@@ -10087,7 +10331,7 @@
       const typeFilter = String(dashboardFilters.maintenance.type || "");
       const query = String(dashboardFilters.maintenance.query || "").trim().toLowerCase();
 
-      const rows = (state.maintenanceCosts || [])
+      const rows = applySortAndColumnFilters((state.maintenanceCosts || [])
         .filter((row) => {
           const matchesCar = carFilter ? String(row.carId) === carFilter : true;
           const matchesType = typeFilter ? row.type === typeFilter : true;
@@ -10099,7 +10343,7 @@
           const da = new Date(`${a.date || "1970-01-01"}T00:00:00`).getTime();
           const db = new Date(`${b.date || "1970-01-01"}T00:00:00`).getTime();
           return db - da;
-        });
+        }), "maintenance", MAINTENANCE_COLUMNS);
 
       rows.forEach((row) => {
         const amountTnd = Number(row.amountTnd || 0);
@@ -10335,6 +10579,16 @@
       return alerts;
     }
 
+    const ALERTS_COLUMNS = [
+      { key: "type" },
+      { key: "ref" },
+      { key: "carPlate" },
+      { key: "amountOriginal", sortType: "number", accessor: (a) => Number(a.amountOriginal || 0) },
+      { key: "dueDate", sortType: "date" },
+      { key: "daysLeft", sortType: "number" },
+      { key: "level", filterType: "select", options: ["en_retard", "urgent", "proche"] },
+    ];
+
     function renderAlerts() {
       const tbody = byId("alertsTable");
       if (!tbody) return;
@@ -10355,8 +10609,8 @@
       if (byId("alertUrgentCount")) byId("alertUrgentCount").textContent = String(urgentCount);
       if (byId("alertNearCount")) byId("alertNearCount").textContent = String(nearCount);
 
-      filteredAlerts
-        .sort((a, b) => a.daysLeft - b.daysLeft)
+      applySortAndColumnFilters(filteredAlerts
+        .sort((a, b) => a.daysLeft - b.daysLeft), "alerts", ALERTS_COLUMNS)
         .forEach((a) => {
           const tr = document.createElement("tr");
           const pillClass = a.level === "en_retard" ? "impaye" : a.level === "urgent" ? "maintenance" : "loue";
@@ -10384,18 +10638,29 @@
       return `<a href="${safe(data)}" download="${safe(name)}">${safe(name)}</a>`;
     }
 
+    const INSURANCES_COLUMNS = [
+      { key: "id" },
+      { key: "carPlate" },
+      { key: "provider" },
+      { key: "monthlyAmount", sortType: "number" },
+      { key: "startDate", sortType: "date" },
+      { key: "attachmentName", sortable: false, filterable: false },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderInsurances() {
       const tbody = byId("insurancesTable");
       if (!tbody) return;
       tbody.innerHTML = "";
       const query = String(dashboardFilters.insurances.query || "").trim().toLowerCase();
 
-      state.insurances
+      const filtered = state.insurances
         .filter((r) => {
           const haystack = `${r.id || ""} ${r.carPlate || ""} ${r.provider || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
           return matchesQuery;
-        })
+        });
+      applySortAndColumnFilters(filtered, "insurances", INSURANCES_COLUMNS)
         .forEach((r) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -10439,6 +10704,16 @@
       });
     }
 
+    const INSURANCE_INSTALLMENTS_COLUMNS = [
+      { key: "id" },
+      { key: "ownerId" },
+      { key: "carPlate" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "dueDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["paye", "a_payer"] },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderInsuranceInstallments() {
       const tbody = byId("insuranceInstallmentsTable");
       if (!tbody) return;
@@ -10450,9 +10725,9 @@
         return;
       }
 
-      const rows = [...state.insuranceInstallments]
+      const rows = applySortAndColumnFilters([...state.insuranceInstallments]
         .filter((x) => String(x.ownerId) === selectedInsuranceId)
-        .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+        .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))), "insuranceInstallments", INSURANCE_INSTALLMENTS_COLUMNS);
       rows.forEach((r) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -10512,12 +10787,22 @@
       });
     }
 
+    const LEASING_CONTRACTS_COLUMNS = [
+      { key: "id" },
+      { key: "carPlate" },
+      { key: "lender" },
+      { key: "monthlyAmount", sortType: "number" },
+      { key: "startDate", sortType: "date" },
+      { key: "attachmentName", sortable: false, filterable: false },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderLeasingContracts() {
       const tbody = byId("leasingContractsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      state.leasingContracts.forEach((r) => {
+      applySortAndColumnFilters(state.leasingContracts, "leasingContracts", LEASING_CONTRACTS_COLUMNS).forEach((r) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         if (selectedRows.leasingContracts === String(r.id)) tr.classList.add("selected");
@@ -10560,6 +10845,16 @@
       });
     }
 
+    const LEASING_INSTALLMENTS_COLUMNS = [
+      { key: "id" },
+      { key: "ownerId" },
+      { key: "carPlate" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "dueDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["paye", "a_payer"] },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderLeasingInstallments() {
       const tbody = byId("leasingInstallmentsTable");
       if (!tbody) return;
@@ -10571,9 +10866,9 @@
         return;
       }
 
-      const rows = [...state.leasingInstallments]
+      const rows = applySortAndColumnFilters([...state.leasingInstallments]
         .filter((x) => String(x.ownerId) === selectedLeasingId)
-        .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+        .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))), "leasingInstallments", LEASING_INSTALLMENTS_COLUMNS);
       rows.forEach((r) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -10633,12 +10928,23 @@
       });
     }
 
+    const VIGNETTES_COLUMNS = [
+      { key: "id" },
+      { key: "carPlate" },
+      { key: "fiscalYear" },
+      { key: "amountTnd", sortType: "number" },
+      { key: "dueDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["paye", "a_payer"] },
+      { key: "attachmentName", sortable: false, filterable: false },
+      { key: "actions", sortable: false, filterable: false },
+    ];
+
     function renderVignettes() {
       const tbody = byId("vignettesTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const rows = [...state.vignettes].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+      const rows = applySortAndColumnFilters([...state.vignettes].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))), "vignettes", VIGNETTES_COLUMNS);
       rows.forEach((v) => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
@@ -10862,12 +11168,23 @@
       }
     }
 
+    const GPS_COLUMNS = [
+      { key: "vehicule", accessor: (car) => `${car.plate || ""} ${car.model || ""}`.trim() },
+      { key: "position", accessor: (car) => {
+          const hasPos = Number.isFinite(Number(car.gpsLat)) && Number.isFinite(Number(car.gpsLng));
+          return hasPos ? `${Number(car.gpsLat).toFixed(6)}, ${Number(car.gpsLng).toFixed(6)}` : "Non renseignee";
+        } },
+      { key: "gpsSpeed", sortType: "number", accessor: (car) => Number(car.gpsSpeed || 0) },
+      { key: "gpsUpdatedAt", sortType: "date" },
+      { key: "map", sortable: false, filterable: false },
+    ];
+
     function renderGpsTable() {
       const tbody = byId("gpsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      state.cars.forEach((car) => {
+      applySortAndColumnFilters(state.cars, "gpsTable", GPS_COLUMNS).forEach((car) => {
         const hasPos = Number.isFinite(Number(car.gpsLat)) && Number.isFinite(Number(car.gpsLng));
         const pos = hasPos
           ? `${Number(car.gpsLat).toFixed(6)}, ${Number(car.gpsLng).toFixed(6)}`
@@ -11547,6 +11864,33 @@
       });
     }
 
+    function rerenderTreasuryForecastTable() {
+      renderTreasuryForecastTable(computeTreasurySnapshot(TREASURY_HORIZON_DAYS));
+    }
+
+    function setupAllSortableTables() {
+      setupSortableTable(byId("carsTable")?.closest("table"), "cars", CARS_COLUMNS, renderCars);
+      setupSortableTable(byId("customersTable")?.closest("table"), "customers", CUSTOMERS_COLUMNS, renderCustomers);
+      setupSortableTable(byId("contractsTable")?.closest("table"), "contracts", CONTRACTS_COLUMNS, renderContracts);
+      setupSortableTable(byId("invoicesTable")?.closest("table"), "invoices", INVOICES_COLUMNS, renderInvoices);
+      setupSortableTable(byId("collectionsTable")?.closest("table"), "collections", COLLECTIONS_COLUMNS, renderCollections);
+      setupSortableTable(byId("paymentsTable")?.closest("table"), "payments", PAYMENTS_COLUMNS, renderPayments);
+      setupSortableTable(byId("maintenanceTable")?.closest("table"), "maintenance", MAINTENANCE_COLUMNS, renderMaintenance);
+      setupSortableTable(byId("reservationsTable")?.closest("table"), "reservations", RESERVATIONS_COLUMNS, renderReservationsTable);
+      setupSortableTable(byId("inspectionsTable")?.closest("table"), "inspections", INSPECTIONS_COLUMNS, renderInspections);
+      setupSortableTable(byId("alertsTable")?.closest("table"), "alerts", ALERTS_COLUMNS, renderAlerts);
+      setupSortableTable(byId("insurancesTable")?.closest("table"), "insurances", INSURANCES_COLUMNS, renderInsurances);
+      setupSortableTable(byId("insuranceInstallmentsTable")?.closest("table"), "insuranceInstallments", INSURANCE_INSTALLMENTS_COLUMNS, renderInsuranceInstallments);
+      setupSortableTable(byId("leasingContractsTable")?.closest("table"), "leasingContracts", LEASING_CONTRACTS_COLUMNS, renderLeasingContracts);
+      setupSortableTable(byId("leasingInstallmentsTable")?.closest("table"), "leasingInstallments", LEASING_INSTALLMENTS_COLUMNS, renderLeasingInstallments);
+      setupSortableTable(byId("vignettesTable")?.closest("table"), "vignettes", VIGNETTES_COLUMNS, renderVignettes);
+      setupSortableTable(byId("gpsTable")?.closest("table"), "gpsTable", GPS_COLUMNS, renderGpsTable);
+      setupSortableTable(byId("usersTable")?.closest("table"), "users", USERS_COLUMNS, renderUsers);
+      setupSortableTable(byId("rentabiliteTable")?.closest("table"), "rentabilite", RENTABILITE_COLUMNS, renderRentabilite);
+      setupSortableTable(byId("treasuryForecastTable")?.closest("table"), "treasuryForecast", TREASURY_FORECAST_COLUMNS, rerenderTreasuryForecastTable);
+    }
+
+    setupAllSortableTables();
     initExcelExportButtons();
     render();
   </script>
