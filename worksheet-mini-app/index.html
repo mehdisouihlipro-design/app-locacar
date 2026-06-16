@@ -2570,50 +2570,9 @@
 
         <!-- Actions entête -->
         <div class="actions" style="margin-bottom:12px;">
-          <button id="cdlEditHeaderBtn" class="secondary">Modifier entête</button>
+          <button id="cdlEditHeaderBtn" class="secondary">✏ Modifier entête</button>
+          <button id="cdlCancelEditBtn" class="secondary" style="display:none;">✗ Annuler</button>
           <button id="cdlAddLineToggleBtn">+ Ajouter une ligne</button>
-        </div>
-
-        <!-- Formulaire ajout de ligne (caché par défaut) -->
-        <div id="cdlAddForm" style="display:none;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;background:#fff;">
-          <h4 style="margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Nouvelle ligne</h4>
-          <div class="row" style="grid-template-columns:2fr 1fr 1fr;gap:10px;">
-            <div>
-              <label>Véhicule</label>
-              <select id="cdlLineCar" style="width:100%;"></select>
-            </div>
-            <div>
-              <label>Date début</label>
-              <input id="cdlLineStart" type="date" style="width:100%;" />
-            </div>
-            <div>
-              <label>Date fin</label>
-              <input id="cdlLineEnd" type="date" style="width:100%;" />
-            </div>
-          </div>
-          <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-top:8px;">
-            <div>
-              <label>Tarif HT (par jour/mois)</label>
-              <input id="cdlLineRate" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
-            </div>
-            <div>
-              <label>Montant HT (TND)</label>
-              <input id="cdlLineAmountHt" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
-            </div>
-            <div>
-              <label>TVA (<span id="cdlVatLabel">19</span>%)</label>
-              <input id="cdlLineVat" type="number" step="0.01" readonly style="width:100%;background:#f8faff;" />
-            </div>
-            <div>
-              <label>Montant TTC (TND)</label>
-              <input id="cdlLineAmountTtc" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
-            </div>
-          </div>
-          <div id="cdlOverlapError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:13px;"></div>
-          <div class="actions" style="margin-top:10px;">
-            <button id="cdlLineSaveBtn">Enregistrer la ligne</button>
-            <button id="cdlLineCancelBtn" class="secondary">Annuler</button>
-          </div>
         </div>
 
         <!-- Grille des lignes -->
@@ -11518,31 +11477,127 @@
 
     // ── Contract detail modal (Phase 2B) ───────────────────────────────────────
 
+    // ── Entête contrat : vue lecture / édition inline ───────────────────────────
+
+    function renderContractDetailHeader(contractId, editMode) {
+      const contract = state.contracts.find(c => c.id === contractId);
+      if (!contract) return;
+      const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule");
+      const sumHt = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
+      const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      const editBtn = byId("cdlEditHeaderBtn");
+      const cancelBtn = byId("cdlCancelEditBtn");
+
+      if (!editMode) {
+        byId("cdlHeader").innerHTML = `
+          <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
+          <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
+          <div><span class="label-small">Date</span><br>${contract.contractDate || "-"}</div>
+          <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
+          <div><span class="label-small">Statut</span><br>${safe(contract.status || "-")}</div>
+          <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+        `;
+        editBtn.textContent = "✏ Modifier entête";
+        editBtn.onclick = () => renderContractDetailHeader(contractId, true);
+        cancelBtn.style.display = "none";
+      } else {
+        const custOpts = state.customers.map(c =>
+          `<option value="${safe(c.id)}"${c.id === contract.customerId ? " selected" : ""}>${safe(c.name)}</option>`
+        ).join("");
+        byId("cdlHeader").innerHTML = `
+          <div>
+            <label class="label-small">Client</label>
+            <select id="cdlEClient" style="width:100%;">${custOpts}</select>
+          </div>
+          <div>
+            <label class="label-small">Type</label>
+            <select id="cdlEType" style="width:100%;">
+              <option value="court"${contract.type === "court" ? " selected" : ""}>court</option>
+              <option value="long"${contract.type === "long" ? " selected" : ""}>long</option>
+              <option value="autre"${contract.type === "autre" ? " selected" : ""}>autre</option>
+            </select>
+          </div>
+          <div>
+            <label class="label-small">Date</label>
+            <input id="cdlEDate" type="date" value="${contract.contractDate || ""}" style="width:100%;" />
+          </div>
+          <div>
+            <label class="label-small">Paiement</label>
+            <select id="cdlEPayment" style="width:100%;">
+              <option value="debut"${contract.paymentMoment === "debut" ? " selected" : ""}>début de location</option>
+              <option value="fin"${contract.paymentMoment === "fin" ? " selected" : ""}>fin de location</option>
+            </select>
+          </div>
+          <div>
+            <label class="label-small">Statut</label>
+            <select id="cdlEStatus" style="width:100%;">
+              <option value="active"${contract.status === "active" ? " selected" : ""}>active</option>
+              <option value="brouillon"${contract.status === "brouillon" ? " selected" : ""}>brouillon</option>
+              <option value="termine"${contract.status === "termine" ? " selected" : ""}>terminé</option>
+              <option value="annule"${contract.status === "annule" ? " selected" : ""}>annulé</option>
+            </select>
+          </div>
+          <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+        `;
+        editBtn.textContent = "✓ Enregistrer";
+        cancelBtn.style.display = "";
+        cancelBtn.onclick = () => renderContractDetailHeader(contractId, false);
+        editBtn.onclick = async () => {
+          const customerId = byId("cdlEClient").value;
+          const type = byId("cdlEType").value;
+          const contractDate = byId("cdlEDate").value;
+          const paymentMoment = byId("cdlEPayment").value;
+          const status = byId("cdlEStatus").value;
+          const customer = state.customers.find(c => c.id === customerId);
+          const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
+          await apiPut(`/contracts/${contractId}`, {
+            customer_id: customerId,
+            customer_name: customer ? customer.name : contract.customerName,
+            type, contract_date: contractDate,
+            payment_moment: paymentMoment, payment_plan: paymentPlan, status,
+          });
+          const idx = state.contracts.findIndex(c => c.id === contractId);
+          if (idx >= 0) {
+            Object.assign(state.contracts[idx], {
+              customerId, customerName: customer ? customer.name : contract.customerName,
+              type, contractDate, paymentMoment, paymentPlan, status,
+            });
+          }
+          renderContractDetailHeader(contractId, false);
+          renderContracts();
+        };
+      }
+    }
+
+    // ── Grille des lignes ────────────────────────────────────────────────────────
+
     function renderContractDetailLines(contractId) {
       const tbody = byId("cdlLinesBody");
+      const inlineRow = tbody.querySelector(".inline-new-line");
       tbody.innerHTML = "";
       const lines = (state.contractLines || []).filter(l => l.contractId === contractId);
-      if (!lines.length) {
-        byId("cdlEmptyMsg").style.display = "";
-        return;
-      }
-      byId("cdlEmptyMsg").style.display = "none";
+      byId("cdlEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
       let sumHt = 0, sumTtc = 0;
       lines.forEach(l => {
         sumHt += l.amountHt || 0;
         sumTtc += l.amountTtc || 0;
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
-        const statusBadge = l.status === "annule" ? '<span class="badge-status loue">annulée</span>' : l.status === "brouillon" ? '<span class="badge-status pending">brouillon</span>' : '<span class="badge-status dispo">active</span>';
+        const statusBadge = l.status === "annule"
+          ? '<span class="badge-status loue">annulée</span>'
+          : l.status === "brouillon" ? '<span class="badge-status pending">brouillon</span>'
+          : '<span class="badge-status dispo">active</span>';
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
-          <td>${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
-          <td>${dur}</td>
-          <td>${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${(l.amountHt || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${statusBadge}</td>
+          <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
+          <td style="text-align:right;">${dur}</td>
+          <td style="text-align:right;">${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td style="text-align:right;">${(l.amountHt || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td style="text-align:right;">${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td style="text-align:right;">${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td style="text-align:center;">${statusBadge}</td>
         `;
         tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", (e) => {
           e.preventDefault(); e.stopPropagation();
@@ -11550,189 +11605,192 @@
         }));
         tbody.appendChild(tr);
       });
-      // Totaux dans le tfoot
+      if (inlineRow) tbody.appendChild(inlineRow);
       const tfoot = byId("cdlLinesFoot");
       if (tfoot) {
-        tfoot.innerHTML = `<tr><td colspan="4"><strong>Total</strong></td><td><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td></tr>`;
+        tfoot.innerHTML = lines.length
+          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td></tr>`
+          : "";
       }
     }
 
-    async function submitContractLine(contractId) {
-      const carId = byId("cdlLineCar").value;
-      const startStr = byId("cdlLineStart").value;
-      const endStr = byId("cdlLineEnd").value;
-      const amountHt = Number(byId("cdlLineAmountHt").value || 0);
-      const rate = Number(byId("cdlLineRate").value || 0);
+    // ── Ligne éditable inline dans la grille ─────────────────────────────────────
 
-      byId("cdlOverlapError").style.display = "none";
-
-      if (!carId) { byId("cdlOverlapError").textContent = "Veuillez sélectionner un véhicule."; byId("cdlOverlapError").style.display = ""; return; }
-      if (!startStr || !endStr) { byId("cdlOverlapError").textContent = "Les dates de début et fin sont obligatoires."; byId("cdlOverlapError").style.display = ""; return; }
-      if (endStr < startStr) { byId("cdlOverlapError").textContent = "La date de fin doit être après la date de début."; byId("cdlOverlapError").style.display = ""; return; }
-      if (amountHt <= 0) { byId("cdlOverlapError").textContent = "Le montant HT doit être supérieur à 0."; byId("cdlOverlapError").style.display = ""; return; }
-
-      const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr);
-      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
-
-      const body = {
-        contract_id: contractId,
-        car_id: carId,
-        car_plate: car ? car.plate : "",
-        period_start: startStr,
-        period_end: endStr,
-        days, months,
-        rate,
-        rate_currency: "TND",
-        amount_ht: amountHt,
-        vat_amount: vatAmount,
-        amount_ttc: amountTtc,
-        amount_tnd: amountTtc,
-        status: "active",
-      };
-
-      const result = await apiPostWithError("/contract-lines", body);
-      if (!result.ok) {
-        byId("cdlOverlapError").textContent = result.status === 409
-          ? `Chevauchement détecté (BR19) : ${result.errorMsg}`
-          : `Erreur ${result.status} : ${result.errorMsg}`;
-        byId("cdlOverlapError").style.display = "";
+    function appendInlineLineRow(contractId) {
+      const tbody = byId("cdlLinesBody");
+      if (tbody.querySelector(".inline-new-line")) {
+        tbody.querySelector(".inline-new-line select")?.focus();
         return;
       }
+      byId("cdlEmptyMsg").style.display = "none";
+      byId("cdlAddLineToggleBtn").textContent = "▲ Masquer";
 
-      const saved = result.data;
-      state.contractLines.push({
-        id: saved.id || uid("CL"),
-        contractId,
-        carId,
-        carPlate: car ? car.plate : "",
-        periodStart: startStr,
-        periodEnd: endStr,
-        days, months,
-        rate,
-        rateCurrency: "TND",
-        amountHt,
-        vatAmount,
-        amountTtc,
-        amountTnd: amountTtc,
-        status: "active",
-      });
+      const carOptions = state.cars.map(car =>
+        `<option value="${safe(car.id)}">${safe(car.plate)}${(car.brand || car.model) ? ` — ${safe(((car.brand || "") + " " + (car.model || "")).trim())}` : ""}</option>`
+      ).join("");
 
-      // Remettre le formulaire à zéro et cacher
-      byId("cdlLineCar").value = "";
-      byId("cdlLineStart").value = "";
-      byId("cdlLineEnd").value = "";
-      byId("cdlLineRate").value = "";
-      byId("cdlLineAmountHt").value = "";
-      byId("cdlLineVat").value = "";
-      byId("cdlLineAmountTtc").value = "";
-      byId("cdlAddForm").style.display = "none";
-      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
-
-      renderContractDetailLines(contractId);
-      renderContracts();
-    }
-
-    function openContractDetail(contractId) {
-      const contract = state.contracts.find(c => c.id === contractId);
-      if (!contract) return;
-
-      // En-tête
-      byId("cdlContractId").textContent = contractId;
-      const vatRate = Number(state.settings.vatRate || 19);
-      const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule");
-      const sumHt = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
-      const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
-      byId("cdlHeader").innerHTML = `
-        <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
-        <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
-        <div><span class="label-small">Date</span><br>${contract.contractDate || "-"}</div>
-        <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || contract.paymentPlan || "-")}</div>
-        <div><span class="label-small">Statut</span><br>${safe(contract.status || "-")}</div>
-        <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
-        <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+      const tr = document.createElement("tr");
+      tr.className = "inline-new-line";
+      tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
+      tr.innerHTML = `
+        <td style="padding:6px 4px;">
+          <select id="ilCar" style="width:100%;min-width:110px;font-size:12px;">
+            <option value="">— véhicule —</option>
+            ${carOptions}
+          </select>
+        </td>
+        <td style="padding:6px 4px;white-space:nowrap;">
+          <input id="ilStart" type="date" style="width:108px;font-size:12px;" />
+          <span style="margin:0 2px;color:var(--muted);">→</span>
+          <input id="ilEnd" type="date" style="width:108px;font-size:12px;" />
+        </td>
+        <td id="ilDur" style="text-align:right;padding:6px 4px;font-size:12px;color:var(--muted);">—</td>
+        <td style="padding:6px 4px;text-align:right;">
+          <input id="ilRate" type="number" step="0.01" min="0" placeholder="tarif/j" style="width:75px;font-size:12px;text-align:right;" />
+        </td>
+        <td style="padding:6px 4px;text-align:right;">
+          <input id="ilAmtHt" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
+        </td>
+        <td style="padding:6px 4px;text-align:right;">
+          <input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:75px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+        </td>
+        <td style="padding:6px 4px;text-align:right;">
+          <input id="ilAmtTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
+        </td>
+        <td style="padding:6px 4px;text-align:center;white-space:nowrap;">
+          <button id="ilSaveBtn" style="padding:3px 10px;font-size:13px;" title="Enregistrer">✓</button>
+          <button id="ilCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;" title="Annuler">✗</button>
+          <div id="ilError" style="display:none;color:#c53030;font-size:11px;margin-top:3px;max-width:130px;line-height:1.3;"></div>
+        </td>
       `;
+      tbody.appendChild(tr);
 
-      // Remettre le formulaire d'ajout à zéro
-      byId("cdlAddForm").style.display = "none";
-      byId("cdlOverlapError").style.display = "none";
-      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      function recomputeHt() {
+        const ht = Number(byId("ilAmtHt").value || 0);
+        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
+        byId("ilVat").value = vatAmount.toFixed(2);
+        byId("ilAmtTtc").value = amountTtc.toFixed(2);
+      }
 
-      // Peupler le select des véhicules (tous, avec marquage conflit)
-      const carSel = byId("cdlLineCar");
-      carSel.innerHTML = '<option value="">— Choisir un véhicule —</option>';
-      state.cars.forEach(car => {
-        const opt = document.createElement("option");
-        opt.value = car.id;
-        opt.textContent = `${car.plate} — ${car.brand || ""} ${car.model || ""}`.trim();
-        carSel.appendChild(opt);
-      });
+      function updateDuration() {
+        const s = byId("ilStart").value;
+        const e = byId("ilEnd").value;
+        if (s && e && e >= s) {
+          const { days } = calcLineDuration(s, e);
+          byId("ilDur").textContent = `${days}j`;
+          const rate = Number(byId("ilRate").value || 0);
+          if (rate > 0) { byId("ilAmtHt").value = (rate * days).toFixed(2); recomputeHt(); }
+        } else {
+          byId("ilDur").textContent = "—";
+        }
+        updateCarConflicts();
+      }
 
-      // Marquer les conflits en fonction des dates saisies (recalcul dynamique)
       function updateCarConflicts() {
-        const startStr = byId("cdlLineStart").value;
-        const endStr = byId("cdlLineEnd").value;
-        Array.from(carSel.options).forEach(opt => {
+        const s = byId("ilStart").value;
+        const e = byId("ilEnd").value;
+        Array.from(byId("ilCar").options).forEach(opt => {
           if (!opt.value) return;
-          if (!startStr || !endStr) { opt.textContent = opt.textContent.replace(/ ⚠ conflit$/, ""); return; }
-          const hasConflict = (state.contractLines || []).some(l =>
-            l.carId === opt.value && l.status === "active" &&
-            l.periodStart <= endStr && l.periodEnd >= startStr
-          );
           const clean = opt.textContent.replace(/ ⚠ conflit$/, "");
+          if (!s || !e) { opt.textContent = clean; opt.style.color = ""; return; }
+          const hasConflict = (state.contractLines || []).some(l =>
+            l.carId === opt.value && l.status === "active" && l.periodStart <= e && l.periodEnd >= s
+          );
           opt.textContent = hasConflict ? `${clean} ⚠ conflit` : clean;
           opt.style.color = hasConflict ? "#c53030" : "";
         });
       }
 
-      byId("cdlLineStart").oninput = updateCarConflicts;
-      byId("cdlLineEnd").oninput = updateCarConflicts;
-
-      // Calcul HT ↔ TTC en temps réel (BR18)
-      byId("cdlLineAmountHt").oninput = () => {
-        const ht = Number(byId("cdlLineAmountHt").value || 0);
-        const { vatAmount, amountTtc, vatRate: vr } = computeContractLineTtc(ht);
-        byId("cdlVatLabel").textContent = vr;
-        byId("cdlLineVat").value = vatAmount.toFixed(2);
-        byId("cdlLineAmountTtc").value = amountTtc.toFixed(2);
-      };
-      byId("cdlLineAmountTtc").oninput = () => {
-        const ttc = Number(byId("cdlLineAmountTtc").value || 0);
-        const result = computeContractLineHt(ttc);
-        byId("cdlVatLabel").textContent = result.vatRate;
-        byId("cdlLineAmountHt").value = result.amountHt.toFixed(2);
-        byId("cdlLineVat").value = result.vatAmount.toFixed(2);
-      };
-      byId("cdlLineRate").oninput = () => {
-        const start = byId("cdlLineStart").value;
-        const end = byId("cdlLineEnd").value;
-        const rate = Number(byId("cdlLineRate").value || 0);
-        if (rate > 0 && start && end) {
-          const { days } = calcLineDuration(start, end);
-          byId("cdlLineAmountHt").value = (rate * days).toFixed(2);
-          byId("cdlLineAmountHt").oninput();
+      byId("ilStart").oninput = updateDuration;
+      byId("ilEnd").oninput = updateDuration;
+      byId("ilRate").oninput = () => {
+        const s = byId("ilStart").value, e = byId("ilEnd").value;
+        const rate = Number(byId("ilRate").value || 0);
+        if (rate > 0 && s && e && e >= s) {
+          const { days } = calcLineDuration(s, e);
+          byId("ilAmtHt").value = (rate * days).toFixed(2);
+          recomputeHt();
         }
       };
-
-      // Remplir le label TVA initial
-      byId("cdlVatLabel").textContent = Number(state.settings.vatRate || 19);
-
-      // Boutons
-      byId("cdlEditHeaderBtn").onclick = () => openRecordEditor("contracts", contractId);
-      byId("cdlAddLineToggleBtn").onclick = () => {
-        const form = byId("cdlAddForm");
-        const visible = form.style.display !== "none";
-        form.style.display = visible ? "none" : "";
-        byId("cdlAddLineToggleBtn").textContent = visible ? "+ Ajouter une ligne" : "▲ Masquer";
+      byId("ilAmtHt").oninput = recomputeHt;
+      byId("ilAmtTtc").oninput = () => {
+        const r = computeContractLineHt(Number(byId("ilAmtTtc").value || 0));
+        byId("ilAmtHt").value = r.amountHt.toFixed(2);
+        byId("ilVat").value = r.vatAmount.toFixed(2);
       };
-      byId("cdlLineCancelBtn").onclick = () => {
-        byId("cdlAddForm").style.display = "none";
+
+      byId("ilCancelBtn").onclick = () => {
+        tr.remove();
         byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+        const hasLines = (state.contractLines || []).some(l => l.contractId === contractId);
+        byId("cdlEmptyMsg").style.display = hasLines ? "none" : "";
       };
-      byId("cdlLineSaveBtn").onclick = () => submitContractLine(contractId);
+      byId("ilSaveBtn").onclick = () => submitInlineContractLine(contractId, tr);
+      byId("ilCar").focus();
+    }
 
+    async function submitInlineContractLine(contractId, tr) {
+      const carId = byId("ilCar").value;
+      const startStr = byId("ilStart").value;
+      const endStr = byId("ilEnd").value;
+      const amountHt = Number(byId("ilAmtHt").value || 0);
+      const rate = Number(byId("ilRate").value || 0);
+      const errDiv = byId("ilError");
+      errDiv.style.display = "none";
+      tr.style.outline = "";
+
+      if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; byId("ilCar").focus(); return; }
+      if (!startStr || !endStr) { errDiv.textContent = "Dates requises"; errDiv.style.display = ""; return; }
+      if (endStr < startStr) { errDiv.textContent = "Fin avant début"; errDiv.style.display = ""; return; }
+      if (amountHt <= 0) { errDiv.textContent = "Montant HT requis (> 0)"; errDiv.style.display = ""; byId("ilAmtHt").focus(); return; }
+
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(startStr, endStr);
+      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
+
+      const saveBtn = byId("ilSaveBtn");
+      saveBtn.disabled = true; saveBtn.textContent = "…";
+
+      const result = await apiPostWithError("/contract-lines", {
+        contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "",
+        period_start: startStr, period_end: endStr, days, months,
+        rate, rate_currency: "TND",
+        amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+        status: "active",
+      });
+
+      if (!result.ok) {
+        saveBtn.disabled = false; saveBtn.textContent = "✓";
+        errDiv.textContent = result.status === 409 ? "Chevauchement (BR19)" : `Erreur : ${result.errorMsg}`;
+        errDiv.style.display = "";
+        tr.style.outline = "2px solid #c53030";
+        return;
+      }
+
+      state.contractLines.push({
+        id: result.data?.id || uid("CL"),
+        contractId, carId, carPlate: car ? car.plate : "",
+        periodStart: startStr, periodEnd: endStr,
+        days, months, rate, rateCurrency: "TND",
+        amountHt, vatAmount, amountTtc, amountTnd: amountTtc, status: "active",
+      });
+
+      tr.remove();
+      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
       renderContractDetailLines(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContracts();
+    }
 
+    // ── Ouvrir le modal de détail ────────────────────────────────────────────────
+
+    function openContractDetail(contractId) {
+      if (!state.contracts.find(c => c.id === contractId)) return;
+      byId("cdlContractId").textContent = contractId;
+      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      byId("cdlAddLineToggleBtn").onclick = () => appendInlineLineRow(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContractDetailLines(contractId);
       byId("contractDetailModal").style.display = "flex";
     }
 
