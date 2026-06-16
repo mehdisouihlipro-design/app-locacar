@@ -327,6 +327,9 @@
 
     .xref { color: #1540c8; text-decoration: none; font-size: inherit; cursor: pointer; }
     .xref:hover { text-decoration: underline; }
+    .badge-lignes { display:inline-block;font-size:11px;font-weight:600;background:#e8f0fe;color:#1540c8;border-radius:12px;padding:2px 8px;text-decoration:none;cursor:pointer;white-space:nowrap; }
+    .badge-lignes:hover { background:#c7d9fc; }
+    .label-small { font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
 
     .hidden {
       display: none !important;
@@ -1448,15 +1451,13 @@
         <button id="newContractBtn">Nouveau</button>
       </div>
 
+      <!-- Phase 2B : formulaire simplifié (entête uniquement). Les lignes (véhicules,
+           périodes, tarifs) s'ajoutent depuis le modal de détail après création. -->
       <div id="contractLegacyForm" style="display:none;">
-      <div class="row">
+      <div class="row" style="grid-template-columns:2fr 1fr 1fr 1fr;">
         <div>
           <label>Client</label>
           <select id="contractCustomer"></select>
-        </div>
-        <div>
-          <label>Vehicule</label>
-          <select id="contractCar"></select>
         </div>
         <div>
           <label>Type de contrat</label>
@@ -1467,73 +1468,27 @@
           </select>
         </div>
         <div>
-          <label>Tarif unitaire</label>
-          <input id="contractRate" type="number" min="0" value="400" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>Devise tarif</label>
-          <select id="contractRateCurrency">
-            <option value="TND">TND</option>
-            <option value="EUR">EUR</option>
-            <option value="SAR">SAR</option>
-            <option value="CAD">CAD</option>
-            <option value="AED">AED</option>
-            <option value="USD">USD</option>
-            <option value="JPY">JPY</option>
-            <option value="KWD">KWD</option>
-            <option value="CHF">CHF</option>
-            <option value="BHD">BHD</option>
-            <option value="CNY">CNY</option>
-            <option value="OMR">OMR</option>
-            <option value="GBP">GBP</option>
-          </select>
+          <label>Date de début</label>
+          <input id="contractDate" type="date" />
         </div>
         <div>
-          <label>Jours (court)</label>
-          <input id="contractDays" type="number" min="1" value="3" />
-        </div>
-        <div>
-          <label>Mois (long)</label>
-          <input id="contractMonths" type="number" min="1" value="12" />
-        </div>
-        <div>
-          <label>Paiement contrat court</label>
+          <label>Paiement</label>
           <select id="contractPaymentMoment">
             <option value="debut">debut de location</option>
             <option value="fin">fin de location</option>
           </select>
         </div>
       </div>
+      <!-- Champs masqués conservés pour éviter les erreurs JS des fonctions existantes -->
+      <input id="contractCar" type="hidden" value="" />
+      <input id="contractRate" type="hidden" value="0" />
+      <select id="contractRateCurrency" style="display:none;"><option value="TND">TND</option></select>
+      <input id="contractDays" type="hidden" value="0" />
+      <input id="contractMonths" type="hidden" value="0" />
+      <input id="contractQuotient" type="hidden" value="0" />
+      <select id="contractQuotientCurrency" style="display:none;"><option value="TND">TND</option></select>
 
-      <div class="row">
-        <div>
-          <label>Quotient</label>
-          <input id="contractQuotient" type="number" min="0" value="0" />
-        </div>
-        <div>
-          <label>Devise quotient</label>
-          <select id="contractQuotientCurrency">
-            <option value="TND">TND</option>
-            <option value="EUR">EUR</option>
-            <option value="SAR">SAR</option>
-            <option value="CAD">CAD</option>
-            <option value="AED">AED</option>
-            <option value="USD">USD</option>
-            <option value="JPY">JPY</option>
-            <option value="KWD">KWD</option>
-            <option value="CHF">CHF</option>
-            <option value="BHD">BHD</option>
-            <option value="CNY">CNY</option>
-            <option value="OMR">OMR</option>
-            <option value="GBP">GBP</option>
-          </select>
-        </div>
-      </div>
-
-      <button id="addContractBtn">Creer contrat</button>
+      <button id="addContractBtn">Créer contrat</button>
       </div>
 
       <div class="row">
@@ -1562,9 +1517,7 @@
             <th>ID</th>
             <th>Type</th>
             <th>Client</th>
-            <th>Vehicule</th>
-            <th>Quotient</th>
-            <th>Modalite</th>
+            <th>Lignes</th>
             <th>Total (TND)</th>
             <th>Restant (TND)</th>
             <th>Statut</th>
@@ -2606,6 +2559,90 @@
       </div>
     </div>
 
+    <!-- Modal détail contrat (Phase 2B) : entête + grille de lignes + formulaire d'ajout -->
+    <div id="contractDetailModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+      <div class="modal-card" style="width:min(960px,100%);max-height:92vh;overflow:auto;">
+        <button type="button" class="modal-close-x" data-close-target="cdlCloseBtn" aria-label="Fermer">&times;</button>
+        <h3 style="margin:0 0 12px;">Contrat <span id="cdlContractId" style="font-family:monospace;"></span></h3>
+
+        <!-- Entête -->
+        <div id="cdlHeader" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;font-size:13px;background:#f8faff;border-radius:8px;padding:12px;margin-bottom:14px;"></div>
+
+        <!-- Actions entête -->
+        <div class="actions" style="margin-bottom:12px;">
+          <button id="cdlEditHeaderBtn" class="secondary">Modifier entête</button>
+          <button id="cdlAddLineToggleBtn">+ Ajouter une ligne</button>
+        </div>
+
+        <!-- Formulaire ajout de ligne (caché par défaut) -->
+        <div id="cdlAddForm" style="display:none;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;background:#fff;">
+          <h4 style="margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Nouvelle ligne</h4>
+          <div class="row" style="grid-template-columns:2fr 1fr 1fr;gap:10px;">
+            <div>
+              <label>Véhicule</label>
+              <select id="cdlLineCar" style="width:100%;"></select>
+            </div>
+            <div>
+              <label>Date début</label>
+              <input id="cdlLineStart" type="date" style="width:100%;" />
+            </div>
+            <div>
+              <label>Date fin</label>
+              <input id="cdlLineEnd" type="date" style="width:100%;" />
+            </div>
+          </div>
+          <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-top:8px;">
+            <div>
+              <label>Tarif HT (par jour/mois)</label>
+              <input id="cdlLineRate" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
+            </div>
+            <div>
+              <label>Montant HT (TND)</label>
+              <input id="cdlLineAmountHt" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
+            </div>
+            <div>
+              <label>TVA (<span id="cdlVatLabel">19</span>%)</label>
+              <input id="cdlLineVat" type="number" step="0.01" readonly style="width:100%;background:#f8faff;" />
+            </div>
+            <div>
+              <label>Montant TTC (TND)</label>
+              <input id="cdlLineAmountTtc" type="number" step="0.01" min="0" placeholder="0" style="width:100%;" />
+            </div>
+          </div>
+          <div id="cdlOverlapError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:13px;"></div>
+          <div class="actions" style="margin-top:10px;">
+            <button id="cdlLineSaveBtn">Enregistrer la ligne</button>
+            <button id="cdlLineCancelBtn" class="secondary">Annuler</button>
+          </div>
+        </div>
+
+        <!-- Grille des lignes -->
+        <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Lignes de contrat</h4>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Plaque</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
+              </tr>
+            </thead>
+            <tbody id="cdlLinesBody"></tbody>
+            <tfoot id="cdlLinesFoot" style="font-weight:700;border-top:2px solid #e2e8f0;"></tfoot>
+          </table>
+        </div>
+        <div id="cdlEmptyMsg" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucune ligne — cliquez sur "+ Ajouter une ligne" pour commencer.</div>
+        <div class="actions" style="margin-top:16px;">
+          <button id="cdlCloseBtn" class="secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Parametres de l'agence (ecran de parametrage isole) -->
     <div id="settingsModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(820px,100%);max-height:90vh;overflow:auto;">
@@ -2921,6 +2958,7 @@
     ];
 
     const state = load();
+    state.contractLines = []; // chargé depuis API au login (non persisté en localStorage)
     const reservationCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let supabaseClient = null;
     let currentUser = null;
@@ -4730,9 +4768,29 @@
       } catch (_) {}
     }
 
+    // Variante de apiPost qui retourne { ok, data, status, errorMsg } pour les erreurs 409 (BR19)
+    async function apiPostWithError(path, body) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return { ok: false, status: 0, errorMsg: "Non authentifié" };
+      try {
+        const res = await fetch(`${API_URL}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) return { ok: true, data: data.data, status: res.status };
+        const errorMsg = data.message || data.error || JSON.stringify(data);
+        return { ok: false, status: res.status, errorMsg };
+      } catch (e) {
+        return { ok: false, status: 0, errorMsg: String(e) };
+      }
+    }
+
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
+      const [cars, customers, contracts, contractLinesRaw, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
+        apiGet("/contract-lines"),
         apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
         apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
@@ -4797,6 +4855,16 @@
         status: c.status || "active",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
+      }));
+
+      if (contractLinesRaw) state.contractLines = contractLinesRaw.map(l => ({
+        id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
+        periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        days: l.days || 0, months: l.months || 0,
+        rate: l.rate || 0, rateCurrency: l.rate_currency || "TND",
+        amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+        amountTtc: l.amount_ttc || 0, amountTnd: l.amount_tnd || 0,
+        status: l.status || "active",
       }));
 
       if (invoices) state.invoices = invoices.map(i => ({
@@ -5034,45 +5102,32 @@
 
     document.getElementById("addContractBtn").addEventListener("click", async () => {
       const customerId = byId("contractCustomer").value;
-      const carId = byId("contractCar").value;
       const type = byId("contractType").value;
-      const rate = Number(byId("contractRate").value || 0);
-      const rateCurrency = byId("contractRateCurrency").value || "TND";
-      const days = Number(byId("contractDays").value || 0);
-      const months = Number(byId("contractMonths").value || 0);
+      const contractDate = byId("contractDate").value || today;
       const paymentMoment = byId("contractPaymentMoment").value;
-      const quotient = Number(byId("contractQuotient").value || 0);
-      const quotientCurrency = byId("contractQuotientCurrency").value || "TND";
 
-      if (!customerId || !carId || rate < 0) {
-        alert("Verifier les champs contrat.");
-        return;
-      }
-
-      if ((type === "court" || type === "autre") && days < 1) {
-        alert("Pour un contrat court/autre, le nombre de jours doit etre >= 1.");
-        return;
-      }
-
-      if (type === "long" && months < 1) {
-        alert("Pour un contrat long, le nombre de mois doit etre >= 1.");
-        return;
-      }
+      if (!customerId) { alert("Veuillez sélectionner un client."); return; }
 
       const customer = state.customers.find((c) => c.id === customerId);
-      const car = state.cars.find((c) => c.id === carId);
-      if (!customer || !car) {
-        alert("Client ou vehicule introuvable.");
-        return;
-      }
+      if (!customer) { alert("Client introuvable."); return; }
 
-      let contractId = uid("CTR");
-      const totalAmountOriginal = type === "long" ? months * rate : days * rate;
-      const totalAmountTnd = convertToTnd(totalAmountOriginal, rateCurrency, state.settings.eurToTnd);
-      const quotientTnd = convertToTnd(quotient, quotientCurrency, state.settings.eurToTnd);
       const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
+      let contractId = uid("CTR");
 
-      const savedContract = await apiPost("/contracts", { id: contractId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, contract_date: today, type, days, months, rate, rate_currency: rateCurrency, quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd, total_amount_original: totalAmountOriginal, total_amount_tnd: totalAmountTnd, payment_moment: paymentMoment, payment_plan: paymentPlan, status: "active" });
+      const savedContract = await apiPost("/contracts", {
+        id: contractId,
+        customer_id: customerId,
+        customer_name: customer.name,
+        contract_date: contractDate,
+        type,
+        payment_moment: paymentMoment,
+        payment_plan: paymentPlan,
+        status: "active",
+        rate_currency: "TND",
+        quotient_currency: "TND",
+        days: 0, months: 0, rate: 0, quotient: 0,
+        total_amount_original: 0, total_amount_tnd: 0,
+      });
       if (savedContract && savedContract.id) contractId = savedContract.id;
 
       state.contracts.push({
@@ -5080,93 +5135,18 @@
         type,
         customerId,
         customerName: customer.name,
-        carId,
-        carPlate: car.plate,
-        days,
-        months,
-        rate,
-        rateCurrency,
-        quotient,
-        quotientCurrency,
-        quotientTnd,
-        paymentMoment,
-        paymentPlan,
-        totalAmountOriginal,
-        totalAmountTnd,
-        status: "actif",
+        carId: null,
+        carPlate: "",
+        contractDate,
+        days: 0, months: 0, rate: 0, rateCurrency: "TND",
+        quotient: 0, quotientCurrency: "TND", quotientTnd: 0,
+        paymentMoment, paymentPlan,
+        totalAmountOriginal: 0, totalAmountTnd: 0,
+        status: "active",
       });
 
-      car.status = "loue";
-
-      // Le tarif saisi (rate) est le prix HT : la facture facturee au client est le TTC
-      // = HT + TVA + taxe journaliere + timbre fiscal (regles parametrables, voir computeTtcFromHt).
-      if (type === "long") {
-        for (let i = 1; i <= months; i += 1) {
-          const periodStart = addDaysToIsoDate(today, (i - 1) * 30);
-          const periodEnd = addDaysToIsoDate(today, i * 30);
-          const rentalDays = 30;
-          const amountHt = convertToTnd(rate, rateCurrency, state.settings.eurToTnd);
-          const breakdown = computeTtcFromHt(amountHt, rentalDays);
-          const amountTnd = breakdown.amountTtc;
-          let invId = uid("FAC");
-          const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: rate, currency: rateCurrency, amount_tnd: amountTnd, amount_ht: breakdown.amountHt, vat_amount: breakdown.vatAmount, daily_tax_amount: breakdown.dailyTaxAmount, stamp_duty_amount: breakdown.stampDutyAmount, rental_days: rentalDays, period_start: periodStart, period_end: periodEnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: `Mensualite ${i}/${months}`, due_date: addDaysToIsoDate(today, i * 30), status: "en_attente", reminder_count: 0 });
-          if (savedInv && savedInv.id) invId = savedInv.id;
-          state.invoices.push({
-            id: invId,
-            contractId,
-            customerName: customer.name,
-            amountOriginal: rate,
-            currency: rateCurrency,
-            amountTnd,
-            amountHt: breakdown.amountHt,
-            vatAmount: breakdown.vatAmount,
-            dailyTaxAmount: breakdown.dailyTaxAmount,
-            stampDutyAmount: breakdown.stampDutyAmount,
-            rentalDays,
-            periodStart,
-            periodEnd,
-            paidAmountTnd: 0,
-            dueAmountTnd: amountTnd,
-            label: `Mensualite ${i}/${months}`,
-            dueDate: addDaysToIsoDate(today, i * 30),
-            lastReminderAt: "",
-            reminderCount: 0,
-          });
-        }
-      } else {
-        const periodStart = today;
-        const periodEnd = addDaysToIsoDate(today, days);
-        const rentalDays = days;
-        const amountHt = totalAmountTnd;
-        const breakdown = computeTtcFromHt(amountHt, rentalDays);
-        const amountTnd = breakdown.amountTtc;
-        let invId = uid("FAC");
-        const savedInv = await apiPost("/invoices", { id: invId, contract_id: contractId, customer_name: customer.name, amount_original: totalAmountOriginal, currency: rateCurrency, amount_tnd: amountTnd, amount_ht: breakdown.amountHt, vat_amount: breakdown.vatAmount, daily_tax_amount: breakdown.dailyTaxAmount, stamp_duty_amount: breakdown.stampDutyAmount, rental_days: rentalDays, period_start: periodStart, period_end: periodEnd, paid_amount_tnd: 0, due_amount_tnd: amountTnd, label: "Contrat court", due_date: addDaysToIsoDate(today, 7), status: "en_attente", reminder_count: 0 });
-        if (savedInv && savedInv.id) invId = savedInv.id;
-        state.invoices.push({
-          id: invId,
-          contractId,
-          customerName: customer.name,
-          amountOriginal: totalAmountOriginal,
-          currency: rateCurrency,
-          amountTnd,
-          amountHt: breakdown.amountHt,
-          vatAmount: breakdown.vatAmount,
-          dailyTaxAmount: breakdown.dailyTaxAmount,
-          stampDutyAmount: breakdown.stampDutyAmount,
-          rentalDays,
-          periodStart,
-          periodEnd,
-          paidAmountTnd: 0,
-          dueAmountTnd: amountTnd,
-          label: "Contrat court",
-          dueDate: addDaysToIsoDate(today, 7),
-          lastReminderAt: "",
-          reminderCount: 0,
-        });
-      }
-
-      saveAndRender();
+      renderContracts();
+      openContractDetail(contractId);
     });
 
     if (byId("invoiceCustomer")) {
@@ -7195,6 +7175,15 @@
       const mapReservation = c => ({ id: c.id, ...mapReservationToApi(c) });
       const mapLeasing = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", leasing_company: c.lender || "", contract_number: c.contractNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
       const mapInsurance = c => ({ id: c.id, car_id: c.carId, car_plate: c.carPlate || "", insurance_company: c.provider || "", policy_number: c.policyNumber || "", start_date: c.startDate || today, end_date: c.endDate || today, monthly_amount: c.monthlyAmount || 0, currency: c.currency || "TND", monthly_amount_tnd: c.monthlyAmountTnd || 0, status: "active" });
+      const mapContractLine = l => ({
+        id: l.id, contract_id: l.contractId, car_id: l.carId, car_plate: l.carPlate || "",
+        period_start: l.periodStart, period_end: l.periodEnd,
+        days: l.days || 0, months: l.months || 0,
+        rate: l.rate || 0, rate_currency: l.rateCurrency || "TND",
+        amount_ht: l.amountHt || 0, vat_amount: l.vatAmount || 0,
+        amount_ttc: l.amountTtc || 0, amount_tnd: l.amountTnd || 0,
+        status: l.status || "active",
+      });
 
       try {
         const res = await fetch(`${API_URL}/demo/reset`, {
@@ -7203,6 +7192,7 @@
             cars: (state.cars || []).map(mapCar),
             customers: (state.customers || []).map(mapCustomer),
             contracts: (state.contracts || []).map(mapContract),
+            contract_lines: (state.contractLines || []).map(mapContractLine),
             invoices: (state.invoices || []).map(mapInvoice),
             payments: (state.payments || []).map(mapPayment),
             maintenance: (state.maintenanceCosts || []).map(mapMaint),
@@ -7311,6 +7301,7 @@
       state.cars = [];
       state.customers = [];
       state.contracts = [];
+      state.contractLines = [];
       state.invoices = [];
       state.payments = [];
       state.reservations = [];
@@ -7521,6 +7512,26 @@
       byId("logoUrl").value = state.settings.logoUrl || "";
       const preview = byId("logoPreviewImg");
       if (preview) { preview.src = byId("logoUrl").value; preview.style.display = byId("logoUrl").value ? "block" : "none"; }
+    }
+
+    // BR18 : lignes de contrat — TVA seule (pas de taxe journalière ni timbre, ceux-ci sont invoice-only)
+    function computeContractLineTtc(amountHt) {
+      const vatRate = Number(state.settings.vatRate || 19);
+      const ht = Math.round(Number(amountHt || 0) * 100) / 100;
+      const vatAmount = Math.round(ht * vatRate / 100 * 100) / 100;
+      return { amountHt: ht, vatAmount, amountTtc: Math.round((ht + vatAmount) * 100) / 100, vatRate };
+    }
+    function computeContractLineHt(amountTtc) {
+      const vatRate = Number(state.settings.vatRate || 19);
+      const ht = Math.round(Number(amountTtc || 0) / (1 + vatRate / 100) * 100) / 100;
+      return computeContractLineTtc(ht);
+    }
+    // Calcule { days, months } entre deux dates ISO (bornes incluses)
+    function calcLineDuration(startStr, endStr) {
+      if (!startStr || !endStr) return { days: 0, months: 0 };
+      const ms = new Date(endStr) - new Date(startStr);
+      const days = Math.max(1, Math.round(ms / 86400000) + 1);
+      return { days, months: Math.round(days / 30) };
     }
 
     // Regles de facturation : TVA, taxe journaliere et timbre fiscal sont parametrables (Parametres > Facturation).
@@ -9397,6 +9408,9 @@
     byId("udCloseBtn").addEventListener("click", () => { byId("userDetailModal").style.display = "none"; });
     byId("userDetailModal").addEventListener("click", (e) => { if (e.target === byId("userDetailModal")) byId("userDetailModal").style.display = "none"; });
 
+    byId("cdlCloseBtn").addEventListener("click", () => { byId("contractDetailModal").style.display = "none"; });
+    byId("contractDetailModal").addEventListener("click", (e) => { if (e.target === byId("contractDetailModal")) byId("contractDetailModal").style.display = "none"; });
+
     // ── Car financial detail modal (revenue, expenses by category, balance — monthly & yearly) ──
     let _carFinanceLedger = null;
 
@@ -9792,12 +9806,10 @@
       { key: "id" },
       { key: "type", filterType: "select", options: ["court", "long", "autre"] },
       { key: "customerName" },
-      { key: "carPlate" },
-      { key: "quotient", sortType: "number" },
-      { key: "paymentPlan" },
+      { key: "lignes", sortType: "number", accessor: (c) => (state.contractLines || []).filter(l => l.contractId === c.id && l.status !== "annule").length },
       { key: "totalTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).totalTnd },
       { key: "dueTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).dueTnd },
-      { key: "status", filterType: "select", options: ["actif", "termine", "annule", "brouillon"] },
+      { key: "status", filterType: "select", options: ["actif", "active", "termine", "annule", "brouillon"] },
     ];
 
     function renderContracts() {
@@ -9822,7 +9834,8 @@
           selectRow("contracts", contract.id);
           renderContracts();
         });
-        tr.addEventListener("dblclick", () => openRecordEditor("contracts", contract.id));
+        tr.addEventListener("dblclick", () => openContractDetail(contract.id));
+        const lignesCount = (state.contractLines || []).filter(l => l.contractId === contract.id && l.status !== "annule").length;
         tr.innerHTML = `
           <td>
             <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a>
@@ -9830,9 +9843,7 @@
           </td>
           <td>${safe(contract.type)}</td>
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
-          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(contract.carPlate)}">${safe(contract.carPlate || "-")}</a></td>
-          <td>${Number(contract.quotient || 0)} ${contract.quotientCurrency || "TND"}</td>
-          <td>${safe(contract.paymentPlan || "-")}</td>
+          <td><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
           <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${totals.dueTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${safe(contract.status)}</td>
@@ -9844,7 +9855,15 @@
           e.preventDefault();
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-contract");
-          openRecordEditor("contracts", id);
+          openContractDetail(id);
+        });
+      });
+      tbody.querySelectorAll("[data-open-contract-detail]").forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.target.getAttribute("data-open-contract-detail");
+          openContractDetail(id);
         });
       });
       tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
@@ -11497,6 +11516,227 @@
       }
     }
 
+    // ── Contract detail modal (Phase 2B) ───────────────────────────────────────
+
+    function renderContractDetailLines(contractId) {
+      const tbody = byId("cdlLinesBody");
+      tbody.innerHTML = "";
+      const lines = (state.contractLines || []).filter(l => l.contractId === contractId);
+      if (!lines.length) {
+        byId("cdlEmptyMsg").style.display = "";
+        return;
+      }
+      byId("cdlEmptyMsg").style.display = "none";
+      let sumHt = 0, sumTtc = 0;
+      lines.forEach(l => {
+        sumHt += l.amountHt || 0;
+        sumTtc += l.amountTtc || 0;
+        const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
+        const tr = document.createElement("tr");
+        const statusBadge = l.status === "annule" ? '<span class="badge-status loue">annulée</span>' : l.status === "brouillon" ? '<span class="badge-status pending">brouillon</span>' : '<span class="badge-status dispo">active</span>';
+        tr.innerHTML = `
+          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
+          <td>${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
+          <td>${dur}</td>
+          <td>${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td>${(l.amountHt || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td>${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td>${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td>${statusBadge}</td>
+        `;
+        tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
+        }));
+        tbody.appendChild(tr);
+      });
+      // Totaux dans le tfoot
+      const tfoot = byId("cdlLinesFoot");
+      if (tfoot) {
+        tfoot.innerHTML = `<tr><td colspan="4"><strong>Total</strong></td><td><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td></tr>`;
+      }
+    }
+
+    async function submitContractLine(contractId) {
+      const carId = byId("cdlLineCar").value;
+      const startStr = byId("cdlLineStart").value;
+      const endStr = byId("cdlLineEnd").value;
+      const amountHt = Number(byId("cdlLineAmountHt").value || 0);
+      const rate = Number(byId("cdlLineRate").value || 0);
+
+      byId("cdlOverlapError").style.display = "none";
+
+      if (!carId) { byId("cdlOverlapError").textContent = "Veuillez sélectionner un véhicule."; byId("cdlOverlapError").style.display = ""; return; }
+      if (!startStr || !endStr) { byId("cdlOverlapError").textContent = "Les dates de début et fin sont obligatoires."; byId("cdlOverlapError").style.display = ""; return; }
+      if (endStr < startStr) { byId("cdlOverlapError").textContent = "La date de fin doit être après la date de début."; byId("cdlOverlapError").style.display = ""; return; }
+      if (amountHt <= 0) { byId("cdlOverlapError").textContent = "Le montant HT doit être supérieur à 0."; byId("cdlOverlapError").style.display = ""; return; }
+
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(startStr, endStr);
+      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
+
+      const body = {
+        contract_id: contractId,
+        car_id: carId,
+        car_plate: car ? car.plate : "",
+        period_start: startStr,
+        period_end: endStr,
+        days, months,
+        rate,
+        rate_currency: "TND",
+        amount_ht: amountHt,
+        vat_amount: vatAmount,
+        amount_ttc: amountTtc,
+        amount_tnd: amountTtc,
+        status: "active",
+      };
+
+      const result = await apiPostWithError("/contract-lines", body);
+      if (!result.ok) {
+        byId("cdlOverlapError").textContent = result.status === 409
+          ? `Chevauchement détecté (BR19) : ${result.errorMsg}`
+          : `Erreur ${result.status} : ${result.errorMsg}`;
+        byId("cdlOverlapError").style.display = "";
+        return;
+      }
+
+      const saved = result.data;
+      state.contractLines.push({
+        id: saved.id || uid("CL"),
+        contractId,
+        carId,
+        carPlate: car ? car.plate : "",
+        periodStart: startStr,
+        periodEnd: endStr,
+        days, months,
+        rate,
+        rateCurrency: "TND",
+        amountHt,
+        vatAmount,
+        amountTtc,
+        amountTnd: amountTtc,
+        status: "active",
+      });
+
+      // Remettre le formulaire à zéro et cacher
+      byId("cdlLineCar").value = "";
+      byId("cdlLineStart").value = "";
+      byId("cdlLineEnd").value = "";
+      byId("cdlLineRate").value = "";
+      byId("cdlLineAmountHt").value = "";
+      byId("cdlLineVat").value = "";
+      byId("cdlLineAmountTtc").value = "";
+      byId("cdlAddForm").style.display = "none";
+      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+
+      renderContractDetailLines(contractId);
+      renderContracts();
+    }
+
+    function openContractDetail(contractId) {
+      const contract = state.contracts.find(c => c.id === contractId);
+      if (!contract) return;
+
+      // En-tête
+      byId("cdlContractId").textContent = contractId;
+      const vatRate = Number(state.settings.vatRate || 19);
+      const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule");
+      const sumHt = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
+      const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      byId("cdlHeader").innerHTML = `
+        <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
+        <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
+        <div><span class="label-small">Date</span><br>${contract.contractDate || "-"}</div>
+        <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || contract.paymentPlan || "-")}</div>
+        <div><span class="label-small">Statut</span><br>${safe(contract.status || "-")}</div>
+        <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+        <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+      `;
+
+      // Remettre le formulaire d'ajout à zéro
+      byId("cdlAddForm").style.display = "none";
+      byId("cdlOverlapError").style.display = "none";
+      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+
+      // Peupler le select des véhicules (tous, avec marquage conflit)
+      const carSel = byId("cdlLineCar");
+      carSel.innerHTML = '<option value="">— Choisir un véhicule —</option>';
+      state.cars.forEach(car => {
+        const opt = document.createElement("option");
+        opt.value = car.id;
+        opt.textContent = `${car.plate} — ${car.brand || ""} ${car.model || ""}`.trim();
+        carSel.appendChild(opt);
+      });
+
+      // Marquer les conflits en fonction des dates saisies (recalcul dynamique)
+      function updateCarConflicts() {
+        const startStr = byId("cdlLineStart").value;
+        const endStr = byId("cdlLineEnd").value;
+        Array.from(carSel.options).forEach(opt => {
+          if (!opt.value) return;
+          if (!startStr || !endStr) { opt.textContent = opt.textContent.replace(/ ⚠ conflit$/, ""); return; }
+          const hasConflict = (state.contractLines || []).some(l =>
+            l.carId === opt.value && l.status === "active" &&
+            l.periodStart <= endStr && l.periodEnd >= startStr
+          );
+          const clean = opt.textContent.replace(/ ⚠ conflit$/, "");
+          opt.textContent = hasConflict ? `${clean} ⚠ conflit` : clean;
+          opt.style.color = hasConflict ? "#c53030" : "";
+        });
+      }
+
+      byId("cdlLineStart").oninput = updateCarConflicts;
+      byId("cdlLineEnd").oninput = updateCarConflicts;
+
+      // Calcul HT ↔ TTC en temps réel (BR18)
+      byId("cdlLineAmountHt").oninput = () => {
+        const ht = Number(byId("cdlLineAmountHt").value || 0);
+        const { vatAmount, amountTtc, vatRate: vr } = computeContractLineTtc(ht);
+        byId("cdlVatLabel").textContent = vr;
+        byId("cdlLineVat").value = vatAmount.toFixed(2);
+        byId("cdlLineAmountTtc").value = amountTtc.toFixed(2);
+      };
+      byId("cdlLineAmountTtc").oninput = () => {
+        const ttc = Number(byId("cdlLineAmountTtc").value || 0);
+        const result = computeContractLineHt(ttc);
+        byId("cdlVatLabel").textContent = result.vatRate;
+        byId("cdlLineAmountHt").value = result.amountHt.toFixed(2);
+        byId("cdlLineVat").value = result.vatAmount.toFixed(2);
+      };
+      byId("cdlLineRate").oninput = () => {
+        const start = byId("cdlLineStart").value;
+        const end = byId("cdlLineEnd").value;
+        const rate = Number(byId("cdlLineRate").value || 0);
+        if (rate > 0 && start && end) {
+          const { days } = calcLineDuration(start, end);
+          byId("cdlLineAmountHt").value = (rate * days).toFixed(2);
+          byId("cdlLineAmountHt").oninput();
+        }
+      };
+
+      // Remplir le label TVA initial
+      byId("cdlVatLabel").textContent = Number(state.settings.vatRate || 19);
+
+      // Boutons
+      byId("cdlEditHeaderBtn").onclick = () => openRecordEditor("contracts", contractId);
+      byId("cdlAddLineToggleBtn").onclick = () => {
+        const form = byId("cdlAddForm");
+        const visible = form.style.display !== "none";
+        form.style.display = visible ? "none" : "";
+        byId("cdlAddLineToggleBtn").textContent = visible ? "+ Ajouter une ligne" : "▲ Masquer";
+      };
+      byId("cdlLineCancelBtn").onclick = () => {
+        byId("cdlAddForm").style.display = "none";
+        byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      };
+      byId("cdlLineSaveBtn").onclick = () => submitContractLine(contractId);
+
+      renderContractDetailLines(contractId);
+
+      byId("contractDetailModal").style.display = "flex";
+    }
+
+    // ── openRecordEditor ────────────────────────────────────────────────────────
     function openRecordEditor(entity, id) {
       const collection = state[entity];
       if (!Array.isArray(collection)) return;

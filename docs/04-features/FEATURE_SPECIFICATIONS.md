@@ -1227,11 +1227,27 @@ Sur le formulaire d'une ligne de contrat (`contract_lines`), deux champs liés *
 
 Les lignes de contrat au statut `brouillon` (contrat non confirmé, 9.3) ne sont soumises à **aucun** de ces trois niveaux ; le contrôle s'applique dès le passage `brouillon → active`.
 
-### 9.3 Contrat entête + lignes (BR20)
+### 9.3 Contrat entête + lignes (BR20) — ✅ Phase 2A + 2B implémentées
+
+**Phase 2A (socle DB + backend)** ✅ Commit `a5b6b6c` :
+- Table `contract_lines` avec contrainte EXCLUDE `excl_contract_lines_car_period` (chevauchement véhicule-période pour lignes `active`)
+- CRUD backend : `GET/POST /contract-lines`, `GET/PUT /contract-lines/:id`, `GET /contracts/:id/lines`
+- RPC `create_contract_with_lines` (Supabase)
+- Migration `002_phase2a_contract_lines.sql`
+
+**Phase 2B (frontend)** ✅ :
+- `contracts.car_id` rendu nullable (migration `003_phase2b_contracts_nullable_car.sql`) → création d'entête sans véhicule
+- Formulaire "Nouveau contrat" simplifié (client, type, date, paiement) → POST `/contracts` → ouvre immédiatement le modal de détail
+- `#contractDetailModal` : pavé entête (client, type, date, paiement, statut, totaux HT/TTC) + grille `contract_lines` + formulaire "+ Ajouter une ligne"
+- HT ⇄ TTC bidirectionnel en temps réel (BR18, TVA uniquement sur lignes)
+- Message d'erreur inline BR19 en cas de chevauchement (statut HTTP 409 depuis le backend)
+- Sélecteur véhicule affiche TOUS les véhicules, avec marquage "⚠ conflit" selon les dates saisies
+- Colonne "Lignes" dans la liste des contrats (badge cliquable → ouvre le modal)
+- `state.contractLines` chargé au login via `loadDataFromAPI` + inclus dans `syncStateToAPI`
 
 **Écran liste "Contrats" (`#contracts`)**
-- Une ligne de tableau = un contrat (entête) : Id, Client, Date, Type, Statut, **Total HT**, **Total TTC**, Nombre de véhicules (= nb de `contract_lines`).
-- Double-clic sur une ligne → ouvre l'écran de détail (modale ou panneau plein écran, sur le modèle de `#carFinanceModal`) :
+- Une ligne de tableau = un contrat (entête) : Id, Type, Client, **Lignes** (badge cliquable), Total HT, Restant, Statut.
+- Clic sur badge "N ligne(s)" ou double-clic sur la ligne → ouvre `#contractDetailModal` :
   - **Pavé haut (entête)** : client, date du contrat, type (court/long), statut, mode/plan de paiement, notes, totaux HT/TVA/TTC (lecture seule, calculés).
   - **Pavé bas (lignes)** : grille `contract_lines` avec colonnes Véhicule (plaque + modèle), Période (début/fin), Jours/Mois, Tarif HT, Montant HT, TVA, Montant TTC, Statut, Actions (Résilier — 9.9, Supprimer la ligne).
   - Bouton "+ Ajouter une ligne" : sélection véhicule + période + tarif HT, avec contrôle de chevauchement en direct (9.2) et calcul HT⇄TTC (9.1).

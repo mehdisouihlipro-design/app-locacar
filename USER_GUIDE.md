@@ -148,32 +148,41 @@ https://web-production-b4967.up.railway.app
 
 ### Onglet: Contrats
 
-#### Créer un Contrat Court Terme
-1. **Sélectionner Client** dans dropdown
-2. **Sélectionner Véhicule** (auto-filtre dispo)
-3. **Type:** `court` (< 30 jours généralement)
-4. **Durée:** {jours} ou {mois/années}
-5. **Tarif:** Montant journalier/mensuel
-6. **Devise Tarif:** EUR, TND, USD, etc. (13 devises)
-7. **Quotient:** Frais supplémentaires
-8. **Devise Quotient:** Séparé du tarif
-9. **Moment Paiement:** `debut` ou `fin`
-10. **Plan de Paiement:** Description (ex: "paiement client debut")
+Un contrat est composé d'un **entête** (client, type, paiement) et de **lignes** (chaque ligne représente un véhicule sur une période donnée).
 
-#### Créer un Contrat Long Terme
-- Similaire, mais:
-  - **Durée:** Généralement mois/années
-  - **Plan:** "mensualite", "trimestrielle", etc.
-  - Factures générées automatiquement par mois
+#### Créer un Contrat (nouveau flux)
+1. Cliquer **"Nouveau"** pour afficher le formulaire simplifié
+2. Renseigner :
+   - **Client** (obligatoire)
+   - **Type de contrat** : `court`, `long` ou `autre`
+   - **Date de début**
+   - **Paiement** : `début de location` ou `fin de location`
+3. Cliquer **"Créer contrat"** → le modal de détail s'ouvre automatiquement
+4. Dans le modal, cliquer **"+ Ajouter une ligne"** pour associer un ou plusieurs véhicules au contrat (voir ci-dessous)
+
+#### Ajouter une ligne de contrat (véhicule + période)
+Dans le modal de détail d'un contrat :
+1. Cliquer **"+ Ajouter une ligne"**
+2. Renseigner :
+   - **Véhicule** : tous les véhicules sont listés ; ceux dont la disponibilité entre en conflit avec les dates saisies sont marqués **⚠ conflit** en rouge
+   - **Date début / Date fin**
+   - **Tarif HT** (par jour ou mois) → le montant HT se calcule automatiquement selon la durée
+   - **Montant HT** et **Montant TTC** sont liés : modifier l'un recalcule l'autre (TVA appliquée selon les Paramètres)
+3. Cliquer **"Enregistrer la ligne"**
+   - Si la période chevauche une ligne active existante pour ce véhicule, un message d'erreur rouge s'affiche (BR19) — ajuster les dates ou choisir un autre véhicule
+
+#### Accéder au détail d'un contrat
+- **Double-clic** sur une ligne du tableau → ouvre le modal de détail
+- **Clic sur le badge "N ligne(s)"** → même action
+- Dans le modal : bouton **"Modifier entête"** pour éditer les informations du contrat
 
 #### États du Contrat
-- 🟢 **actif:** En cours
+- 🟢 **active:** En cours
 - 🔴 **termine:** Fini, compte clôturé
-- 🟡 **suspendu:** Temporairement en pause
+- ⚫ **annule:** Annulé
 
-#### Symboles Contrats
-- **Tarif multi-devises:** Converti automatiquement en TND
-- **Total:** Montant facturé calculé (durée × tarif + quotient)
+#### Colonne "Lignes"
+Le badge affiché dans la colonne "Lignes" indique le nombre de lignes actives (hors lignes annulées) associées à ce contrat.
 
 ---
 

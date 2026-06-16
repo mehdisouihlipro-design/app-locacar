@@ -7,8 +7,8 @@ router.use(authorizeRoles('admin'));
 // Clear all demo tables in reverse FK order, then bulk insert
 router.post('/reset', async (req: AuthRequest, res: Response) => {
   try {
-    const { cars = [], customers = [], contracts = [], invoices = [],
-            payments = [], maintenance = [], vignettes = [],
+    const { cars = [], customers = [], contracts = [], contract_lines = [],
+            invoices = [], payments = [], maintenance = [], vignettes = [],
             reservations = [], insurances = [], leasing = [] } = req.body;
 
     // Delete in reverse FK order
@@ -41,6 +41,7 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
     await insertMany('cars', cars);
     await insertMany('customers', customers);
     await insertMany('contracts', contracts);
+    await insertMany('contract_lines', contract_lines); // FK contract_lines.contract_id → contracts (CASCADE)
     await insertMany('invoices', invoices);
     await insertMany('payments', payments);
     await insertMany('maintenance_costs', maintenance);
