@@ -680,16 +680,19 @@ X-RateLimit-Reset: 1620000000
 
 > Spécification — endpoints à créer pour le lot d'évolutions V2 (cf. `docs/01-specifications/BMAD.md` 6.5, `docs/03-data-model/SCHEMA_REFERENCE.md` "Évolutions V2", `docs/04-features/FEATURE_SPECIFICATIONS.md` section 9). Suivent le même format de réponse passthrough PostgREST que les endpoints existants (`{ success, data }`).
 >
-> **✅ Phase 1A (BR22/BR23, implémenté)** : les 3 puces "BR22"/"BR23" du bloc "Champs ajoutés aux endpoints existants" ci-dessous sont en production (`POST /invoices` accepte `rib`/`ribLabel`, `PUT /settings` accepte `companyRibLabel`/`companyRib2`/`companyRib2Label`, et toutes les routes `POST`/`PUT` renseignent `created_by`/`updated_by`). Le reste de cette section (endpoints `contract-lines`, `invoice-lines`, `quotes`, RPC, BR18-21/24-27) reste à l'état de spécification cible.
+> **✅ Phase 1A (BR22/BR23, implémenté)** : les 3 puces "BR22"/"BR23" du bloc "Champs ajoutés aux endpoints existants" ci-dessous sont en production (`POST /invoices` accepte `rib`/`ribLabel`, `PUT /settings` accepte `companyRibLabel`/`companyRib2`/`companyRib2Label`, et toutes les routes `POST`/`PUT` renseignent `created_by`/`updated_by`).
+>
+> **✅ Phase 2A (socle DB + backend, implémenté)** : `GET/POST /contract-lines`, `GET/PUT/DELETE /contract-lines/:id`, `GET /contracts/:id/lines`, `POST /contracts/with-lines` (RPC `create_contract_with_lines`) et le contrôle de chevauchement BR19 niveau 2/3 (`409 vehicle_overlap`) sont en production. **Non couvert par 2A** : la séquence réservation automatique BR25 (le RPC crée les lignes mais ne recherche/crée pas encore de `reservations` associée) et `/contract-lines/:id/terminate` (BR26) — phases 2B/2C. Le reste de cette section (`invoice-lines`, `quotes`, BR18 UI, BR21/24/27) reste à l'état de spécification cible.
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| GET/POST | `/contract-lines` | Lister / créer une ligne de contrat (`contract_lines`). `POST` (et `PUT` ci-dessous) exécutent côté backend le contrôle de chevauchement BR19 (niveau 2) avant écriture — pas seulement côté frontend. |
-| GET/PUT/DELETE | `/contract-lines/:id` | Lire / modifier / supprimer une ligne de contrat. `PUT` revalide BR19 (niveau 2) si `car_id`/`period_start`/`period_end` changent. |
-| POST | `/contract-lines/:id/terminate` | Résiliation anticipée d'une ligne (BR26) : body `{ actualEndDate }` — met à jour la ligne, le statut du contrat et la réservation liée |
+| GET/POST | `/contract-lines` | ✅ Implémenté (Phase 2A). Lister / créer une ligne de contrat (`contract_lines`). `POST` (et `PUT` ci-dessous) exécutent côté backend le contrôle de chevauchement BR19 (niveau 2) avant écriture — pas seulement côté frontend. Seules les lignes dont le statut **résultant** est `'active'` sont soumises à ce contrôle (cohérent avec la portée `WHERE (status = 'active')` de la contrainte `excl_contract_lines_car_period`, niveau 3) ; créer/passer une ligne en `brouillon`, `termine`, `annule` ou `resilie` ne déclenche jamais de `409`. |
+| GET/PUT/DELETE | `/contract-lines/:id` | ✅ Implémenté (Phase 2A). Lire / modifier / supprimer une ligne de contrat. `PUT` revalide BR19 (niveau 2) si le statut résultant est `'active'` et que `car_id`/`period_start`/`period_end` changent. |
+| POST | `/contract-lines/:id/terminate` | Spécification cible (Phase 2C) — Résiliation anticipée d'une ligne (BR26) : body `{ actualEndDate }` — met à jour la ligne, le statut du contrat et la réservation liée |
 | GET/POST | `/invoice-lines` | Lister / créer une ligne de facture (`invoice_lines`, remplace `invoices.lines`) |
 | GET/PUT/DELETE | `/invoice-lines/:id` | Lire / modifier / supprimer une ligne de facture |
-| GET | `/contracts/:id/lines` | Lister les lignes d'un contrat (pour l'écran détail entête + lignes, BR20) |
+| GET | `/contracts/:id/lines` | ✅ Implémenté (Phase 2A). Lister les lignes d'un contrat (pour l'écran détail entête + lignes, BR20) |
+| POST | `/contracts/with-lines` | ✅ Implémenté (Phase 2A). Body : `{ contract: {...}, lines: [{...}, ...] }`. Crée l'entête `contracts` + les `contract_lines` en un appel atomique via `/rpc/create_contract_with_lines` (BR20bis). Renvoie `409 vehicle_overlap` si une ligne `active` chevauche une ligne/réservation existante (aucun contrat orphelin créé). |
 | GET | `/invoices/:id/lines` | Lister les lignes d'une facture (BR21) |
 | GET/POST | `/quotes` | Lister / créer un devis (entête `quotes`, BR27) |
 | GET/PUT/DELETE | `/quotes/:id` | Lire / modifier / supprimer un devis (modification/suppression impossibles si `status = 'valide'`) |
@@ -705,12 +708,12 @@ X-RateLimit-Reset: 1620000000
 
 | Méthode | Endpoint | Description |
 |---|---|---|
-| POST | `/rpc/create_contract_with_lines` | Body : `{ contract, lines[] }`. Crée l'entête `contracts` + les `contract_lines` en une transaction ; pour chaque ligne `active`, exécute la séquence réservation (BR25) et le contrôle BR19. Utilisé par l'écran Contrats (9.3) et par `validate_quote`. |
+| POST | `/rpc/create_contract_with_lines` | ✅ Implémenté (Phase 2A, fonction PL/pgSQL sans `validate_quote` ni séquence BR25 pour l'instant). Body : `{ p_contract, p_lines[] }`. Crée l'entête `contracts` + les `contract_lines` en une transaction ; toute erreur (y compris violation de `excl_contract_lines_car_period`) annule l'ensemble. Appelé via `POST /contracts/with-lines` ci-dessus. La séquence réservation (BR25) et l'usage par `validate_quote` restent à implémenter (phases 2C/futur BR27). |
 | POST | `/rpc/create_invoice_with_lines` | Body : `{ invoice, lines[] }`. Crée l'entête `invoices` + les `invoice_lines` en une transaction ; renvoie une erreur 400 si `lines` est vide (BR21 : « Une facture doit contenir au moins une ligne. »). |
 | POST | `/rpc/validate_quote` | Body : `{ quoteId }`. Marque le devis `valide`, appelle `create_contract_with_lines` avec les `quote_lines` converties, renseigne `quotes.converted_contract_id`. Rollback complet (devis non modifié) en cas d'échec. |
 
 **Champs ajoutés aux endpoints existants** :
-- `POST /reservations` : accepte désormais `contractLineId` (FK `contract_lines.id`, BR25), renseigné automatiquement à la création d'une ligne de contrat.
+- `POST /reservations` : la colonne `contract_line_id` (FK `contract_lines.id`, `ON DELETE SET NULL`) existe en base depuis la Phase 2A et est acceptée en passthrough si fournie ; son renseignement automatique à la création d'une ligne de contrat (BR25) reste à implémenter (phase 2C).
 - `POST /invoices` : accepte `rib`/`ribLabel` (BR22, copie figée du RIB choisi). **✅ Implémenté (Phase 1A)**.
 - `PUT /settings` : accepte `companyRibLabel`, `companyRib2`, `companyRib2Label` (second RIB, BR22 — **✅ Implémenté Phase 1A**). `vatRate` est rejeté (400) si négatif (BR18, contrainte `chk_vat_rate_non_negative` — toujours à l'état de spécification cible).
 - Toutes les routes `POST`/`PUT` existantes : renseignent désormais `created_by`/`updated_by` à partir de `req.user.id` (BR23). **✅ Implémenté (Phase 1A)**.

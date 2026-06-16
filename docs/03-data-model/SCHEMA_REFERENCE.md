@@ -704,7 +704,9 @@ CREATE INDEX idx_gps_tracking_time ON gps_tracking(tracked_at);
 
 > Cette section décrit le schéma **cible** pour le lot d'évolutions "V2 — version professionnelle" (cf. `docs/01-specifications/BMAD.md` section 6.5, BR18-BR27, et `docs/04-features/FEATURE_SPECIFICATIONS.md` section 9). Il s'agit d'une spécification : sauf mention contraire (✅ Implémenté), aucune migration n'a encore été créée ni exécutée. Les tables/colonnes ci-dessous complètent ou remplacent celles décrites plus haut.
 >
-> **✅ Phase 1A (implémentée)** : les colonnes d'audit `created_by`/`updated_by` (BR23) et le second RIB `settings.company_rib_label`/`company_rib_2`/`company_rib_2_label` + `invoices.rib`/`rib_label` (BR22) ont été ajoutées via migration et sont disponibles en production. Le reste de cette section (BR18-21, BR24-27) reste à l'état de spécification cible.
+> **✅ Phase 1A (implémentée)** : les colonnes d'audit `created_by`/`updated_by` (BR23) et le second RIB `settings.company_rib_label`/`company_rib_2`/`company_rib_2_label` + `invoices.rib`/`rib_label` (BR22) ont été ajoutées via migration et sont disponibles en production.
+>
+> **✅ Phase 2A (implémentée, socle DB + backend)** : la table `contract_lines` (avec contrainte `EXCLUDE`, BR19 niveau 3), la colonne `reservations.contract_line_id` et la RPC `create_contract_with_lines` (BR20bis) ont été ajoutées via `src/backend/migrations/002_phase2a_contract_lines.sql`, avec rétro-remplissage (1 contrat existant = 1 ligne). **Additif et non destructif** : la table `contracts` garde pour l'instant **toutes** ses colonnes actuelles (`car_id`, `car_plate`, `days`, `months`, `rate`, `quotient*`, `total_amount_original`, `total_amount_tnd`) — le frontend continue de fonctionner sans changement. Le "CONTRACTS (entête) — révisé" ci-dessous (retrait des champs véhicule, totaux agrégés `total_amount_ht`/`total_vat_amount`/`total_amount_ttc`) reste une cible pour la phase 2B (réécriture du frontend), pas encore appliquée en base. Les routes API exposant `contract_lines` sont documentées dans `docs/05-api/API_REFERENCE.md`. Le reste de cette section (BR18-21, BR24-27 non listés ci-dessus) reste à l'état de spécification cible ou est couvert par les phases 2B/2C à venir.
 
 ### Colonnes d'audit (toutes les tables métier) — ✅ Implémenté (Phase 1A, BR23)
 
@@ -750,7 +752,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 - `status` : `active`, `termine`, `annule`, `brouillon`, `resilie` (au moins une ligne résiliée, BR26).
 - Migration de données : chaque contrat existant (mono-véhicule) est converti en 1 entête (`contracts`, champs véhicule retirés) + 1 ligne (`contract_lines`, reprenant `car_id`/`car_plate`/`days`/`months`/`rate`/`quotient*`/dates).
 
-### CONTRACT_LINES (nouvelle table)
+### CONTRACT_LINES (nouvelle table) — ✅ Implémenté (Phase 2A)
 
 ```sql
 CREATE TABLE IF NOT EXISTS contract_lines (
@@ -774,17 +776,17 @@ CREATE TABLE IF NOT EXISTS contract_lines (
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   actual_end_date DATE,
   reservation_id VARCHAR(50) REFERENCES reservations(id),
-  created_by VARCHAR(50) REFERENCES users(id),
-  updated_by VARCHAR(50) REFERENCES users(id),
+  created_by VARCHAR(50),
+  updated_by VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_contract_line_dates CHECK (period_end >= period_start),
   CONSTRAINT chk_contract_line_actual_end CHECK (actual_end_date IS NULL OR (actual_end_date >= period_start AND actual_end_date <= period_end))
 );
 
-CREATE INDEX idx_contract_lines_contract ON contract_lines(contract_id);
-CREATE INDEX idx_contract_lines_car ON contract_lines(car_id);
-CREATE INDEX idx_contract_lines_period ON contract_lines(car_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_contract_lines_contract ON contract_lines(contract_id);
+CREATE INDEX IF NOT EXISTS idx_contract_lines_car ON contract_lines(car_id);
+CREATE INDEX IF NOT EXISTS idx_contract_lines_period ON contract_lines(car_id, period_start, period_end);
 
 -- Contrôle de chevauchement véhicule/période au niveau base de données (BR19, niveau 3)
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -793,6 +795,8 @@ ALTER TABLE contract_lines ADD CONSTRAINT excl_contract_lines_car_period
   EXCLUDE USING gist (car_id WITH =, daterange(period_start, period_end, '[]') WITH &&)
   WHERE (status = 'active');
 ```
+
+> Migration appliquée : `src/backend/migrations/002_phase2a_contract_lines.sql` (idempotent ; la contrainte `EXCLUDE` est ajoutée dans un bloc `DO $$ ... $$` vérifiant `pg_constraint`, avec une requête de diagnostic fournie en commentaire en cas d'échec sur des chevauchements déjà présents dans les données existantes). `created_by`/`updated_by` sont des `VARCHAR(50)` **sans** `REFERENCES users(id)` : sur ce projet Supabase, `users.id` est de type `uuid`, incompatible avec les ids applicatifs `VARCHAR(50)` (`CTR-xxx`, etc.) — même convention que `001_phase1a_audit_and_rib2.sql`.
 
 - `amount_ht` / `vat_amount` / `amount_ttc` : ventilation HT/TVA/TTC de la ligne. `amount_ttc = amount_ht * (1 + vat_rate/100)` (BR18) — **ne comprend pas** la taxe journalière ni le timbre fiscal, qui restent calculés uniquement au niveau des lignes de facture (`invoice_lines`, BR15bis).
 - `status` : `brouillon` (ligne créée avec un contrat `brouillon`, non engageante, hors contrôle BR19/BR25), `active`, `termine`, `annule`, `resilie`. La valeur par défaut `'active'` s'applique aux lignes créées avec un contrat déjà `active` ; les lignes créées avec un contrat `brouillon` sont insérées avec `status = 'brouillon'`.
@@ -803,13 +807,14 @@ ALTER TABLE contract_lines ADD CONSTRAINT excl_contract_lines_car_period
 
 > **Ordre des opérations (BR25)** : `contract_lines` est insérée d'abord avec `reservation_id = NULL`. Le backend recherche ensuite une `reservations` existante pour le même `car_id` et la même période : si trouvée, elle est liée (`reservations.contract_line_id = contract_lines.id`) ; sinon une nouvelle réservation est créée (ou une réservation existante à des dates différentes est corrigée) aux dates de la ligne. Enfin `contract_lines.reservation_id` est mis à jour avec l'id de la réservation retenue. Cette séquence est exécutée dans la même transaction que la création de la ligne (cf. fonctions RPC ci-dessous).
 
-### RESERVATIONS — colonne ajoutée
+### RESERVATIONS — colonne ajoutée — ✅ Implémenté (Phase 2A)
 
 ```sql
-ALTER TABLE reservations ADD COLUMN IF NOT EXISTS contract_line_id VARCHAR(50) REFERENCES contract_lines(id) ON DELETE CASCADE;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS contract_line_id VARCHAR(50) REFERENCES contract_lines(id) ON DELETE SET NULL;
 ```
 
 - Renseignée par la réservation automatique créée à la création d'une ligne de contrat (BR25). `NULL` pour les réservations manuelles (non liées à un contrat).
+- **Déviation vs la cible initiale (`ON DELETE CASCADE`)** : `ON DELETE SET NULL` a été retenu en Phase 2A. BR25 (phase 2C) précise qu'une réservation préexistante liée à une ligne ne doit **pas** être supprimée si la ligne l'est ; `CASCADE` supprimerait silencieusement la réservation avant même que cette logique applicative n'existe. La phase 2C pourra implémenter la suppression nuancée au niveau applicatif si nécessaire.
 
 ### INVOICES (entête) — colonnes ajoutées — ✅ Implémenté (Phase 1A, BR22)
 
