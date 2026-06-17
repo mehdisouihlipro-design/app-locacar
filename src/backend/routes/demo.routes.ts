@@ -9,13 +9,15 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
   try {
     const { cars = [], customers = [], contracts = [], contract_lines = [],
             invoices = [], payments = [], maintenance = [], vignettes = [],
-            reservations = [], insurances = [], leasing = [] } = req.body;
+            reservations = [], insurances = [], leasing = [],
+            quotes = [], quote_lines = [] } = req.body;
 
     // Delete in reverse FK order
     const tables = [
       'inspection_details', 'inspections', 'vignettes', 'insurances',
       'leasing_contracts', 'maintenance_costs', 'payments', 'invoices',
-      'collections', 'contracts', 'reservations', 'cars', 'customers',
+      'collections', 'quote_lines', 'quotes', 'contract_lines', 'contracts',
+      'reservations', 'cars', 'customers',
     ];
     for (const t of tables) {
       await global.db.delete(`/${t}?id=gte.`).catch(() => {});
@@ -49,6 +51,8 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
     await insertMany('reservations', reservations);
     await insertMany('insurances', insurances);
     await insertMany('leasing_contracts', leasing);
+    await insertMany('quotes', quotes);
+    await insertMany('quote_lines', quote_lines);
 
     res.json({ success: true, results });
   } catch (err: any) {

@@ -1220,6 +1220,7 @@
       <button class="tab" data-tab="cars">Vehicules</button>
       <button class="tab" data-tab="customers">Clients</button>
       <button class="tab" data-tab="contracts">Contrats</button>
+      <button class="tab" data-tab="quotes">Devis</button>
       <button class="tab" data-tab="invoices">Factures</button>
       <button class="tab" data-tab="collections">Recouvrements</button>
       <button class="tab" data-tab="payments">Paiements client</button>
@@ -1525,6 +1526,120 @@
         <tbody id="contractsTable"></tbody>
       </table>
     </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- DEVIS                                                                  -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="quotes" class="panel">
+      <h3>Devis</h3>
+      <p class="small">Un devis ne réserve pas le véhicule. La validation convertit le devis en contrat et déclenche la vérification de chevauchement (BR19) et la réservation automatique (BR25).</p>
+
+      <div class="actions" style="margin-bottom:10px;">
+        <button id="newQuoteBtn">+ Nouveau devis</button>
+      </div>
+
+      <div id="quoteLegacyForm" style="display:none;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;background:#fafbff;">
+        <div class="row">
+          <div>
+            <label>Client</label>
+            <select id="quoteCustomer"></select>
+          </div>
+          <div>
+            <label>Date du devis</label>
+            <input id="quoteDate" type="date" />
+          </div>
+          <div>
+            <label>Date de validité</label>
+            <input id="quoteValidityDate" type="date" />
+          </div>
+          <div>
+            <label>Notes</label>
+            <input id="quoteNotes" placeholder="Notes optionnelles" />
+          </div>
+        </div>
+        <button id="addQuoteBtn" style="margin-top:8px;">Créer le devis</button>
+        <button id="cancelQuoteBtn" class="secondary" style="margin-top:8px;margin-left:8px;">Annuler</button>
+      </div>
+
+      <div class="row" style="margin-bottom:10px;">
+        <div>
+          <label>Filtre statut</label>
+          <select id="quotesFilterStatus">
+            <option value="">tous</option>
+            <option value="brouillon">brouillon</option>
+            <option value="envoye">envoyé</option>
+            <option value="valide">validé</option>
+            <option value="refuse">refusé</option>
+            <option value="expire">expiré</option>
+          </select>
+        </div>
+        <div>
+          <label>Recherche</label>
+          <input id="quotesSearch" placeholder="Client, ID..." />
+        </div>
+      </div>
+
+      <table id="quotesTableWrapper">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Client</th>
+            <th>Date</th>
+            <th>Validité</th>
+            <th>Lignes</th>
+            <th>Total TTC</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody id="quotesTable"></tbody>
+      </table>
+    </section>
+
+    <!-- Modal détail devis -->
+    <div id="quoteDetailModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
+      <div class="modal-card" style="width:min(960px,96%);max-height:92vh;overflow-y:auto;padding:24px;background:#fff;border-radius:12px;position:relative;">
+        <button class="modal-close-x" id="qdCloseBtn" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button>
+        <h3 style="margin:0 0 16px;">Devis <span id="qdQuoteId" style="color:var(--primary);"></span></h3>
+
+        <!-- Entête -->
+        <div id="qdHeader" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px;margin-bottom:16px;padding:12px;background:#f8faff;border-radius:8px;"></div>
+        <div class="actions" style="margin-bottom:12px;gap:8px;display:flex;flex-wrap:wrap;">
+          <button id="qdEditHeaderBtn" class="secondary">✏ Modifier entête</button>
+          <button id="qdCancelEditBtn" class="secondary" style="display:none;">✗ Annuler</button>
+          <button id="qdSendBtn" class="secondary" style="font-size:12px;">📤 Marquer envoyé</button>
+          <button id="qdRefuseBtn" class="secondary" style="font-size:12px;color:#c53030;">✗ Refuser</button>
+          <button id="qdValidateBtn" style="background:var(--success,#22c55e);color:#fff;font-weight:600;">✓ Valider → Contrat</button>
+          <button id="qdPdfBtn" class="secondary" style="font-size:12px;">🖨 PDF</button>
+        </div>
+
+        <!-- Lignes -->
+        <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Lignes de devis</h4>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Plaque</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);"></th>
+              </tr>
+            </thead>
+            <tbody id="qdLinesBody"></tbody>
+            <tfoot id="qdLinesFoot" style="font-weight:700;border-top:2px solid #e2e8f0;"></tfoot>
+          </table>
+        </div>
+        <div id="qdEmptyMsg" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucune ligne — cliquez sur "+ Ajouter une ligne".</div>
+        <div class="actions" style="margin-top:12px;">
+          <button id="qdAddLineBtn">+ Ajouter une ligne</button>
+          <button id="qdCloseBtn2" class="secondary">Fermer</button>
+        </div>
+        <div id="qdValidateError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px;margin-top:8px;font-size:13px;"></div>
+      </div>
+    </div>
 
     <section id="invoices" class="panel">
       <h3>Factures generees</h3>
@@ -2948,6 +3063,8 @@
 
     const state = load();
     state.contractLines = []; // chargé depuis API au login (non persisté en localStorage)
+    state.quotes = [];
+    state.quoteLines = [];
     const reservationCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let supabaseClient = null;
     let currentUser = null;
@@ -3988,6 +4105,7 @@
         case "cars":         applyCarsFilter({ query }); break;
         case "maintenance":  applyMaintenanceFilter({ query }); break;
         case "reservations": renderReservations(); break;
+        case "quotes":       renderQuotes(); break;
         default: break;
       }
       openTab(tabId);
@@ -4399,6 +4517,7 @@
       switch (tabId) {
         case "reservations": if (typeof renderReservations === "function") renderReservations(); break;
         case "contracts":    if (typeof renderContracts    === "function") renderContracts();    break;
+        case "quotes":       if (typeof renderQuotes       === "function") renderQuotes();       break;
         case "invoices":     if (typeof renderInvoices     === "function") renderInvoices();     break;
         case "cars":         if (typeof renderCars         === "function") renderCars();         break;
         case "customers":    if (typeof renderCustomers    === "function") renderCustomers();    break;
@@ -4805,9 +4924,10 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, contractLinesRaw, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
+      const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/contract-lines"),
+        apiGet("/quotes"), apiGet("/quote-lines"),
         apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
         apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
@@ -4884,6 +5004,24 @@
         status: l.status || "active",
         actualEndDate: l.actual_end_date || null,
         reservationId: l.reservation_id || null,
+      }));
+
+      if (quotesRaw) state.quotes = quotesRaw.map(q => ({
+        id: q.id, customerId: q.customer_id, customerName: q.customer_name || "",
+        quoteDate: q.quote_date || "", validityDate: q.validity_date || "",
+        status: q.status || "brouillon", notes: q.notes || "",
+        totalAmountHt: q.total_amount_ht || 0, totalVatAmount: q.total_vat_amount || 0,
+        totalAmountTtc: q.total_amount_ttc || 0,
+        convertedContractId: q.converted_contract_id || null,
+      }));
+
+      if (quoteLinesRaw) state.quoteLines = quoteLinesRaw.map(l => ({
+        id: l.id, quoteId: l.quote_id, carId: l.car_id, carPlate: l.car_plate || "",
+        periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        days: l.days || 0, months: l.months || 0,
+        rate: l.rate || 0, rateCurrency: l.rate_currency || "TND",
+        amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+        amountTtc: l.amount_ttc || 0, amountTnd: l.amount_tnd || 0,
       }));
 
       if (invoices) state.invoices = invoices.map(i => ({
@@ -7270,6 +7408,21 @@
             reservations: (state.reservations || []).map(mapReservation),
             leasing: (state.leasingContracts || []).map(mapLeasing),
             insurances: (state.insurances || []).map(mapInsurance),
+            quotes: (state.quotes || []).map(q => ({
+              id: q.id, customer_id: q.customerId, customer_name: q.customerName || "",
+              quote_date: q.quoteDate, validity_date: q.validityDate, status: q.status || "brouillon",
+              notes: q.notes || "", total_amount_ht: q.totalAmountHt || 0,
+              total_vat_amount: q.totalVatAmount || 0, total_amount_ttc: q.totalAmountTtc || 0,
+              converted_contract_id: q.convertedContractId || null,
+            })),
+            quote_lines: (state.quoteLines || []).map(l => ({
+              id: l.id, quote_id: l.quoteId, car_id: l.carId, car_plate: l.carPlate || "",
+              period_start: l.periodStart, period_end: l.periodEnd,
+              days: l.days || 0, months: l.months || 0,
+              rate: l.rate || 0, rate_currency: l.rateCurrency || "TND",
+              amount_ht: l.amountHt || 0, vat_amount: l.vatAmount || 0,
+              amount_ttc: l.amountTtc || 0, amount_tnd: l.amountTnd || 0,
+            })),
           }),
         });
         const data = await res.json();
@@ -7372,6 +7525,8 @@
       state.customers = [];
       state.contracts = [];
       state.contractLines = [];
+      state.quotes = [];
+      state.quoteLines = [];
       state.invoices = [];
       state.payments = [];
       state.reservations = [];
@@ -9890,6 +10045,532 @@
         }
       }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DEVIS (BR27)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    function getQuoteDisplayStatus(q) {
+      if (q.status === "valide" || q.status === "refuse") return q.status;
+      if (q.validityDate && q.validityDate < today) return "expire";
+      return q.status;
+    }
+
+    const QUOTES_COLUMNS = [
+      { key: "id" },
+      { key: "customerName" },
+      { key: "quoteDate", sortType: "date" },
+      { key: "validityDate", sortType: "date" },
+      { key: "lignes", sortType: "number", accessor: (q) => (state.quoteLines || []).filter(l => l.quoteId === q.id).length },
+      { key: "totalAmountTtc", sortType: "number" },
+      { key: "status", filterType: "select", options: ["brouillon","envoye","valide","refuse","expire"], accessor: (q) => getQuoteDisplayStatus(q) },
+    ];
+
+    function renderQuotes() {
+      const tbody = byId("quotesTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      const statusFilter = byId("quotesFilterStatus") ? byId("quotesFilterStatus").value : "";
+      const query = String(byId("quotesSearch") ? byId("quotesSearch").value : "").trim().toLowerCase();
+      const filtered = (state.quotes || []).filter(q => {
+        const displayStatus = getQuoteDisplayStatus(q);
+        const matchesStatus = statusFilter ? displayStatus === statusFilter : true;
+        const haystack = `${q.id} ${q.customerName}`.toLowerCase();
+        return matchesStatus && (!query || haystack.includes(query));
+      });
+      const sorted = applySortAndColumnFilters(filtered, "quotes", QUOTES_COLUMNS);
+      const { items, page, pages, total } = paginateArray(sorted, "quotes");
+      items.forEach(q => {
+        const lineCount = (state.quoteLines || []).filter(l => l.quoteId === q.id).length;
+        const displayStatus = getQuoteDisplayStatus(q);
+        const statusCss = displayStatus === "valide" ? "dispo" : displayStatus === "refuse" || displayStatus === "expire" ? "loue" : displayStatus === "envoye" ? "maintenance" : "pending";
+        const tr = document.createElement("tr");
+        tr.className = "clickable-row";
+        tr.addEventListener("dblclick", () => openQuoteDetail(q.id));
+        tr.innerHTML = `
+          <td><a href="#" data-open-quote="${safe(q.id)}">${safe(q.id)}</a></td>
+          <td>${safe(q.customerName || "-")}</td>
+          <td>${q.quoteDate || "-"}</td>
+          <td style="${displayStatus === "expire" ? "color:#c53030;" : ""}">${q.validityDate || "-"}</td>
+          <td><a href="#" data-open-quote-detail="${safe(q.id)}" class="badge-lignes">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
+          <td>${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td><span class="badge-status ${statusCss}">${displayStatus}</span></td>
+        `;
+        tr.querySelectorAll("[data-open-quote],[data-open-quote-detail]").forEach(a => a.addEventListener("click", e => {
+          e.preventDefault(); e.stopPropagation();
+          openQuoteDetail(q.id);
+        }));
+        tbody.appendChild(tr);
+      });
+      renderPaginationControls(null, "quotes", total, page, pages);
+    }
+
+    // ── Entête devis ─────────────────────────────────────────────────────────
+
+    function renderQuoteDetailHeader(quoteId, editMode) {
+      const q = (state.quotes || []).find(q => q.id === quoteId);
+      if (!q) return;
+      const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
+      const sumHt  = lines.reduce((s, l) => s + (l.amountHt  || 0), 0);
+      const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      const displayStatus = getQuoteDisplayStatus(q);
+      const editBtn   = byId("qdEditHeaderBtn");
+      const cancelBtn = byId("qdCancelEditBtn");
+
+      if (!editMode) {
+        byId("qdHeader").innerHTML = `
+          <div><span class="label-small">Client</span><br><strong>${safe(q.customerName || "-")}</strong></div>
+          <div><span class="label-small">Date devis</span><br>${q.quoteDate || "-"}</div>
+          <div><span class="label-small">Validité</span><br>${q.validityDate || "-"}</div>
+          <div><span class="label-small">Statut</span><br>${displayStatus}</div>
+          <div><span class="label-small">Notes</span><br>${safe(q.notes || "—")}</div>
+          <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          ${q.convertedContractId ? `<div><span class="label-small">Contrat</span><br><a href="#" data-open-contract="${safe(q.convertedContractId)}">${safe(q.convertedContractId)}</a></div>` : ""}
+        `;
+        editBtn.textContent = "✏ Modifier entête";
+        editBtn.onclick = () => renderQuoteDetailHeader(quoteId, true);
+        cancelBtn.style.display = "none";
+      } else {
+        const custOpts = state.customers.map(c =>
+          `<option value="${safe(c.id)}"${c.id === q.customerId ? " selected" : ""}>${safe(c.name)}</option>`
+        ).join("");
+        byId("qdHeader").innerHTML = `
+          <div><label class="label-small">Client</label><select id="qdEClient" style="width:100%;">${custOpts}</select></div>
+          <div><label class="label-small">Date devis</label><input id="qdEDate" type="date" value="${q.quoteDate||""}" style="width:100%;" /></div>
+          <div><label class="label-small">Date validité</label><input id="qdEValidity" type="date" value="${q.validityDate||""}" style="width:100%;" /></div>
+          <div><label class="label-small">Statut</label>
+            <select id="qdEStatus" style="width:100%;">
+              <option value="brouillon"${q.status==="brouillon"?" selected":""}>brouillon</option>
+              <option value="envoye"${q.status==="envoye"?" selected":""}>envoyé</option>
+              <option value="valide"${q.status==="valide"?" selected":""}>validé</option>
+              <option value="refuse"${q.status==="refuse"?" selected":""}>refusé</option>
+            </select>
+          </div>
+          <div><label class="label-small">Notes</label><input id="qdENotes" value="${safe(q.notes||"")}" style="width:100%;" /></div>
+          <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+        `;
+        editBtn.textContent = "✓ Enregistrer";
+        cancelBtn.style.display = "";
+        cancelBtn.onclick = () => renderQuoteDetailHeader(quoteId, false);
+        editBtn.onclick = async () => {
+          const customerId = byId("qdEClient").value;
+          const customer = state.customers.find(c => c.id === customerId);
+          await apiPut(`/quotes/${quoteId}`, {
+            customer_id: customerId, customer_name: customer ? customer.name : q.customerName,
+            quote_date: byId("qdEDate").value, validity_date: byId("qdEValidity").value,
+            status: byId("qdEStatus").value, notes: byId("qdENotes").value,
+          });
+          const idx = state.quotes.findIndex(x => x.id === quoteId);
+          if (idx >= 0) Object.assign(state.quotes[idx], {
+            customerId, customerName: customer ? customer.name : q.customerName,
+            quoteDate: byId("qdEDate").value, validityDate: byId("qdEValidity").value,
+            status: byId("qdEStatus").value, notes: byId("qdENotes").value,
+          });
+          renderQuoteDetailHeader(quoteId, false);
+          renderQuotes();
+        };
+      }
+
+      // Afficher/masquer les boutons d'action selon le statut
+      const isEditable = !["valide","refuse"].includes(q.status);
+      byId("qdSendBtn").style.display    = q.status === "brouillon" ? "" : "none";
+      byId("qdRefuseBtn").style.display  = isEditable ? "" : "none";
+      byId("qdValidateBtn").style.display = isEditable ? "" : "none";
+      byId("qdPdfBtn").style.display     = "";
+    }
+
+    // ── Grille lignes devis ───────────────────────────────────────────────────
+
+    function renderQuoteDetailLines(quoteId) {
+      const tbody = byId("qdLinesBody");
+      const inlineRow = tbody.querySelector(".ql-inline-new");
+      tbody.innerHTML = "";
+      const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
+      byId("qdEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
+      let sumHt = 0, sumTtc = 0;
+      lines.forEach(l => {
+        sumHt  += l.amountHt  || 0;
+        sumTtc += l.amountTtc || 0;
+        const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
+          <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
+          <td style="text-align:right;">${dur}</td>
+          <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:right;">${(l.amountHt||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:right;">${(l.vatAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:right;">${(l.amountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:center;"><button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button></td>
+        `;
+        tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", e => {
+          e.preventDefault(); e.stopPropagation();
+          byId("quoteDetailModal").style.display = "none";
+          goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
+        }));
+        tr.querySelector(".ql-delete-btn").addEventListener("click", () => deleteQuoteLine(quoteId, l.id));
+        tbody.appendChild(tr);
+      });
+      if (inlineRow) tbody.appendChild(inlineRow);
+      const tfoot = byId("qdLinesFoot");
+      if (tfoot) {
+        tfoot.innerHTML = lines.length
+          ? `<tr><td colspan="4"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td></tr>`
+          : "";
+      }
+    }
+
+    function appendInlineQuoteLineRow(quoteId) {
+      const tbody = byId("qdLinesBody");
+      if (tbody.querySelector(".ql-inline-new")) { tbody.querySelector(".ql-inline-new select")?.focus(); return; }
+      byId("qdEmptyMsg").style.display = "none";
+      byId("qdAddLineBtn").textContent = "▲ Masquer";
+      const carOptions = state.cars.map(c =>
+        `<option value="${safe(c.id)}">${safe(c.plate)}${(c.brand||c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
+      ).join("");
+      const tr = document.createElement("tr");
+      tr.className = "ql-inline-new";
+      tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
+      tr.innerHTML = `
+        <td style="padding:4px;"><select id="qlCar" style="width:100%;min-width:110px;font-size:12px;"><option value="">— véhicule —</option>${carOptions}</select></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <input id="qlStart" type="date" style="width:108px;font-size:12px;" />
+          <span style="margin:0 2px;">→</span>
+          <input id="qlEnd" type="date" style="width:108px;font-size:12px;" />
+        </td>
+        <td id="qlDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
+        <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="tarif/j" style="width:75px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlHt" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:75px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <button id="qlSaveBtn" style="padding:3px 10px;font-size:13px;">✓</button>
+          <button id="qlCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;">✗</button>
+          <div id="qlError" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      const recompute = () => {
+        const ht = Number(byId("qlHt").value || 0);
+        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
+        byId("qlVat").value = vatAmount.toFixed(2);
+        byId("qlTtc").value = amountTtc.toFixed(2);
+      };
+      const recomputeFromTtc = () => {
+        const { amountHt, vatAmount } = computeContractLineHt(Number(byId("qlTtc").value || 0));
+        byId("qlHt").value = amountHt.toFixed(2);
+        byId("qlVat").value = vatAmount.toFixed(2);
+      };
+      const updateDur = () => {
+        const s = byId("qlStart").value, e = byId("qlEnd").value;
+        if (s && e && e >= s) {
+          const { days } = calcLineDuration(s, e);
+          byId("qlDur").textContent = days + "j";
+          const rate = Number(byId("qlRate").value || 0);
+          if (rate > 0) { byId("qlHt").value = (rate * days).toFixed(2); recompute(); }
+        } else { byId("qlDur").textContent = "—"; }
+      };
+      byId("qlHt").oninput    = recompute;
+      byId("qlTtc").oninput   = recomputeFromTtc;
+      byId("qlStart").oninput = updateDur;
+      byId("qlEnd").oninput   = updateDur;
+      byId("qlSaveBtn").onclick   = () => submitInlineQuoteLine(quoteId, tr);
+      byId("qlCancelBtn").onclick = () => { tr.remove(); byId("qdAddLineBtn").textContent = "+ Ajouter une ligne"; renderQuoteDetailLines(quoteId); };
+      byId("qlCar").focus();
+    }
+
+    async function submitInlineQuoteLine(quoteId, tr) {
+      const carId = byId("qlCar").value;
+      const startStr = byId("qlStart").value, endStr = byId("qlEnd").value;
+      const amountHt = Number(byId("qlHt").value || 0);
+      const rate = Number(byId("qlRate").value || 0);
+      const errDiv = byId("qlError");
+      errDiv.style.display = "none";
+      if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
+      if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
+      if (amountHt <= 0) { errDiv.textContent = "Montant HT requis"; errDiv.style.display = ""; return; }
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(startStr, endStr);
+      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
+      const saveBtn = byId("qlSaveBtn");
+      saveBtn.disabled = true; saveBtn.textContent = "…";
+      const result = await apiPostWithError("/quote-lines", {
+        quote_id: quoteId, car_id: carId, car_plate: car ? car.plate : "",
+        period_start: startStr, period_end: endStr, days, months,
+        rate, rate_currency: "TND",
+        amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+      });
+      if (!result.ok) {
+        saveBtn.disabled = false; saveBtn.textContent = "✓";
+        errDiv.textContent = result.errorMsg || "Erreur"; errDiv.style.display = ""; return;
+      }
+      const lineData = result.data;
+      state.quoteLines.push({
+        id: lineData?.id || uid("QL"), quoteId, carId, carPlate: car ? car.plate : "",
+        periodStart: startStr, periodEnd: endStr, days, months, rate, rateCurrency: "TND",
+        amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+      });
+      // Mettre à jour les totaux du devis dans state
+      const qIdx = state.quotes.findIndex(q => q.id === quoteId);
+      if (qIdx >= 0) {
+        const allLines = state.quoteLines.filter(l => l.quoteId === quoteId);
+        state.quotes[qIdx].totalAmountHt  = allLines.reduce((s, l) => s + (l.amountHt  || 0), 0);
+        state.quotes[qIdx].totalAmountTtc = allLines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      }
+      tr.remove();
+      byId("qdAddLineBtn").textContent = "+ Ajouter une ligne";
+      renderQuoteDetailLines(quoteId);
+      renderQuoteDetailHeader(quoteId, false);
+      renderQuotes();
+    }
+
+    async function deleteQuoteLine(quoteId, lineId) {
+      if (!confirm("Supprimer cette ligne ?")) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/quote-lines/${lineId}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { alert("Erreur lors de la suppression"); return; }
+      const idx = state.quoteLines.findIndex(l => l.id === lineId);
+      if (idx >= 0) state.quoteLines.splice(idx, 1);
+      const qIdx = state.quotes.findIndex(q => q.id === quoteId);
+      if (qIdx >= 0) {
+        const allLines = state.quoteLines.filter(l => l.quoteId === quoteId);
+        state.quotes[qIdx].totalAmountHt  = allLines.reduce((s, l) => s + (l.amountHt  || 0), 0);
+        state.quotes[qIdx].totalAmountTtc = allLines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      }
+      renderQuoteDetailLines(quoteId);
+      renderQuoteDetailHeader(quoteId, false);
+      renderQuotes();
+    }
+
+    // ── Validation → Contrat ─────────────────────────────────────────────────
+
+    async function validateQuote(quoteId) {
+      if (!confirm("Valider ce devis et créer le contrat correspondant ?\nCette action est irréversible.")) return;
+      const errDiv = byId("qdValidateError");
+      errDiv.style.display = "none";
+      const btn = byId("qdValidateBtn");
+      btn.disabled = true; btn.textContent = "…";
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/quotes/${quoteId}/validate`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        btn.disabled = false; btn.textContent = "✓ Valider → Contrat";
+        errDiv.textContent = data.message || data.error || "Erreur lors de la validation";
+        errDiv.style.display = "";
+        return;
+      }
+      const contractId = data.contractId;
+      // Mettre à jour le devis dans state
+      const qIdx = state.quotes.findIndex(q => q.id === quoteId);
+      if (qIdx >= 0) { state.quotes[qIdx].status = "valide"; state.quotes[qIdx].convertedContractId = contractId; }
+      // Recharger les données fraîches (contract_lines + reservations créées par BR25)
+      const [newContractsRaw, newLinesRaw, newRsvRaw] = await Promise.all([
+        apiGet("/contracts"), apiGet("/contract-lines"), apiGet("/reservations"),
+      ]);
+      if (newContractsRaw) state.contracts = newContractsRaw.map(c => ({
+        id: c.id, customerId: c.customer_id, customerName: c.customer_name || "",
+        carId: c.car_id, carPlate: c.car_plate || "", contractDate: c.contract_date || "",
+        type: c.type || "court", days: c.days || 0, months: c.months || 0,
+        rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
+        quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND", quotientTnd: c.quotient_tnd || 0,
+        totalAmountOriginal: c.total_amount_original || 0, totalAmountTnd: c.total_amount_tnd || 0,
+        paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
+        status: c.status || "active",
+      }));
+      if (newLinesRaw) state.contractLines = newLinesRaw.map(l => ({
+        id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
+        periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        days: l.days || 0, months: l.months || 0, rate: l.rate || 0, rateCurrency: l.rate_currency || "TND",
+        amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+        amountTtc: l.amount_ttc || 0, amountTnd: l.amount_tnd || 0,
+        status: l.status || "active", actualEndDate: l.actual_end_date || null, reservationId: l.reservation_id || null,
+      }));
+      if (newRsvRaw) state.reservations = newRsvRaw.map(r => ({
+        id: r.id, carId: r.car_id, carPlate: r.car_plate || "",
+        customerId: r.customer_id, customerName: r.customer_name || "",
+        startDate: r.start_date, endDate: r.end_date,
+        startTime: r.start_time || "09:00", endTime: r.end_time || "18:00",
+        status: r.status || "confirmee", notes: r.notes || "",
+        contractLineId: r.contract_line_id || null,
+      }));
+      byId("quoteDetailModal").style.display = "none";
+      renderQuotes();
+      renderContracts();
+      if (typeof renderReservations === "function") renderReservations();
+      openContractDetail(contractId);
+    }
+
+    // ── PDF devis ─────────────────────────────────────────────────────────────
+
+    function generateQuotePdf(quoteId) {
+      const q = (state.quotes || []).find(x => x.id === quoteId);
+      if (!q) { alert("Devis introuvable."); return; }
+      const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
+      const customer = state.customers.find(c => c.id === q.customerId);
+      let branding = {};
+      try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
+      const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
+      const settings = state.settings || {};
+      const sumHt  = lines.reduce((s, l) => s + (l.amountHt  || 0), 0);
+      const sumVat = lines.reduce((s, l) => s + (l.vatAmount  || 0), 0);
+      const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      const lineRowsHtml = lines.map(l => {
+        const car = state.cars.find(c => c.plate === l.carPlate);
+        return `<tr>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate||"-")}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;">${safe(car ? (car.brand||""+" "+car.model||"").trim() : "-")}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.periodStart||"-"}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.periodEnd||"-"}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days||"-"}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
+        </tr>`;
+      }).join("");
+      const win = window.open("", "_blank");
+      if (!win) { alert("Autorisez les popups pour ce site."); return; }
+      win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Devis ${safe(q.id)}</title>
+      <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a202c;}
+      table{border-collapse:collapse;width:100%;}th{background:#1a56db;color:#fff;padding:8px;text-align:left;}
+      .header{display:flex;justify-content:space-between;margin-bottom:20px;}
+      .validity{background:#fef3c7;border:2px solid #f59e0b;padding:10px;border-radius:6px;text-align:center;font-size:14px;font-weight:bold;margin-bottom:16px;}
+      </style></head><body>
+      <div class="header">
+        <div><h2 style="margin:0;">${safe(companyName)}</h2>
+          ${settings.companyAddress ? `<div>${safe(settings.companyAddress)}</div>` : ""}
+          ${settings.companyRib ? `<div>RIB : ${safe(settings.companyRib)}</div>` : ""}
+        </div>
+        <div style="text-align:right;">
+          <h2 style="margin:0;color:#1a56db;">DEVIS</h2>
+          <div>N° ${safe(q.id)}</div>
+          <div>Date : ${q.quoteDate||"-"}</div>
+        </div>
+      </div>
+      <div class="validity">⚠ Devis valable jusqu'au : ${q.validityDate||"-"}</div>
+      <div style="margin-bottom:16px;"><strong>Client :</strong> ${safe(q.customerName||"-")}
+        ${customer && customer.phone ? ` — ${safe(customer.phone)}` : ""}
+        ${customer && customer.address ? `<br>${safe(customer.address)}` : ""}
+      </div>
+      ${q.notes ? `<div style="margin-bottom:12px;padding:8px;background:#f1f5f9;border-radius:4px;"><em>${safe(q.notes)}</em></div>` : ""}
+      <table style="margin-bottom:16px;">
+        <thead><tr><th>Immatriculation</th><th>Modèle</th><th>Début</th><th>Fin</th><th>Jours</th><th>Montant HT</th><th>TVA</th><th>TTC</th></tr></thead>
+        <tbody>${lineRowsHtml}</tbody>
+        <tfoot>
+          <tr><td colspan="5" style="padding:6px;font-weight:bold;">Total</td>
+            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumHt)}</td>
+            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumVat)}</td>
+            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumTtc)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="margin-top:24px;font-size:11px;color:#718096;text-align:center;">Ce devis est valable jusqu'au ${q.validityDate||"-"}. Passé cette date, il sera considéré comme expiré.</div>
+      <script>window.onload=()=>{window.print();}<\/script></body></html>`);
+      win.document.close();
+    }
+
+    // ── Modal + handlers ──────────────────────────────────────────────────────
+
+    function openQuoteDetail(quoteId) {
+      const q = (state.quotes || []).find(x => x.id === quoteId);
+      if (!q) return;
+      byId("qdQuoteId").textContent = quoteId;
+      byId("qdAddLineBtn").textContent = "+ Ajouter une ligne";
+      byId("qdAddLineBtn").onclick = () => appendInlineQuoteLineRow(quoteId);
+      byId("qdValidateError").style.display = "none";
+      byId("qdValidateBtn").disabled = false;
+      byId("qdValidateBtn").textContent = "✓ Valider → Contrat";
+      byId("qdSendBtn").onclick   = async () => {
+        await apiPut(`/quotes/${quoteId}`, { status: "envoye" });
+        const idx = state.quotes.findIndex(x => x.id === quoteId);
+        if (idx >= 0) state.quotes[idx].status = "envoye";
+        renderQuoteDetailHeader(quoteId, false); renderQuotes();
+      };
+      byId("qdRefuseBtn").onclick = async () => {
+        if (!confirm("Marquer ce devis comme refusé ?")) return;
+        await apiPut(`/quotes/${quoteId}`, { status: "refuse" });
+        const idx = state.quotes.findIndex(x => x.id === quoteId);
+        if (idx >= 0) state.quotes[idx].status = "refuse";
+        renderQuoteDetailHeader(quoteId, false); renderQuotes();
+      };
+      byId("qdValidateBtn").onclick = () => validateQuote(quoteId);
+      byId("qdPdfBtn").onclick      = () => generateQuotePdf(quoteId);
+      byId("qdCloseBtn").onclick    = () => { byId("quoteDetailModal").style.display = "none"; };
+      byId("qdCloseBtn2").onclick   = () => { byId("quoteDetailModal").style.display = "none"; };
+      renderQuoteDetailHeader(quoteId, false);
+      renderQuoteDetailLines(quoteId);
+      byId("quoteDetailModal").style.display = "flex";
+
+      // Lien "Voir contrat" dans entête si validé
+      byId("qdHeader").querySelectorAll("[data-open-contract]").forEach(a => a.addEventListener("click", e => {
+        e.preventDefault();
+        byId("quoteDetailModal").style.display = "none";
+        openContractDetail(a.getAttribute("data-open-contract"));
+      }));
+    }
+
+    // ── Nouveau devis + filtres ───────────────────────────────────────────────
+
+    if (byId("newQuoteBtn")) {
+      byId("newQuoteBtn").addEventListener("click", () => {
+        const form = byId("quoteLegacyForm");
+        if (!form) return;
+        form.style.display = form.style.display === "none" ? "block" : "none";
+        if (form.style.display === "block") {
+          const custSelect = byId("quoteCustomer");
+          custSelect.innerHTML = '<option value="">— Sélectionner client —</option>';
+          state.customers.forEach(c => {
+            const o = document.createElement("option"); o.value = c.id; o.textContent = `${c.name} (${c.phone||""})`;
+            custSelect.appendChild(o);
+          });
+          byId("quoteDate").value = today;
+          const validity = new Date(); validity.setDate(validity.getDate() + 30);
+          byId("quoteValidityDate").value = validity.toISOString().split("T")[0];
+          byId("quoteNotes").value = "";
+          custSelect.focus();
+        }
+      });
+    }
+
+    if (byId("cancelQuoteBtn")) {
+      byId("cancelQuoteBtn").addEventListener("click", () => { byId("quoteLegacyForm").style.display = "none"; });
+    }
+
+    if (byId("addQuoteBtn")) {
+      byId("addQuoteBtn").addEventListener("click", async () => {
+        const customerId = byId("quoteCustomer").value;
+        const quoteDate = byId("quoteDate").value;
+        const validityDate = byId("quoteValidityDate").value;
+        const notes = byId("quoteNotes").value.trim();
+        if (!customerId) { alert("Client requis."); return; }
+        if (!quoteDate || !validityDate) { alert("Dates requises."); return; }
+        const customer = state.customers.find(c => c.id === customerId);
+        const quoteId = uid("QUO");
+        const saved = await apiPost("/quotes", {
+          id: quoteId, customer_id: customerId,
+          customer_name: customer ? customer.name : "",
+          quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
+        });
+        state.quotes.push({
+          id: quoteId, customerId, customerName: customer ? customer.name : "",
+          quoteDate, validityDate, status: "brouillon", notes,
+          totalAmountHt: 0, totalVatAmount: 0, totalAmountTtc: 0, convertedContractId: null,
+        });
+        byId("quoteLegacyForm").style.display = "none";
+        renderQuotes();
+        openQuoteDetail(quoteId);
+      });
+    }
+
+    if (byId("quotesFilterStatus")) byId("quotesFilterStatus").addEventListener("change", renderQuotes);
+    if (byId("quotesSearch")) byId("quotesSearch").addEventListener("input", renderQuotes);
 
     const CONTRACTS_COLUMNS = [
       { key: "id" },
@@ -12908,6 +13589,7 @@
       setupSortableTable(byId("vignettesTable")?.closest("table"), "vignettes", VIGNETTES_COLUMNS, renderVignettes);
       setupSortableTable(byId("gpsTable")?.closest("table"), "gpsTable", GPS_COLUMNS, renderGpsTable);
       setupSortableTable(byId("usersTable")?.closest("table"), "users", USERS_COLUMNS, renderUsers);
+      setupSortableTable(byId("quotesTable")?.closest("table"), "quotes", QUOTES_COLUMNS, renderQuotes);
       setupSortableTable(byId("rentabiliteTable")?.closest("table"), "rentabilite", RENTABILITE_COLUMNS, renderRentabilite);
       setupSortableTable(byId("treasuryForecastTable")?.closest("table"), "treasuryForecast", TREASURY_FORECAST_COLUMNS, rerenderTreasuryForecastTable);
     }
