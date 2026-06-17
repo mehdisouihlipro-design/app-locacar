@@ -144,6 +144,52 @@ https://web-production-b4967.up.railway.app
 
 ---
 
+## Devis
+
+### Onglet: Devis
+
+L'onglet **Devis** permet de créer des propositions commerciales pour vos clients avant de les convertir en contrats. Un devis est composé d'un **entête** (client, date, date de validité, statut, notes) et de **lignes** (chaque ligne représente un véhicule sur une période avec son tarif).
+
+#### Créer un devis
+
+1. Cliquer sur **"+ Nouveau devis"**
+2. Sélectionner le **client**, la **date du devis** et la **date de validité** (par défaut +30 jours)
+3. Ajouter des notes optionnelles puis cliquer **"Créer le devis"**
+4. La modale de détail s'ouvre — cliquer **"+ Ajouter une ligne"** pour ajouter les véhicules et périodes
+
+#### Ajouter une ligne de devis
+
+Dans la modale de détail d'un devis :
+1. Cliquer **"+ Ajouter une ligne"** — une ligne de saisie apparaît en bas du tableau
+2. Choisir le **véhicule**, renseigner **début** et **fin de période**
+3. Saisir le **tarif journalier** : le montant HT est calculé automatiquement (jours × tarif)
+4. Les montants **HT ↔ TTC** se synchronisent en temps réel (TVA configurée dans les paramètres)
+5. Cliquer **✓** pour enregistrer la ligne
+
+#### Statuts d'un devis
+
+| Statut | Signification |
+|--------|---------------|
+| **brouillon** | En cours de rédaction |
+| **envoyé** | Transmis au client (bouton "📤 Marquer envoyé") |
+| **refusé** | Client a décliné (bouton "✗ Refuser") |
+| **validé** | Converti en contrat — lecture seule |
+| **expiré** | Date de validité dépassée sans validation |
+
+#### Valider un devis → Contrat
+
+Le bouton **"✓ Valider → Contrat"** convertit le devis en contrat de location :
+1. Confirmation demandée (opération irréversible)
+2. Vérification des chevauchements (BR19) — si un véhicule est déjà engagé sur la période, la validation échoue avec un message d'erreur rouge
+3. Si OK : création automatique du contrat + lignes de contrat + réservations (BR25)
+4. Le devis passe en statut "validé" et un lien vers le nouveau contrat apparaît dans son entête
+
+#### Générer le PDF
+
+Bouton **"🖨 PDF"** disponible depuis la modale de détail : génère un document imprimable avec les informations de l'agence, du client, le tableau des lignes et la date de validité mise en évidence.
+
+---
+
 ## Contrats de Location
 
 ### Onglet: Contrats

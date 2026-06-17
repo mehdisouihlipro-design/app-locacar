@@ -1330,7 +1330,7 @@ Sur la grille des lignes de contrat (9.3), bouton **"Résilier"** disponible pou
 5. Le véhicule redevient disponible/réservable à partir du lendemain de `actual_end_date`.
 6. Recalcule `amount_ht`/`vat_amount`/`amount_ttc` de la ligne au prorata de la durée réelle (`actual_end_date - period_start + 1` jours) ; ce montant ajusté est repris par la prochaine ligne de facture générée pour ce contrat (9.4).
 
-### 9.10 Devis entête + lignes, PDF, validation et conversion en contrat (BR27)
+### 9.10 ✅ Implémenté (2026-06) — Devis entête + lignes, PDF, validation et conversion en contrat (BR27)
 
 **Écran liste "Devis" (`#quotes`)**
 - Nouvel onglet, sur le modèle de l'écran Contrats (9.3) : une ligne de tableau = un devis (entête) : Id, Client, Date du devis, Date de validité, Statut, Total HT, Total TTC, Nombre de véhicules. Tri/filtre génériques (9.7), tri par défaut sur `created_at` décroissant (BR23).
