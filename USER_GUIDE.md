@@ -170,6 +170,7 @@ Dans le modal de détail d'un contrat :
    - **Montant HT** et **Montant TTC** sont liés : modifier l'un recalcule l'autre (TVA appliquée selon les Paramètres)
 3. Cliquer **"Enregistrer la ligne"**
    - Si la période chevauche une ligne active existante pour ce véhicule, un message d'erreur rouge s'affiche (BR19) — ajuster les dates ou choisir un autre véhicule
+   - En cas de succès, **une réservation est automatiquement créée** (ou liée si une réservation correspondante existait déjà) pour ce véhicule sur la même période. La ligne de contrat affiche un badge **📅 RSV-XXXXX** cliquable dans la colonne Réservation — cliquer dessus ouvre directement l'onglet Réservations avec cette réservation mise en évidence.
 
 #### Accéder au détail d'un contrat
 - **Double-clic** sur une ligne du tableau → ouvre le modal de détail
@@ -210,10 +211,18 @@ Le badge affiché dans la colonne "Lignes" indique le nombre de lignes actives (
 4. Cliquer **"Créer facture"**
 
 #### Modifier / Imprimer une Facture
-- Double-clic sur une facture pour ouvrir sa fiche détaillée (voir [Édition des Fiches & Navigation](#édition-des-fiches--navigation)), ou utiliser la modale dédiée d'édition/impression :
-  - Ajuster le montant HT ou TTC (calcul automatique de la TVA, de la taxe journalière et du timbre fiscal dans l'autre sens)
-  - Bouton **"Télécharger PDF"** : ouvre un aperçu imprimable de la facture (impression/export PDF via le navigateur), avec le RIB sélectionné à la création
-  - Bouton **"Enregistrer"** : sauvegarde les modifications
+Cliquer sur le bouton **"Facture"** d'une ligne pour ouvrir la fiche détaillée. La modale affiche :
+
+**Pavé entête** (lecture par défaut) :
+- Client, contrat, libellé, date d'échéance, statut, totaux HT/TTC, montant réglé, solde dû, RIB.
+- Bouton **"✏ Modifier entête"** → les champs passent en mode saisie dans le même pavé (sans fenêtre secondaire) : Libellé, Échéance, Statut, RIB. Bouton **"✓ Enregistrer"** sauvegarde. **"✗ Annuler"** revient en lecture.
+
+**Grille des lignes de facturation** :
+- Chaque ligne affiche : Contrat/Véhicule, Début de période, Jours, Montant HT, TVA, Taxe journalière, Montant TTC, bouton ✕ (supprimer la ligne).
+- Le pied de tableau récapitule les totaux + timbre fiscal.
+- Bouton **"+ Ajouter une ligne"** → une ligne vide apparaît directement dans le tableau. Renseigner le contrat, la date de début, les jours et le montant HT (le TTC se calcule automatiquement dans l'autre sens). Cliquer **✓** pour valider, **✗** pour annuler.
+
+Bouton **"Télécharger PDF"** : génère l'aperçu imprimable de la facture.
 
 #### Colonnes
 | Col | Signification |

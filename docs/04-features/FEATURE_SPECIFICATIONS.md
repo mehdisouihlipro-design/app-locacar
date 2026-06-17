@@ -804,14 +804,24 @@ TVA            = Montant_HT × taux_TVA / 100
 
 Pour une **facture multi-lignes** (voir 4.1.7), `computeLineBreakdown(amountHt, days)` applique la même logique TVA/taxe journalière **par ligne** (1 ligne = 1 contrat + 1 véhicule), sans timbre fiscal. Les totaux de la facture (`amountHt`, `vatAmount`, `dailyTaxAmount`, `amountTnd`) sont la somme des lignes, plus le timbre fiscal ajouté **une seule fois** au niveau de la facture.
 
-**4.1.6 Édition et impression de facture**
+**4.1.6 Édition et impression de facture** — ✅ Redesign UX entête+lignes (2026-06)
 
-Depuis l'onglet **Factures**, le bouton **"Facture"** ouvre une modale qui permet de :
-- consulter le détail (contrat, client, véhicule, période facturée) ;
-- modifier le montant **HT** ou le montant **TTC** global — l'autre valeur et la ventilation complète (TVA / taxe journalière / timbre / total TTC) se recalculent en direct, dans les deux sens ;
-- visualiser le montant en toutes lettres ("Arrêtée la présente facture à la somme de … dinars") ;
-- **Enregistrer** la ventilation choisie (persistée via `PUT /invoices/:id` → Supabase) ;
-- **Télécharger le PDF** de la facture : `generateInvoicePdf` ouvre une nouvelle fenêtre (`window.open`) contenant un gabarit HTML autonome reproduisant le format papier de l'agence (en-tête avec logo/nom société/adresse/téléphone/RIB/matricule fiscal issus du white-label et des `Paramètres de facturation`, bloc client, tableau des lignes de prestation, bloc de totaux, montant en toutes lettres) avec un bouton "Imprimer / Enregistrer en PDF" qui déclenche `window.print()`.
+Depuis l'onglet **Factures**, le bouton **"Facture"** ouvre la modale `#invoiceEditModal` redessinée selon le même pattern entête+lignes inline que `#contractDetailModal` (section 9.3) :
+
+**Pavé entête (lecture/édition inline)** — `renderInvoiceDetailHeader(invoiceId, editMode)` :
+- Lecture : grille 5 colonnes (Client, Contrat, Libellé, Échéance, Statut, Total HT, Total TTC, Réglé, Solde dû, RIB).
+- Bouton "✏ Modifier entête" → bascule en édition inline dans le même pavé : inputs/selects pour Libellé, Échéance, Statut (en_attente/non_payee/payee/partiel), RIB (sélecteur RIB1/RIB2 conforme BR22). "✓ Enregistrer" → `PUT /invoices/:id`. "✗ Annuler" → retour lecture sans sauvegarde.
+
+**Grille de lignes** — `renderInvoiceDetailLines(invoiceId)` :
+- Colonnes : Libellé/Contrat/Véhicule, Début période, Jours, HT, TVA, Taxe journalière, TTC, ✕ Supprimer.
+- Pied de tableau : totaux + timbre fiscal. Suppression : `deleteInvoiceDetailLine` → `saveInvoiceLines` → re-render.
+- `saveInvoiceLines` : recalcule tous les totaux depuis `invoice.lines` → `PUT /invoices/:id` (JSONB + agrégats).
+
+**Ajout inline** — `appendInlineInvoiceLineRow` / `submitInlineInvoiceLine` :
+- Bouton "+ Ajouter une ligne" → `<tr class="inline-new-line">` dans le tableau.
+- HT↔TTC bidirectionnel via `computeLineBreakdown`. Annulation = suppression de la `<tr>`.
+
+Le bouton **"Télécharger le PDF"** (`iePdfBtn`) reste disponible depuis la modale pour générer le document papier via `generateInvoicePdf` (cf. ci-dessous).
 
 **4.1.7 Création manuelle de facture multi-lignes**
 
@@ -1295,7 +1305,7 @@ Comportement appliqué aux ~19 grilles principales de l'application (Voitures, C
   - `setupSortableTable(table, entityKey, columns, renderFn)` : initialise une fois par table (`headRow.dataset.sortableInit`) les en-têtes cliquables + indicateurs et injecte la ligne de filtres ; appelée pour les 19 grilles depuis `setupAllSortableTables()`.
   - Chaque grille définit un tableau `const <ENTITY>_COLUMNS = [...]` (ordre = ordre des `<th>`), avec `sortType`, `filterType: "select"` + `options` pour les colonnes énumérées, `accessor` pour les colonnes calculées (ex. `contracts.totalTnd`/`dueTnd`, `invoices.status`, `rentabilite.revenue`/`expenses`/`balance`), et `sortable: false`/`filterable: false` pour les colonnes d'actions.
 
-### 9.8 Réservation liée à une ligne de contrat — recherche ou création (BR25)
+### 9.8 Réservation liée à une ligne de contrat — recherche ou création (BR25) — ✅ Implémenté (2026-06)
 
 À la création d'une ligne de contrat `active` (ou à la confirmation `brouillon → active`, 9.3), le système exécute la séquence suivante :
 

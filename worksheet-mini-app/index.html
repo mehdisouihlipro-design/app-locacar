@@ -1519,7 +1519,6 @@
             <th>Client</th>
             <th>Lignes</th>
             <th>Total (TND)</th>
-            <th>Restant (TND)</th>
             <th>Statut</th>
           </tr>
         </thead>
@@ -1537,6 +1536,12 @@
 
       <div id="invoiceLegacyForm" style="display:none;">
         <div class="row">
+          <div>
+            <label>Contrat (optionnel — auto-remplit les lignes)</label>
+            <select id="invoiceContract">
+              <option value="">— Facture manuelle (sans contrat) —</option>
+            </select>
+          </div>
           <div>
             <label>Client</label>
             <select id="invoiceCustomer"></select>
@@ -1619,12 +1624,12 @@
             <th>Facture</th>
             <th>Contrat</th>
             <th>Client</th>
+            <th>Lignes</th>
             <th>Echeance</th>
             <th>Total (TND)</th>
             <th>Paye (TND)</th>
             <th>Restant (TND)</th>
             <th>Statut</th>
-            <th>Action</th>
           </tr>
         </thead>
         <tbody id="invoicesTable"></tbody>
@@ -2524,38 +2529,61 @@
 
     <!-- Modal édition / impression de facture -->
     <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
-      <div class="modal-card" style="width:min(640px,100%);max-height:90vh;overflow:auto;">
+      <div class="modal-card" style="width:min(960px,100%);max-height:92vh;overflow:auto;">
         <button type="button" class="modal-close-x" data-close-target="ieCloseBtn" aria-label="Fermer">&times;</button>
-        <h3 style="margin:0 0 16px;">Facture <span id="ieNumber"></span></h3>
-        <div id="ieInfo" class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px;"></div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:180px;">
-              <label>Montant HT (TND)</label>
-              <input id="ieAmountHt" type="number" step="0.001" style="width:100%;" />
-            </div>
-            <div style="flex:1;min-width:180px;">
-              <label>Montant TTC (TND)</label>
-              <input id="ieAmountTtc" type="number" step="0.001" style="width:100%;" />
-            </div>
-          </div>
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <tbody>
-              <tr><td style="padding:4px 0;">Montant HT</td><td style="padding:4px 0;text-align:right;" id="ieRowHt"></td></tr>
-              <tr><td style="padding:4px 0;">TVA (<span id="ieVatRateLabel"></span>%)</td><td style="padding:4px 0;text-align:right;" id="ieRowVat"></td></tr>
-              <tr><td style="padding:4px 0;">Taxe <span id="ieDailyTaxLabel"></span> dt/jour (<span id="ieDaysLabel"></span> j)</td><td style="padding:4px 0;text-align:right;" id="ieRowDailyTax"></td></tr>
-              <tr><td style="padding:4px 0;">Timbre fiscal</td><td style="padding:4px 0;text-align:right;" id="ieRowStamp"></td></tr>
-              <tr style="font-weight:600;border-top:1px solid #e2e8f0;"><td style="padding:6px 0;">Total TTC</td><td style="padding:6px 0;text-align:right;" id="ieRowTtc"></td></tr>
-            </tbody>
-          </table>
-          <div id="ieWords" class="muted" style="font-size:12px;font-style:italic;"></div>
-          <div id="ieStatus" style="display:none;padding:8px;border-radius:6px;font-size:13px;"></div>
-        </div>
-        <div class="actions" style="margin-top:16px;">
-          <button id="ieSaveBtn">Enregistrer</button>
+        <h3 style="margin:0 0 12px;">Facture <span id="ieNumber" style="font-family:monospace;"></span></h3>
+
+        <!-- Entête (vue lecture / édition inline) -->
+        <div id="ieHeader" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px 16px;font-size:13px;background:#f8faff;border-radius:8px;padding:12px;margin-bottom:14px;"></div>
+
+        <!-- Actions entête -->
+        <div class="actions" style="margin-bottom:12px;">
+          <button id="ieEditHeaderBtn" class="secondary">✏ Modifier entête</button>
+          <button id="ieCancelEditBtn" class="secondary" style="display:none;">✗ Annuler</button>
           <button id="iePdfBtn" class="secondary">Télécharger PDF</button>
           <button id="ieCloseBtn" class="secondary">Fermer</button>
         </div>
+
+        <!-- Lignes de facturation -->
+        <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Lignes de facturation</h4>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Libellé / Contrat</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Début période</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Jours</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Taxe+Timbre</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                <th style="padding:6px 4px;background:#f8faff;"></th>
+              </tr>
+            </thead>
+            <tbody id="ieLinesBody"></tbody>
+            <tfoot id="ieLinesFoot" style="font-weight:700;border-top:2px solid #e2e8f0;"></tfoot>
+          </table>
+        </div>
+        <div id="ieEmptyMsg" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">Aucune ligne — cliquez sur "+ Ajouter une ligne" pour commencer.</div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="ieAddLineBtn">+ Ajouter une ligne</button>
+        </div>
+
+        <!-- Éléments conservés pour les listeners existants (ne pas supprimer) -->
+        <input id="ieAmountHt" type="number" style="display:none;" value="0" />
+        <input id="ieAmountTtc" type="number" style="display:none;" value="0" />
+        <button id="ieSaveBtn" type="button" style="display:none;">legacy</button>
+        <div id="ieInfo" style="display:none;"></div>
+        <span id="ieVatRateLabel" style="display:none;"></span>
+        <span id="ieDailyTaxLabel" style="display:none;"></span>
+        <span id="ieDaysLabel" style="display:none;"></span>
+        <span id="ieRowHt" style="display:none;"></span>
+        <span id="ieRowVat" style="display:none;"></span>
+        <span id="ieRowDailyTax" style="display:none;"></span>
+        <span id="ieRowStamp" style="display:none;"></span>
+        <span id="ieRowTtc" style="display:none;"></span>
+        <div id="ieWords" style="display:none;"></div>
+        <div id="ieStatus" style="display:none;"></div>
       </div>
     </div>
 
@@ -2589,6 +2617,8 @@
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
+                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Réservation</th>
+                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Actions</th>
               </tr>
             </thead>
             <tbody id="cdlLinesBody"></tbody>
@@ -3957,6 +3987,7 @@
         case "customers":    applyCustomersFilter({ query }); break;
         case "cars":         applyCarsFilter({ query }); break;
         case "maintenance":  applyMaintenanceFilter({ query }); break;
+        case "reservations": renderReservations(); break;
         default: break;
       }
       openTab(tabId);
@@ -4364,8 +4395,16 @@
       tab.classList.add("active");
       const panel = document.getElementById(tabId);
       if (panel) panel.classList.add("active");
-      if (tabId === "gps") renderGpsMap();
-      if (tabId === "users") renderUsers();
+      // Re-render le contenu de l'onglet cible pour garantir la fraîcheur des données
+      switch (tabId) {
+        case "reservations": if (typeof renderReservations === "function") renderReservations(); break;
+        case "contracts":    if (typeof renderContracts    === "function") renderContracts();    break;
+        case "invoices":     if (typeof renderInvoices     === "function") renderInvoices();     break;
+        case "cars":         if (typeof renderCars         === "function") renderCars();         break;
+        case "customers":    if (typeof renderCustomers    === "function") renderCustomers();    break;
+        case "gps":          renderGpsMap(); break;
+        case "users":        renderUsers();  break;
+      }
     }
 
     tabs.forEach((tab) => {
@@ -4727,6 +4766,25 @@
       } catch (_) {}
     }
 
+    // Variante de apiPut qui retourne { ok, data, status, errorMsg } — gère les 409 (BR19)
+    async function apiPutWithError(path, body) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return { ok: false, status: 0, errorMsg: "Non authentifié" };
+      try {
+        const res = await fetch(`${API_URL}${path}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) return { ok: true, data: data.data, status: res.status };
+        const errorMsg = data.message || data.error || JSON.stringify(data);
+        return { ok: false, status: res.status, errorMsg };
+      } catch (e) {
+        return { ok: false, status: 0, errorMsg: String(e) };
+      }
+    }
+
     // Variante de apiPost qui retourne { ok, data, status, errorMsg } pour les erreurs 409 (BR19)
     async function apiPostWithError(path, body) {
       const token = localStorage.getItem("locacar-jwt");
@@ -4824,6 +4882,8 @@
         amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
         amountTtc: l.amount_ttc || 0, amountTnd: l.amount_tnd || 0,
         status: l.status || "active",
+        actualEndDate: l.actual_end_date || null,
+        reservationId: l.reservation_id || null,
       }));
 
       if (invoices) state.invoices = invoices.map(i => ({
@@ -5114,6 +5174,50 @@
       });
     }
 
+    function populateInvoiceLinesFromContract(contractId) {
+      const contract = state.contracts.find(c => c.id === contractId);
+      if (!contract) { resetInvoiceLinesForm(); return; }
+      // Pré-remplir client et libellé
+      byId("invoiceCustomer").value = contract.customerId || "";
+      byId("invoiceLabel").value = `Facture – ${contractId}`;
+      // Lignes depuis contract_lines actives
+      const contractLines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status === "active");
+      const tbody = byId("invoiceLinesBody");
+      tbody.innerHTML = "";
+      if (contractLines.length === 0) { addInvoiceLineRow(); return; }
+      contractLines.forEach(cl => {
+        const tr = document.createElement("tr");
+        tr.className = "invoice-line-row";
+        tr.dataset.contractLineId = cl.id;
+        tr.innerHTML = `
+          <td><select class="ilContract"></select></td>
+          <td><input type="date" class="ilPeriodStart" value="${cl.periodStart || today}" /></td>
+          <td><input type="number" min="0" class="ilDays" value="${cl.days || 1}" style="width:70px;" /></td>
+          <td><input type="number" min="0" class="ilAmountHt" value="${cl.amountHt || 0}" style="width:90px;" /></td>
+          <td><button type="button" class="removeLineBtn" title="Supprimer">&times;</button></td>
+        `;
+        tbody.appendChild(tr);
+        renderInvoiceLineContractOptions(tr.querySelector(".ilContract"), contract.customerId);
+        tr.querySelector(".ilContract").value = contractId;
+        tr.querySelector(".removeLineBtn").addEventListener("click", () => {
+          if (tbody.querySelectorAll(".invoice-line-row").length > 1) tr.remove();
+        });
+      });
+    }
+
+    if (byId("invoiceContract")) {
+      byId("invoiceContract").addEventListener("change", () => {
+        const contractId = byId("invoiceContract").value;
+        if (contractId) {
+          populateInvoiceLinesFromContract(contractId);
+        } else {
+          byId("invoiceCustomer").value = "";
+          byId("invoiceLabel").value = "Facture manuelle";
+          resetInvoiceLinesForm();
+        }
+      });
+    }
+
     if (byId("addInvoiceLineBtn")) {
       byId("addInvoiceLineBtn").addEventListener("click", () => {
         addInvoiceLineRow();
@@ -5145,6 +5249,7 @@
         const lines = [];
         for (const row of lineRows) {
           const contractId = row.querySelector(".ilContract").value || null;
+          const contractLineId = row.dataset.contractLineId || null;
           const periodStart = row.querySelector(".ilPeriodStart").value || today;
           const days = Number(row.querySelector(".ilDays").value || 0);
           const amountOriginal = Number(row.querySelector(".ilAmountHt").value || 0);
@@ -5153,13 +5258,17 @@
             return;
           }
           const contract = state.contracts.find((c) => c.id === contractId);
-          const car = contract ? state.cars.find((c) => c.id === contract.carId) : null;
+          // Récupérer la plaque depuis la ligne de contrat si disponible, sinon depuis le contrat
+          const contractLine = contractLineId ? (state.contractLines || []).find(l => l.id === contractLineId) : null;
+          const carPlate = contractLine ? contractLine.carPlate : (contract ? contract.carPlate : "");
+          const car = carPlate ? state.cars.find(c => c.plate === carPlate) : null;
           const amountHt = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
           const lineBreakdown = computeLineBreakdown(amountHt, days);
           const periodEnd = addDaysToIsoDate(periodStart, days);
           lines.push({
             contractId,
-            carPlate: contract ? contract.carPlate : "",
+            contractLineId,
+            carPlate,
             designation: car ? car.model || "" : "",
             amountOriginal,
             currency,
@@ -6175,13 +6284,15 @@
           form.style.display = form.style.display === "none" ? "block" : "none";
           if (form.style.display === "block") {
             renderInvoiceFormOptions();
+            if (byId("invoiceContract")) byId("invoiceContract").value = "";
             byId("invoiceCustomer").value = "";
             byId("invoiceLabel").value = "Facture manuelle";
             byId("invoiceCurrency").value = "TND";
             byId("invoiceDueDate").value = addDaysToIsoDate(today, 7);
             if (byId("invoiceLinesDailyTaxLabel")) byId("invoiceLinesDailyTaxLabel").textContent = Number(state.settings.dailyTaxTnd || 0);
             resetInvoiceLinesForm();
-            byId("invoiceCustomer").focus();
+            if (byId("invoiceContract")) byId("invoiceContract").focus();
+            else byId("invoiceCustomer").focus();
           }
         }
       });
@@ -9687,9 +9798,12 @@
       state.contracts
         .filter((c) => !customerId || c.customerId === customerId)
         .forEach((c) => {
+          const lineCount = (state.contractLines || []).filter(l => l.contractId === c.id && l.status === "active").length;
           const opt = document.createElement("option");
           opt.value = c.id;
-          opt.textContent = `${c.id} - ${c.customerName} (${c.carPlate})`;
+          opt.textContent = lineCount > 0
+            ? `${c.id} — ${c.customerName} (${lineCount} ligne${lineCount !== 1 ? "s" : ""})`
+            : `${c.id} — ${c.customerName}${c.carPlate ? " (" + c.carPlate + ")" : ""}`;
           selectEl.appendChild(opt);
         });
       if (prevValue && Array.from(selectEl.options).some((o) => o.value === prevValue)) {
@@ -9745,6 +9859,22 @@
         customerSelect.appendChild(opt);
       });
 
+      // Peupler le select "Contrat" — contrats actifs triés par date desc
+      const contractSelect = byId("invoiceContract");
+      if (contractSelect) {
+        contractSelect.innerHTML = '<option value="">— Facture manuelle (sans contrat) —</option>';
+        [...state.contracts]
+          .filter(c => c.status === "active" || c.status === "brouillon")
+          .sort((a, b) => (b.contractDate || "").localeCompare(a.contractDate || ""))
+          .forEach(c => {
+            const lineCount = (state.contractLines || []).filter(l => l.contractId === c.id && l.status === "active").length;
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = `${c.id} — ${c.customerName} (${lineCount} ligne${lineCount !== 1 ? "s" : ""})`;
+            contractSelect.appendChild(opt);
+          });
+      }
+
       const ribSelect = byId("invoiceRib");
       if (ribSelect) {
         ribSelect.innerHTML = "";
@@ -9767,7 +9897,6 @@
       { key: "customerName" },
       { key: "lignes", sortType: "number", accessor: (c) => (state.contractLines || []).filter(l => l.contractId === c.id && l.status !== "annule").length },
       { key: "totalTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).totalTnd },
-      { key: "dueTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).dueTnd },
       { key: "status", filterType: "select", options: ["actif", "active", "termine", "annule", "brouillon"] },
     ];
 
@@ -9804,7 +9933,6 @@
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
           <td><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
           <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${totals.dueTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${safe(contract.status)}</td>
         `;
         tbody.appendChild(tr);
@@ -9884,27 +10012,415 @@
       byId("ieWords").textContent = `Arretee la presente facture a la somme de : ${amountToFrenchWords(breakdown.amountTtc)}.`;
     }
 
+    // ============================================================
+    //  INVOICE DETAIL MODAL — entete + lignes inline (nouveau pattern)
+    // ============================================================
+
+    function renderInvoiceDetailHeader(invoiceId, editMode) {
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice) return;
+      const hdr = byId("ieHeader");
+      if (!hdr) return;
+      const editBtn = byId("ieEditHeaderBtn");
+      const cancelBtn = byId("ieCancelEditBtn");
+
+      if (!editMode) {
+        const balance = Number(invoice.dueAmountTnd || 0);
+        const statusLabel = { en_attente: "En attente", non_payee: "Non payee", payee: "Payee", partiel: "Partiellement payee" }[invoice.status] || invoice.status;
+        hdr.innerHTML = `
+          <div><span class="label-small">Client</span><div style="font-weight:600;">${safe(invoice.customerName || "-")}</div></div>
+          <div><span class="label-small">Contrat</span><div>${safe(invoice.contractId || "-")}</div></div>
+          <div><span class="label-small">Libelle</span><div>${safe(invoice.label || "-")}</div></div>
+          <div><span class="label-small">Echeance</span><div>${safe(invoice.dueDate || "-")}</div></div>
+          <div><span class="label-small">Statut</span><div>${statusLabel}</div></div>
+          <div><span class="label-small">Total HT</span><div style="font-weight:600;">${formatTnd(invoice.amountHt || 0)}</div></div>
+          <div><span class="label-small">Total TTC</span><div style="font-weight:700;color:var(--primary);">${formatTnd(invoice.amountTnd || 0)}</div></div>
+          <div><span class="label-small">Regle</span><div style="color:#166534;">${formatTnd(invoice.paidAmountTnd || 0)}</div></div>
+          <div><span class="label-small">Solde du</span><div style="font-weight:700;color:${balance > 0 ? "#c53030" : "#166534"};">${formatTnd(balance)}</div></div>
+          <div><span class="label-small">RIB</span><div>${safe(invoice.ribLabel || invoice.rib || "-")}</div></div>
+        `;
+        editBtn.textContent = "✏ Modifier entete";
+        editBtn.onclick = () => renderInvoiceDetailHeader(invoiceId, true);
+        cancelBtn.style.display = "none";
+      } else {
+        const ribOpts = [
+          { value: state.settings.companyRib || "", label: `${state.settings.companyRibLabel || "RIB"} - ${state.settings.companyRib || ""}` },
+          ...(state.settings.companyRib2 ? [{ value: state.settings.companyRib2, label: `${state.settings.companyRib2Label || "RIB 2"} - ${state.settings.companyRib2}` }] : []),
+        ];
+        const ribSelHtml = ribOpts.map(o => `<option value="${safe(o.value)}"${invoice.rib === o.value ? " selected" : ""}>${safe(o.label)}</option>`).join("");
+        hdr.innerHTML = `
+          <div><span class="label-small">Client</span><div style="color:var(--muted);">${safe(invoice.customerName || "-")}</div></div>
+          <div><span class="label-small">Contrat</span><div style="color:var(--muted);">${safe(invoice.contractId || "-")}</div></div>
+          <div><span class="label-small">Libelle</span><input id="ieELabel" style="width:100%;" value="${safe(invoice.label || "")}" /></div>
+          <div><span class="label-small">Echeance</span><input id="ieEDueDate" type="date" style="width:100%;" value="${safe(invoice.dueDate || "")}" /></div>
+          <div><span class="label-small">Statut</span>
+            <select id="ieEStatus" style="width:100%;">
+              <option value="en_attente"${invoice.status === "en_attente" ? " selected" : ""}>En attente</option>
+              <option value="non_payee"${invoice.status === "non_payee" ? " selected" : ""}>Non payee</option>
+              <option value="payee"${invoice.status === "payee" ? " selected" : ""}>Payee</option>
+              <option value="partiel"${invoice.status === "partiel" ? " selected" : ""}>Partiellement payee</option>
+            </select>
+          </div>
+          <div style="grid-column:span 2;"><span class="label-small">RIB</span><select id="ieERib" style="width:100%;">${ribSelHtml}</select></div>
+          <div id="ieHdrSaveStatus" style="grid-column:span 3;font-size:12px;padding-top:4px;"></div>
+        `;
+        editBtn.textContent = "✓ Enregistrer";
+        editBtn.onclick = async () => {
+          const label = byId("ieELabel").value.trim();
+          const dueDate = byId("ieEDueDate").value;
+          const status = byId("ieEStatus").value;
+          const ribVal = byId("ieERib").value;
+          const ribOpt = ribOpts.find(o => o.value === ribVal);
+          const ribLabel = ribOpt ? ribOpt.label.split(" - ")[0] : "";
+          const st = byId("ieHdrSaveStatus");
+          st.textContent = "Enregistrement..."; st.style.color = "#0369a1";
+          const res = await apiPut(`/invoices/${invoiceId}`, { label, due_date: dueDate, status, rib: ribVal, rib_label: ribLabel });
+          if (res) {
+            const idx = state.invoices.findIndex(i => String(i.id) === String(invoiceId));
+            if (idx >= 0) Object.assign(state.invoices[idx], { label, dueDate, status, rib: ribVal, ribLabel });
+            renderInvoiceDetailHeader(invoiceId, false);
+            renderInvoices();
+          } else {
+            st.textContent = "Erreur lors de l'enregistrement."; st.style.color = "#c53030";
+          }
+        };
+        cancelBtn.style.display = "";
+        cancelBtn.onclick = () => renderInvoiceDetailHeader(invoiceId, false);
+      }
+    }
+
+    function renderInvoiceDetailLines(invoiceId) {
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice) return;
+      const tbody = byId("ieLinesBody");
+      const tfoot = byId("ieLinesFoot");
+      const emptyMsg = byId("ieEmptyMsg");
+      if (!tbody) return;
+
+      const inlineRow = tbody.querySelector(".inline-new-line");
+      tbody.innerHTML = "";
+      const lines = invoice.lines || [];
+
+      emptyMsg && (emptyMsg.style.display = (lines.length === 0 && !inlineRow) ? "block" : "none");
+
+      lines.forEach((line, idx) => {
+        const tr = document.createElement("tr");
+        tr.dataset.lineIdx = idx;
+        tr.innerHTML = `
+          <td style="padding:6px 8px;">${safe(line.contractId || "-")} &mdash; ${safe(line.carPlate || "-")} <span style="color:var(--muted);">${safe(line.designation || "")}</span></td>
+          <td style="padding:6px 8px;">${safe(line.periodStart || "-")}</td>
+          <td style="padding:6px 8px;text-align:right;">${line.days || 0}</td>
+          <td style="padding:6px 8px;text-align:right;">${formatTnd(line.amountHt || 0)}</td>
+          <td style="padding:6px 8px;text-align:right;">${formatTnd(line.vatAmount || 0)}</td>
+          <td style="padding:6px 8px;text-align:right;">${formatTnd(line.dailyTaxAmount || 0)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:600;">${formatTnd(line.lineTtc || 0)}</td>
+          <td style="padding:6px 4px;text-align:center;white-space:nowrap;">
+            <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;"
+              onclick="editInvoiceDetailLine('${safe(String(invoiceId))}', ${idx})">&#x270E;</button>
+            <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;color:#c53030;"
+              onclick="deleteInvoiceDetailLine('${safe(String(invoiceId))}', ${idx})">&#x2715;</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      if (inlineRow) tbody.appendChild(inlineRow);
+
+      const totalHt = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
+      const totalVat = lines.reduce((s, l) => s + (l.vatAmount || 0), 0);
+      const totalTax = lines.reduce((s, l) => s + (l.dailyTaxAmount || 0), 0);
+      const stamp = Number(invoice.stampDutyAmount || 0);
+      const totalTtc = totalHt + totalVat + totalTax + stamp;
+      if (tfoot) tfoot.innerHTML = `
+        <tr>
+          <td colspan="3" style="padding:6px 8px;text-align:right;font-size:12px;color:var(--muted);">Timbre : ${formatTnd(stamp)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;">${formatTnd(totalHt)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;">${formatTnd(totalVat)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;">${formatTnd(totalTax)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--primary);">${formatTnd(totalTtc)}</td>
+          <td></td>
+        </tr>
+      `;
+    }
+
+    window.editInvoiceDetailLine = function(invoiceId, lineIdx) {
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice || !invoice.lines || !invoice.lines[lineIdx]) return;
+      const tbody = byId("ieLinesBody");
+      const tr = tbody ? tbody.querySelector(`tr[data-line-idx="${lineIdx}"]`) : null;
+      if (!tr) return;
+      const line = invoice.lines[lineIdx];
+
+      const contractOpts = state.contracts
+        .map(c => `<option value="${safe(c.id)}"${String(c.id) === String(line.contractId) ? " selected" : ""}>${safe(c.id)} &mdash; ${safe(c.customerName)}</option>`).join("");
+
+      tr.style.background = "#fffbea";
+      tr.innerHTML = `
+        <td style="padding:4px 6px;" colspan="2">
+          <select class="ilContractSel" style="width:100%;font-size:12px;">
+            <option value="">— Contrat —</option>${contractOpts}
+          </select>
+          <input class="ilPeriodStart" type="date" style="width:100%;margin-top:3px;font-size:12px;" value="${safe(line.periodStart || "")}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilDays" type="number" min="1" step="1" style="width:60px;font-size:12px;" value="${line.days || 0}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilAmountHt" type="number" step="0.001" style="width:80px;font-size:12px;" value="${Number(line.amountHt || 0).toFixed(3)}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilVat" type="number" step="0.001" style="width:70px;font-size:12px;background:#f8faff;" readonly value="${Number(line.vatAmount || 0).toFixed(3)}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilTax" type="number" step="0.001" style="width:70px;font-size:12px;background:#f8faff;" readonly value="${Number(line.dailyTaxAmount || 0).toFixed(3)}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilTtc" type="number" step="0.001" style="width:80px;font-size:12px;" value="${Number(line.lineTtc || 0).toFixed(3)}" />
+        </td>
+        <td style="padding:4px 6px;white-space:nowrap;">
+          <button type="button" style="font-size:11px;padding:3px 8px;"
+            onclick="saveInvoiceLineEdit('${safe(String(invoiceId))}', ${lineIdx}, this.closest('tr'))">&#x2713;</button>
+          <button type="button" class="secondary" style="font-size:11px;padding:3px 8px;"
+            onclick="renderInvoiceDetailLines('${safe(String(invoiceId))}')">&#x2715;</button>
+        </td>
+      `;
+      tr.dataset.lineIdx = lineIdx;
+
+      const recompute = () => {
+        const ht   = Number(tr.querySelector(".ilAmountHt").value || 0);
+        const days = Number(tr.querySelector(".ilDays").value || 0);
+        const bd   = computeLineBreakdown(ht, days);
+        tr.querySelector(".ilVat").value = Number(bd.vatAmount.toFixed(3));
+        tr.querySelector(".ilTax").value = Number(bd.dailyTaxAmount.toFixed(3));
+        tr.querySelector(".ilTtc").value = Number(bd.lineTtc.toFixed(3));
+      };
+      const recomputeFromTtc = () => {
+        const ttc  = Number(tr.querySelector(".ilTtc").value || 0);
+        const days = Number(tr.querySelector(".ilDays").value || 0);
+        const vatRate  = Number(state.settings.vatRate || 0);
+        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+        const taxTotal = days * dailyTax;
+        const ht  = (ttc - taxTotal) / (1 + vatRate / 100);
+        const vat = ht * vatRate / 100;
+        tr.querySelector(".ilAmountHt").value = Number(ht.toFixed(3));
+        tr.querySelector(".ilVat").value      = Number(vat.toFixed(3));
+        tr.querySelector(".ilTax").value      = Number(taxTotal.toFixed(3));
+      };
+      tr.querySelector(".ilAmountHt").oninput = recompute;
+      tr.querySelector(".ilDays").oninput      = recompute;
+      tr.querySelector(".ilTtc").oninput       = recomputeFromTtc;
+    };
+
+    window.saveInvoiceLineEdit = async function(invoiceId, lineIdx, tr) {
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice || !invoice.lines || !invoice.lines[lineIdx]) return;
+      const contractId  = tr.querySelector(".ilContractSel").value || null;
+      const periodStart = tr.querySelector(".ilPeriodStart").value;
+      const days        = Number(tr.querySelector(".ilDays").value || 0);
+      const amountHt    = Number(tr.querySelector(".ilAmountHt").value || 0);
+      if (!periodStart || days < 1 || amountHt <= 0) { alert("Date de début, jours et montant HT requis."); return; }
+      const contract = contractId ? state.contracts.find(c => c.id === contractId) : null;
+      const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
+      const bd       = computeLineBreakdown(amountHt, days);
+      const periodEnd = addDaysToIsoDate(periodStart, days);
+      invoice.lines[lineIdx] = {
+        contractId: contractId || null,
+        carPlate:    contract ? (contract.carPlate || "") : "",
+        designation: car      ? (car.model || "")        : "",
+        amountOriginal: amountHt, currency: "TND",
+        amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
+        days, periodStart, periodEnd, lineTtc: bd.lineTtc,
+      };
+      await saveInvoiceLines(invoice);
+      renderInvoiceDetailLines(invoiceId);
+      renderInvoiceDetailHeader(invoiceId, false);
+      renderInvoices();
+    };
+
+    window.deleteInvoiceDetailLine = async function(invoiceId, lineIdx) {
+      if (!confirm("Supprimer cette ligne de facture ?")) return;
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice) return;
+      invoice.lines = (invoice.lines || []).filter((_, i) => i !== lineIdx);
+      await saveInvoiceLines(invoice);
+      renderInvoiceDetailHeader(invoiceId, false);
+      renderInvoiceDetailLines(invoiceId);
+      renderInvoices();
+    };
+
+    async function saveInvoiceLines(invoice) {
+      const lines = invoice.lines || [];
+      const totalHt  = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
+      const totalVat = lines.reduce((s, l) => s + (l.vatAmount || 0), 0);
+      const totalTax = lines.reduce((s, l) => s + (l.dailyTaxAmount || 0), 0);
+      const stamp    = Number(invoice.stampDutyAmount || state.settings.stampDutyTnd || 0);
+      const totalDays = lines.reduce((s, l) => s + (l.days || 0), 0);
+      const totalTtc  = totalHt + totalVat + totalTax + stamp;
+      const periodStart = lines.reduce((mn, l) => (!mn || (l.periodStart && l.periodStart < mn) ? l.periodStart : mn), "");
+      const periodEnd   = lines.reduce((mx, l) => (!mx || (l.periodEnd && l.periodEnd > mx) ? l.periodEnd : mx), "");
+      invoice.amountHt = totalHt; invoice.vatAmount = totalVat;
+      invoice.dailyTaxAmount = totalTax; invoice.stampDutyAmount = stamp;
+      invoice.amountTnd = totalTtc;
+      invoice.dueAmountTnd = Math.max(0, totalTtc - Number(invoice.paidAmountTnd || 0));
+      invoice.rentalDays = totalDays; invoice.periodStart = periodStart; invoice.periodEnd = periodEnd;
+      await apiPut(`/invoices/${invoice.id}`, {
+        lines: invoice.lines,
+        amount_ht: totalHt, vat_amount: totalVat, daily_tax_amount: totalTax,
+        stamp_duty_amount: stamp, amount_tnd: totalTtc,
+        due_amount_tnd: invoice.dueAmountTnd, rental_days: totalDays,
+        period_start: periodStart || null, period_end: periodEnd || null,
+      });
+    }
+
+    function appendInlineInvoiceLineRow(invoiceId) {
+      const tbody = byId("ieLinesBody");
+      if (!tbody || tbody.querySelector(".inline-new-line")) return;
+      byId("ieAddLineBtn").textContent = "▲ Masquer";
+      const emptyMsg = byId("ieEmptyMsg");
+      if (emptyMsg) emptyMsg.style.display = "none";
+
+      const tr = document.createElement("tr");
+      tr.className = "inline-new-line";
+      tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
+
+      const contractOpts = state.contracts
+        .map(c => `<option value="${safe(c.id)}">${safe(c.id)} &mdash; ${safe(c.customerName)}</option>`).join("");
+
+      tr.innerHTML = `
+        <td style="padding:4px 6px;" colspan="2">
+          <select class="ilContractSel" style="width:100%;font-size:12px;">
+            <option value="">— Contrat —</option>${contractOpts}
+          </select>
+          <input class="ilPeriodStart" type="date" style="width:100%;margin-top:3px;font-size:12px;" value="${today}" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilDays" type="number" min="1" step="1" placeholder="Jours" style="width:60px;font-size:12px;" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilAmountHt" type="number" step="0.001" placeholder="HT" style="width:80px;font-size:12px;" />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilVat" type="number" step="0.001" placeholder="TVA" style="width:70px;font-size:12px;background:#f8faff;" readonly />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilTax" type="number" step="0.001" placeholder="Taxe" style="width:70px;font-size:12px;background:#f8faff;" readonly />
+        </td>
+        <td style="padding:4px 6px;">
+          <input class="ilTtc" type="number" step="0.001" placeholder="TTC" style="width:80px;font-size:12px;" />
+        </td>
+        <td style="padding:4px 6px;white-space:nowrap;">
+          <button type="button" style="font-size:11px;padding:3px 8px;"
+            onclick="submitInlineInvoiceLine('${safe(String(invoiceId))}', this.closest('tr'))">&#x2713;</button>
+          <button type="button" class="secondary" style="font-size:11px;padding:3px 8px;"
+            onclick="this.closest('tr').remove(); document.getElementById('ieAddLineBtn').textContent = '+ Ajouter une ligne';">&#x2715;</button>
+          <div class="il-err" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
+        </td>
+      `;
+
+      const recompute = () => {
+        const ht   = Number(tr.querySelector(".ilAmountHt").value || 0);
+        const days = Number(tr.querySelector(".ilDays").value || 0);
+        const bd   = computeLineBreakdown(ht, days);
+        tr.querySelector(".ilVat").value = bd.vatAmount   ? Number(bd.vatAmount.toFixed(3))   : "";
+        tr.querySelector(".ilTax").value = bd.dailyTaxAmount ? Number(bd.dailyTaxAmount.toFixed(3)) : "";
+        tr.querySelector(".ilTtc").value = bd.lineTtc     ? Number(bd.lineTtc.toFixed(3))     : "";
+      };
+      const recomputeFromTtc = () => {
+        const ttc  = Number(tr.querySelector(".ilTtc").value || 0);
+        const days = Number(tr.querySelector(".ilDays").value || 0);
+        const vatRate  = Number(state.settings.vatRate || 0);
+        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+        const taxTotal = days * dailyTax;
+        const ht  = (ttc - taxTotal) / (1 + vatRate / 100);
+        const vat = ht * vatRate / 100;
+        tr.querySelector(".ilAmountHt").value = Number(ht.toFixed(3));
+        tr.querySelector(".ilVat").value      = Number(vat.toFixed(3));
+        tr.querySelector(".ilTax").value      = Number(taxTotal.toFixed(3));
+      };
+
+      tr.querySelector(".ilAmountHt").oninput = recompute;
+      tr.querySelector(".ilDays").oninput      = recompute;
+      tr.querySelector(".ilTtc").oninput       = recomputeFromTtc;
+
+      tbody.appendChild(tr);
+    }
+
+    window.submitInlineInvoiceLine = async function(invoiceId, tr) {
+      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+      if (!invoice) return;
+      const errDiv     = tr.querySelector(".il-err");
+      const contractId = tr.querySelector(".ilContractSel").value || null;
+      const periodStart = tr.querySelector(".ilPeriodStart").value;
+      const days       = Number(tr.querySelector(".ilDays").value || 0);
+      const amountHt   = Number(tr.querySelector(".ilAmountHt").value || 0);
+
+      if (!periodStart || days < 1 || amountHt <= 0) {
+        errDiv.style.display = "block";
+        errDiv.textContent = "Date de debut, jours et montant HT requis.";
+        return;
+      }
+
+      const contract = contractId ? state.contracts.find(c => c.id === contractId) : null;
+      const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
+      const bd       = computeLineBreakdown(amountHt, days);
+      const periodEnd = addDaysToIsoDate(periodStart, days);
+
+      if (!invoice.lines) invoice.lines = [];
+      invoice.lines.push({
+        contractId: contractId || null,
+        carPlate:    contract ? (contract.carPlate || "") : "",
+        designation: car      ? (car.model || "")        : "",
+        amountOriginal: amountHt, currency: "TND",
+        amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
+        days, periodStart, periodEnd, lineTtc: bd.lineTtc,
+      });
+
+      await saveInvoiceLines(invoice);
+      tr.remove();
+      byId("ieAddLineBtn").textContent = "+ Ajouter une ligne";
+      renderInvoiceDetailLines(invoiceId);
+      renderInvoiceDetailHeader(invoiceId, false);
+      renderInvoices();
+    };
+
     window.openInvoiceEditModal = (invoiceId) => {
       const invoice = state.invoices.find((i) => String(i.id) === String(invoiceId));
       if (!invoice) return;
       _currentEditInvoiceId = invoice.id;
-      const { contract, car, customer } = getInvoiceContext(invoice);
-      const days = Number(invoice.rentalDays || 0);
+
+      // Si la facture n'a pas encore de lignes (format ancien : données scalaires),
+      // synthétiser une ligne initiale depuis les champs scalaires pour affichage.
+      // Cette ligne sera persistée en JSONB lors de la prochaine modification.
+      if ((!invoice.lines || invoice.lines.length === 0) && Number(invoice.amountHt || 0) > 0) {
+        const contract = invoice.contractId
+          ? state.contracts.find(c => String(c.id) === String(invoice.contractId)) : null;
+        const car = contract && contract.carId
+          ? state.cars.find(c => String(c.id) === String(contract.carId)) : null;
+        const lineTtc = Number(invoice.amountHt || 0)
+                      + Number(invoice.vatAmount || 0)
+                      + Number(invoice.dailyTaxAmount || 0);
+        invoice.lines = [{
+          contractId:    invoice.contractId || null,
+          carPlate:      car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
+          designation:   car ? (car.model || "") : "",
+          amountOriginal: Number(invoice.amountHt || 0),
+          currency:      "TND",
+          amountHt:      Number(invoice.amountHt || 0),
+          vatAmount:     Number(invoice.vatAmount || 0),
+          dailyTaxAmount: Number(invoice.dailyTaxAmount || 0),
+          days:          Number(invoice.rentalDays || 0),
+          periodStart:   invoice.periodStart || "",
+          periodEnd:     invoice.periodEnd || "",
+          lineTtc,
+        }];
+      }
 
       byId("ieNumber").textContent = invoice.id;
-      byId("ieInfo").innerHTML = `
-        Contrat : <strong>${safe(invoice.contractId || "-")}</strong> &middot;
-        Client : <strong>${safe(invoice.customerName || (customer && customer.name) || "-")}</strong> &middot;
-        Vehicule : <strong>${safe(car ? `${car.plate || ""}${car.model ? " · " + car.model : ""}` : "-")}</strong><br/>
-        Periode : <strong>${safe(invoice.periodStart || "-")}</strong> au <strong>${safe(invoice.periodEnd || "-")}</strong> (${days} jour${days > 1 ? "s" : ""})
-      `;
+      byId("ieAddLineBtn").textContent = "+ Ajouter une ligne";
+      byId("ieAddLineBtn").onclick = () => appendInlineInvoiceLineRow(invoice.id);
 
-      const amountTtcFallback = Number(invoice.amountTnd || invoice.dueAmountTnd || 0);
-      const breakdown = invoice.amountHt
-        ? computeTtcFromHt(Number(invoice.amountHt), days)
-        : computeHtFromTtc(amountTtcFallback, days);
-      renderInvoiceEditBreakdown(breakdown, days);
-      const s = byId("ieStatus"); s.style.display = "none";
+      renderInvoiceDetailHeader(invoice.id, false);
+      renderInvoiceDetailLines(invoice.id);
       byId("invoiceEditModal").style.display = "flex";
     };
 
@@ -10044,12 +10560,12 @@
       { key: "id" },
       { key: "contractId" },
       { key: "customerName" },
+      { key: "lignes", sortType: "number", accessor: (i) => (i.lines || []).length },
       { key: "dueDate", sortType: "date" },
       { key: "amountTnd", sortType: "number" },
       { key: "paidAmountTnd", sortType: "number" },
       { key: "dueAmountTnd", sortType: "number" },
       { key: "status", filterType: "select", options: ["paye", "partiel", "impaye"], accessor: (i) => getInvoiceStatusInfo(i).label },
-      { key: "actions", sortable: false, filterable: false },
     ];
 
     function renderInvoices() {
@@ -10071,6 +10587,7 @@
         const statusInfo = getInvoiceStatusInfo(invoice);
         const statusClass = statusInfo.css;
         const statusLabel = statusInfo.label;
+        const lineCount = (invoice.lines || []).length || (Number(invoice.amountHt || 0) > 0 ? 1 : 0);
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         if (selectedRows.invoices === String(invoice.id)) tr.classList.add("selected");
@@ -10078,29 +10595,28 @@
           selectRow("invoices", invoice.id);
           renderInvoices();
         });
-        tr.addEventListener("dblclick", () => openRecordEditor("invoices", invoice.id));
+        tr.addEventListener("dblclick", () => openInvoiceEditModal(invoice.id));
         tr.innerHTML = `
           <td>
-            <a href="#" data-open-invoice="${safe(invoice.id)}">${safe(invoice.id)}</a>
-            <div class="small">${safe(invoice.label || "Facture")}</div>
+            <a href="#" class="xref" data-open-invoice="${safe(invoice.id)}">${safe(invoice.id)}</a>
+            <div class="small">${safe(invoice.label || "")}</div>
           </td>
           <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
+          <td><a href="#" class="badge-lignes" data-open-invoice="${safe(invoice.id)}">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
           <td>${safe(invoice.dueDate || "-")}</td>
           <td>${Number(invoice.amountTnd).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td><span class="pill ${statusClass}">${statusLabel}</span></td>
-          <td><button class="secondary" style="font-size:12px;padding:4px 10px;" data-edit-invoice="${safe(invoice.id)}">Facture</button></td>
         `;
         tbody.appendChild(tr);
       });
-      tbody.querySelectorAll("[data-open-invoice]").forEach((link) => {
-        link.addEventListener("click", (e) => {
+      tbody.querySelectorAll("[data-open-invoice]").forEach((el) => {
+        el.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const id = e.target.getAttribute("data-open-invoice");
-          openRecordEditor("invoices", id);
+          openInvoiceEditModal(el.getAttribute("data-open-invoice"));
         });
       });
       tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
@@ -10108,13 +10624,6 @@
           e.preventDefault();
           e.stopPropagation();
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
-        });
-      });
-      tbody.querySelectorAll("[data-edit-invoice]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openInvoiceEditModal(btn.getAttribute("data-edit-invoice"));
         });
       });
     }
@@ -11266,16 +11775,14 @@
     }
 
     function getContractTotals(contractId) {
-      const rows = state.invoices.filter((i) => i.contractId === contractId);
-      return rows.reduce(
-        (acc, i) => {
-          acc.totalTnd += Number(i.amountTnd || 0);
-          acc.paidTnd += Number(i.paidAmountTnd || 0);
-          acc.dueTnd += Number(i.dueAmountTnd || 0);
-          return acc;
-        },
-        { totalTnd: 0, paidTnd: 0, dueTnd: 0 }
-      );
+      // Total contracté : somme des lignes actives (pas des factures)
+      const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule");
+      const totalTnd = lines.reduce((s, l) => s + Number(l.amountTnd || l.amountTtc || 0), 0);
+      // Reste dû : somme des factures impayées liées au contrat
+      const invoices = state.invoices.filter(i => i.contractId === contractId);
+      const dueTnd = invoices.reduce((s, i) => s + Number(i.dueAmountTnd || 0), 0);
+      const paidTnd = invoices.reduce((s, i) => s + Number(i.paidAmountTnd || 0), 0);
+      return { totalTnd, paidTnd, dueTnd };
     }
 
     function getEditorFieldConfig(entity, key, currentValue) {
@@ -11489,10 +11996,13 @@
       const cancelBtn = byId("cdlCancelEditBtn");
 
       if (!editMode) {
+        const periodStart = lines.length ? lines.reduce((min, l) => l.periodStart < min ? l.periodStart : min, lines[0].periodStart) : null;
+        const periodEnd   = lines.length ? lines.reduce((max, l) => l.periodEnd   > max ? l.periodEnd   : max, lines[0].periodEnd)   : null;
+        const periodLabel = periodStart ? `${periodStart} → ${periodEnd}` : "—";
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
-          <div><span class="label-small">Date</span><br>${contract.contractDate || "-"}</div>
+          <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
           <div><span class="label-small">Statut</span><br>${safe(contract.status || "-")}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
@@ -11519,7 +12029,7 @@
             </select>
           </div>
           <div>
-            <label class="label-small">Date</label>
+            <label class="label-small">Date signature</label>
             <input id="cdlEDate" type="date" value="${contract.contractDate || ""}" style="width:100%;" />
           </div>
           <div>
@@ -11581,39 +12091,229 @@
       byId("cdlEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
       let sumHt = 0, sumTtc = 0;
       lines.forEach(l => {
-        sumHt += l.amountHt || 0;
-        sumTtc += l.amountTtc || 0;
+        if (l.status !== "annule") { sumHt += l.amountHt || 0; sumTtc += l.amountTtc || 0; }
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
-        const statusBadge = l.status === "annule"
-          ? '<span class="badge-status loue">annulée</span>'
-          : l.status === "brouillon" ? '<span class="badge-status pending">brouillon</span>'
+        tr.dataset.lineId = l.id;
+        const statusBadge = l.status === "annule"   ? '<span class="badge-status loue">annulée</span>'
+          : l.status === "resilie"  ? '<span class="badge-status pending">résiliée</span>'
+          : l.status === "brouillon"? '<span class="badge-status pending">brouillon</span>'
           : '<span class="badge-status dispo">active</span>';
+        const rsvBadge = l.reservationId
+          ? `<a href="#" class="badge-lignes" style="font-size:10px;padding:1px 6px;" data-goto-tab="reservations" data-goto-query="${safe(l.reservationId)}">&#x1F4C5; ${safe(l.reservationId)}</a>`
+          : '<span style="color:var(--muted);font-size:11px;">—</span>';
+        const periodLabel = l.actualEndDate
+          ? `${l.periodStart || "-"} → ${l.periodEnd || "-"}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
+          : `${l.periodStart || "-"} → ${l.periodEnd || "-"}`;
+        const canEdit      = l.status === "active" || l.status === "brouillon";
+        const canTerminate = l.status === "active";
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
-          <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
+          <td style="white-space:nowrap;">${periodLabel}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:right;">${(l.amountHt || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:right;">${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:right;">${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:center;">${statusBadge}</td>
+          <td style="text-align:center;">${rsvBadge}</td>
+          <td class="cl-actions-cell" style="text-align:center;white-space:nowrap;">
+            ${canEdit      ? `<button class="cl-edit-btn secondary" style="padding:2px 6px;font-size:12px;" title="Modifier">✎</button>` : ""}
+            ${canTerminate ? `<button class="cl-terminate-btn secondary" style="padding:2px 6px;font-size:12px;color:#c53030;" title="Résilier">⏹</button>` : ""}
+            <button class="cl-delete-btn secondary" style="padding:2px 6px;font-size:12px;" title="Supprimer">🗑</button>
+          </td>
         `;
         tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", (e) => {
           e.preventDefault(); e.stopPropagation();
+          byId("contractDetailModal").style.display = "none";
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         }));
+        if (canEdit)      tr.querySelector(".cl-edit-btn")     .addEventListener("click", () => editContractLine(contractId, l.id, tr));
+        if (canTerminate) tr.querySelector(".cl-terminate-btn").addEventListener("click", () => terminateContractLine(contractId, l.id, tr));
+        tr.querySelector(".cl-delete-btn").addEventListener("click", () => deleteContractLine(contractId, l.id));
         tbody.appendChild(tr);
       });
       if (inlineRow) tbody.appendChild(inlineRow);
       const tfoot = byId("cdlLinesFoot");
       if (tfoot) {
         tfoot.innerHTML = lines.length
-          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td></tr>`
+          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td></td><td></td></tr>`
           : "";
       }
     }
 
+    // ── Actions sur une ligne existante (édition, résiliation, suppression) ────────
+
+    function editContractLine(contractId, lineId, tr) {
+      const line = (state.contractLines || []).find(l => l.id === lineId);
+      if (!line) return;
+      const carOptions = state.cars.map(c =>
+        `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand || c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
+      ).join("");
+      tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
+      tr.innerHTML = `
+        <td style="padding:4px;"><select id="cleCar" style="width:100%;min-width:100px;font-size:12px;">${carOptions}</select></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <input id="cleStart" type="date" value="${line.periodStart||""}" style="width:105px;font-size:12px;" />
+          → <input id="cleEnd" type="date" value="${line.periodEnd||""}" style="width:105px;font-size:12px;" />
+        </td>
+        <td id="cleDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
+        <td style="padding:4px;"><input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="cleHt" type="number" step="0.01" value="${line.amountHt||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
+        <td colspan="2"></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <button id="cleSaveBtn" style="padding:2px 8px;font-size:13px;">✓</button>
+          <button id="cleCancelBtn" class="secondary" style="padding:2px 7px;font-size:13px;">✗</button>
+          <div id="cleError" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
+        </td>
+      `;
+      const recomputeHt = () => {
+        const { vatAmount, amountTtc } = computeContractLineTtc(Number(tr.querySelector("#cleHt").value || 0));
+        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
+        tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
+      };
+      const recomputeTtc = () => {
+        const { amountHt, vatAmount } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0));
+        tr.querySelector("#cleHt").value = amountHt.toFixed(2);
+        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
+      };
+      const updateDur = () => {
+        const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
+        if (s && e && e >= s) {
+          const { days } = calcLineDuration(s, e);
+          tr.querySelector("#cleDur").textContent = days + "j";
+          const rate = Number(tr.querySelector("#cleRate").value || 0);
+          if (rate > 0) { tr.querySelector("#cleHt").value = (rate * days).toFixed(2); recomputeHt(); }
+        } else { tr.querySelector("#cleDur").textContent = "—"; }
+      };
+      tr.querySelector("#cleHt").oninput    = recomputeHt;
+      tr.querySelector("#cleTtc").oninput   = recomputeTtc;
+      tr.querySelector("#cleStart").oninput = updateDur;
+      tr.querySelector("#cleEnd").oninput   = updateDur;
+      tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
+      tr.querySelector("#cleCancelBtn").onclick = () => renderContractDetailLines(contractId);
+      tr.querySelector("#cleCar").focus();
+    }
+
+    async function saveContractLineEdit(contractId, lineId, tr) {
+      const carId = tr.querySelector("#cleCar").value;
+      const periodStart = tr.querySelector("#cleStart").value;
+      const periodEnd   = tr.querySelector("#cleEnd").value;
+      const rate        = Number(tr.querySelector("#cleRate").value || 0);
+      const amountHt    = Number(tr.querySelector("#cleHt").value || 0);
+      const vatAmount   = Number(tr.querySelector("#cleVat").value || 0);
+      const amountTtc   = Number(tr.querySelector("#cleTtc").value || 0);
+      const errDiv = tr.querySelector("#cleError");
+      errDiv.style.display = "none";
+      if (!carId || !periodStart || !periodEnd) { errDiv.textContent = "Champs requis"; errDiv.style.display = ""; return; }
+      if (amountHt <= 0) { errDiv.textContent = "Montant HT requis (> 0)"; errDiv.style.display = ""; return; }
+      const saveBtn = tr.querySelector("#cleSaveBtn");
+      saveBtn.disabled = true; saveBtn.textContent = "…";
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(periodStart, periodEnd);
+      const result = await apiPutWithError(`/contract-lines/${lineId}`, {
+        car_id: carId, car_plate: car ? car.plate : "",
+        period_start: periodStart, period_end: periodEnd, days, months,
+        rate, amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+      });
+      if (!result.ok) {
+        saveBtn.disabled = false; saveBtn.textContent = "✓";
+        errDiv.textContent = result.status === 409 ? (result.errorMsg || "Chevauchement (BR19)") : `Erreur : ${result.errorMsg}`;
+        errDiv.style.display = "";
+        return;
+      }
+      const idx = (state.contractLines || []).findIndex(l => l.id === lineId);
+      if (idx >= 0) Object.assign(state.contractLines[idx], {
+        carId, carPlate: car ? car.plate : "", periodStart, periodEnd, days, months,
+        rate, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+      });
+      renderContractDetailLines(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContracts();
+    }
+
+    function terminateContractLine(contractId, lineId, tr) {
+      const line = (state.contractLines || []).find(l => l.id === lineId);
+      if (!line) return;
+      const actionsCell = tr.querySelector(".cl-actions-cell");
+      actionsCell.innerHTML = `
+        <span style="font-size:11px;color:var(--muted);margin-right:4px;">Résil. le :</span>
+        <input id="cleTermDate" type="date" value="${line.periodEnd||""}" min="${line.periodStart||""}" max="${line.periodEnd||""}" style="font-size:12px;width:120px;" />
+        <button id="cleTermOk" style="padding:2px 7px;font-size:12px;color:#c53030;margin-left:4px;">✓</button>
+        <button id="cleTermCancel" class="secondary" style="padding:2px 6px;font-size:12px;">✗</button>
+        <div id="cleTermError" style="display:none;color:#c53030;font-size:10px;margin-top:2px;"></div>
+      `;
+      actionsCell.querySelector("#cleTermOk").onclick     = () => submitTerminateContractLine(contractId, lineId, actionsCell);
+      actionsCell.querySelector("#cleTermCancel").onclick = () => renderContractDetailLines(contractId);
+      actionsCell.querySelector("#cleTermDate").focus();
+    }
+
+    async function submitTerminateContractLine(contractId, lineId, actionsCell) {
+      const actualEndDate = actionsCell.querySelector("#cleTermDate").value;
+      const errDiv = actionsCell.querySelector("#cleTermError");
+      errDiv.style.display = "none";
+      if (!actualEndDate) { errDiv.textContent = "Date requise"; errDiv.style.display = ""; return; }
+      const line = (state.contractLines || []).find(l => l.id === lineId);
+      if (!line) return;
+      const today = new Date().toISOString().split("T")[0];
+      if (actualEndDate < today) {
+        if (!confirm(`La date ${actualEndDate} est dans le passé. Confirmer la résiliation rétroactive ?`)) return;
+      }
+      const okBtn = actionsCell.querySelector("#cleTermOk");
+      okBtn.disabled = true; okBtn.textContent = "…";
+      const result = await apiPostWithError(`/contract-lines/${lineId}/terminate`, { actual_end_date: actualEndDate });
+      if (!result.ok) {
+        okBtn.disabled = false; okBtn.textContent = "✓";
+        errDiv.textContent = result.errorMsg || "Erreur";
+        errDiv.style.display = "";
+        return;
+      }
+      const updated = result.data;
+      const idx = (state.contractLines || []).findIndex(l => l.id === lineId);
+      if (idx >= 0) Object.assign(state.contractLines[idx], {
+        status: "resilie", actualEndDate: updated?.actual_end_date || actualEndDate,
+        days: updated?.days || line.days,
+        amountHt: updated?.amount_ht || line.amountHt,
+        vatAmount: updated?.vat_amount || line.vatAmount,
+        amountTtc: updated?.amount_ttc || line.amountTtc,
+        amountTnd: updated?.amount_tnd || line.amountTnd,
+      });
+      // Mettre à jour le statut du contrat si toutes les lignes sont non-actives
+      const contractLines = (state.contractLines || []).filter(l => l.contractId === contractId);
+      if (contractLines.every(l => l.status !== "active")) {
+        const cIdx = (state.contracts || []).findIndex(c => c.id === contractId);
+        if (cIdx >= 0) state.contracts[cIdx].status = "resilie";
+      }
+      renderContractDetailLines(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContracts();
+    }
+
+    async function deleteContractLine(contractId, lineId) {
+      if (!confirm("Supprimer cette ligne ? La réservation liée sera également supprimée.")) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/contract-lines/${lineId}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { alert("Erreur lors de la suppression"); return; }
+      const data = await res.json().catch(() => ({}));
+      // Retirer la ligne du state
+      const idx = (state.contractLines || []).findIndex(l => l.id === lineId);
+      if (idx >= 0) state.contractLines.splice(idx, 1);
+      // Retirer la réservation liée si elle existait
+      if (data.deletedReservationId) {
+        const rIdx = (state.reservations || []).findIndex(r => r.id === data.deletedReservationId);
+        if (rIdx >= 0) state.reservations.splice(rIdx, 1);
+        if (typeof renderReservations === "function") renderReservations();
+      }
+      renderContractDetailLines(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContracts();
+    }
+
+    // ── Nouvelle ligne inline ─────────────────────────────────────────────────────
     // ── Ligne éditable inline dans la grille ─────────────────────────────────────
 
     function appendInlineLineRow(contractId) {
@@ -11657,6 +12357,8 @@
         <td style="padding:6px 4px;text-align:right;">
           <input id="ilAmtTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
         </td>
+        <td></td>
+        <td></td>
         <td style="padding:6px 4px;text-align:center;white-space:nowrap;">
           <button id="ilSaveBtn" style="padding:3px 10px;font-size:13px;" title="Enregistrer">✓</button>
           <button id="ilCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;" title="Annuler">✗</button>
@@ -11761,19 +12463,41 @@
 
       if (!result.ok) {
         saveBtn.disabled = false; saveBtn.textContent = "✓";
-        errDiv.textContent = result.status === 409 ? "Chevauchement (BR19)" : `Erreur : ${result.errorMsg}`;
+        errDiv.textContent = result.status === 409 ? (result.errorMsg || "Chevauchement (BR19)") : `Erreur : ${result.errorMsg}`;
         errDiv.style.display = "";
         tr.style.outline = "2px solid #c53030";
         return;
       }
 
+      // La réponse POST /contract-lines retourne { line, reservation } (BR25)
+      const lineData = result.data?.line || result.data;
+      const rsvData  = result.data?.reservation || null;
+
       state.contractLines.push({
-        id: result.data?.id || uid("CL"),
+        id: lineData?.id || uid("CL"),
         contractId, carId, carPlate: car ? car.plate : "",
         periodStart: startStr, periodEnd: endStr,
         days, months, rate, rateCurrency: "TND",
-        amountHt, vatAmount, amountTtc, amountTnd: amountTtc, status: "active",
+        amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+        status: "active",
+        reservationId: rsvData ? rsvData.id : null,
       });
+
+      // BR25 : intégrer la réservation auto-créée/liée dans state.reservations
+      if (rsvData && rsvData.id) {
+        const existingIdx = state.reservations.findIndex(r => r.id === rsvData.id);
+        const mapped = {
+          id: rsvData.id, carId: rsvData.car_id, carPlate: rsvData.car_plate || "",
+          customerId: rsvData.customer_id, customerName: rsvData.customer_name || "",
+          startDate: rsvData.start_date, endDate: rsvData.end_date,
+          startTime: rsvData.start_time || "09:00", endTime: rsvData.end_time || "18:00",
+          status: rsvData.status || "confirmee", notes: rsvData.notes || "",
+          contractLineId: rsvData.contract_line_id || null,
+        };
+        if (existingIdx >= 0) state.reservations[existingIdx] = mapped;
+        else state.reservations.push(mapped);
+        if (typeof renderReservations === "function") renderReservations();
+      }
 
       tr.remove();
       byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
