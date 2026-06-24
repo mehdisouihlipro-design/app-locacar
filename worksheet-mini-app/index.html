@@ -1489,6 +1489,10 @@
       <input id="contractQuotient" type="hidden" value="0" />
       <select id="contractQuotientCurrency" style="display:none;"><option value="TND">TND</option></select>
 
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:8px;">
+        <input id="contractIsBrouillon" type="checkbox" />
+        Créer en mode <strong>brouillon</strong> (sans réservation automatique — à confirmer plus tard)
+      </label>
       <button id="addContractBtn">Créer contrat</button>
       </div>
 
@@ -2712,11 +2716,13 @@
         <div id="cdlHeader" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;font-size:13px;background:#f8faff;border-radius:8px;padding:12px;margin-bottom:14px;"></div>
 
         <!-- Actions entête -->
-        <div class="actions" style="margin-bottom:12px;">
+        <div class="actions" style="margin-bottom:8px;">
           <button id="cdlEditHeaderBtn" class="secondary">✏ Modifier entête</button>
           <button id="cdlCancelEditBtn" class="secondary" style="display:none;">✗ Annuler</button>
+          <button id="cdlConfirmBtn" style="display:none;background:var(--success,#22c55e);color:#fff;font-weight:600;">✓ Confirmer le contrat</button>
           <button id="cdlAddLineToggleBtn">+ Ajouter une ligne</button>
         </div>
+        <div id="cdlConfirmError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:13px;"></div>
 
         <!-- Grille des lignes -->
         <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Lignes de contrat</h4>
@@ -5271,6 +5277,9 @@
       const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
       let contractId = uid("CTR");
 
+      const isBrouillon = byId("contractIsBrouillon") && byId("contractIsBrouillon").checked;
+      const initialStatus = isBrouillon ? "brouillon" : "active";
+
       const savedContract = await apiPost("/contracts", {
         id: contractId,
         customer_id: customerId,
@@ -5279,7 +5288,7 @@
         type,
         payment_moment: paymentMoment,
         payment_plan: paymentPlan,
-        status: "active",
+        status: initialStatus,
         rate_currency: "TND",
         quotient_currency: "TND",
         days: 0, months: 0, rate: 0, quotient: 0,
@@ -5299,7 +5308,7 @@
         quotient: 0, quotientCurrency: "TND", quotientTnd: 0,
         paymentMoment, paymentPlan,
         totalAmountOriginal: 0, totalAmountTnd: 0,
-        status: "active",
+        status: initialStatus,
       });
 
       renderContracts();
@@ -12680,18 +12689,25 @@
         const periodStart = lines.length ? lines.reduce((min, l) => l.periodStart < min ? l.periodStart : min, lines[0].periodStart) : null;
         const periodEnd   = lines.length ? lines.reduce((max, l) => l.periodEnd   > max ? l.periodEnd   : max, lines[0].periodEnd)   : null;
         const periodLabel = periodStart ? `${periodStart} → ${periodEnd}` : "—";
+        const isBrouillon = contract.status === "brouillon";
+        const statusStyle = isBrouillon ? "color:#d97706;font-weight:600;" : "";
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
           <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
-          <div><span class="label-small">Statut</span><br>${safe(contract.status || "-")}</div>
+          <div><span class="label-small">Statut</span><br><span style="${statusStyle}">${isBrouillon ? "⚠ brouillon" : safe(contract.status || "-")}</span></div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
         `;
         editBtn.textContent = "✏ Modifier entête";
         editBtn.onclick = () => renderContractDetailHeader(contractId, true);
         cancelBtn.style.display = "none";
+        // Bouton confirmer : visible uniquement pour les contrats brouillon
+        const confirmBtn = byId("cdlConfirmBtn");
+        confirmBtn.style.display = isBrouillon ? "" : "none";
+        confirmBtn.onclick = () => confirmContract(contractId);
+        byId("cdlConfirmError").style.display = "none";
       } else {
         const custOpts = state.customers.map(c =>
           `<option value="${safe(c.id)}"${c.id === contract.customerId ? " selected" : ""}>${safe(c.name)}</option>`
@@ -12776,9 +12792,12 @@
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
         tr.dataset.lineId = l.id;
-        const statusBadge = l.status === "annule"   ? '<span class="badge-status loue">annulée</span>'
-          : l.status === "resilie"  ? '<span class="badge-status pending">résiliée</span>'
-          : l.status === "brouillon"? '<span class="badge-status pending">brouillon</span>'
+        const isExpired = l.status === "active" && l.periodEnd && l.periodEnd < today;
+        const displayStatus = isExpired ? "terminee" : l.status;
+        const statusBadge = displayStatus === "annule"   ? '<span class="badge-status loue">annulée</span>'
+          : displayStatus === "resilie"  ? '<span class="badge-status pending">résiliée</span>'
+          : displayStatus === "brouillon"? '<span class="badge-status pending">brouillon</span>'
+          : displayStatus === "terminee" ? '<span class="badge-status loue" style="background:#94a3b8;">terminée</span>'
           : '<span class="badge-status dispo">active</span>';
         const rsvBadge = l.reservationId
           ? `<a href="#" class="badge-lignes" style="font-size:10px;padding:1px 6px;" data-goto-tab="reservations" data-goto-query="${safe(l.reservationId)}">&#x1F4C5; ${safe(l.reservationId)}</a>`
@@ -12786,8 +12805,8 @@
         const periodLabel = l.actualEndDate
           ? `${l.periodStart || "-"} → ${l.periodEnd || "-"}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
           : `${l.periodStart || "-"} → ${l.periodEnd || "-"}`;
-        const canEdit      = l.status === "active" || l.status === "brouillon";
-        const canTerminate = l.status === "active";
+        const canEdit      = displayStatus === "active" || displayStatus === "brouillon";
+        const canTerminate = displayStatus === "active";
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
           <td style="white-space:nowrap;">${periodLabel}</td>
@@ -13134,12 +13153,14 @@
       const saveBtn = byId("ilSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
 
+      const parentContract = state.contracts.find(c => c.id === contractId);
+      const lineStatus = (parentContract && parentContract.status === "brouillon") ? "brouillon" : "active";
       const result = await apiPostWithError("/contract-lines", {
         contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "",
         period_start: startStr, period_end: endStr, days, months,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
-        status: "active",
+        status: lineStatus,
       });
 
       if (!result.ok) {
@@ -13160,7 +13181,7 @@
         periodStart: startStr, periodEnd: endStr,
         days, months, rate, rateCurrency: "TND",
         amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
-        status: "active",
+        status: lineStatus,
         reservationId: rsvData ? rsvData.id : null,
       });
 
@@ -13182,6 +13203,72 @@
 
       tr.remove();
       byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      renderContractDetailLines(contractId);
+      renderContractDetailHeader(contractId, false);
+      renderContracts();
+    }
+
+    // ── Confirmation brouillon → active (BR20 + BR19 + BR25) ────────────────────
+
+    async function confirmContract(contractId) {
+      const confirmBtn = byId("cdlConfirmBtn");
+      const errDiv = byId("cdlConfirmError");
+      errDiv.style.display = "none";
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "…";
+
+      const token = localStorage.getItem("locacar-jwt");
+      let res, data;
+      try {
+        res = await fetch(`${API_URL}/contracts/${contractId}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({}),
+        });
+        data = await res.json().catch(() => ({}));
+      } catch (e) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "✓ Confirmer le contrat";
+        errDiv.textContent = "Erreur réseau lors de la confirmation.";
+        errDiv.style.display = ""; return;
+      }
+
+      if (!res.ok) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "✓ Confirmer le contrat";
+        errDiv.textContent = data.message || data.error || "Erreur lors de la confirmation.";
+        errDiv.style.display = ""; return;
+      }
+
+      // Mettre à jour state : contrat → active, lignes brouillon → active
+      const cIdx = state.contracts.findIndex(c => c.id === contractId);
+      if (cIdx >= 0) state.contracts[cIdx].status = "active";
+      (state.contractLines || []).forEach(l => {
+        if (l.contractId === contractId && l.status === "brouillon") l.status = "active";
+      });
+
+      // Intégrer les réservations créées par BR25
+      const newReservations = data.reservations || [];
+      newReservations.forEach(rsvData => {
+        if (!rsvData || !rsvData.id) return;
+        const existingIdx = state.reservations.findIndex(r => r.id === rsvData.id);
+        const mapped = {
+          id: rsvData.id, carId: rsvData.car_id, carPlate: rsvData.car_plate || "",
+          customerId: rsvData.customer_id, customerName: rsvData.customer_name || "",
+          startDate: rsvData.start_date, endDate: rsvData.end_date,
+          startTime: rsvData.start_time || "09:00", endTime: rsvData.end_time || "18:00",
+          status: rsvData.status || "confirmee", notes: rsvData.notes || "",
+          contractLineId: rsvData.contract_line_id || null,
+        };
+        if (existingIdx >= 0) state.reservations[existingIdx] = mapped;
+        else state.reservations.push(mapped);
+      });
+      // Mettre à jour reservation_id sur les lignes de state depuis les réservations reçues
+      newReservations.forEach(rsvData => {
+        if (!rsvData || !rsvData.contract_line_id) return;
+        const lIdx = state.contractLines.findIndex(l => l.id === rsvData.contract_line_id);
+        if (lIdx >= 0) state.contractLines[lIdx].reservationId = rsvData.id;
+      });
+
+      if (typeof renderReservations === "function") renderReservations();
       renderContractDetailLines(contractId);
       renderContractDetailHeader(contractId, false);
       renderContracts();

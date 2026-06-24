@@ -46,6 +46,110 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
+// Phase 5 (BR20) : confirmation d'un contrat brouillon → active
+// BR19 pour chaque ligne, puis BR25, puis PATCH statuts
+router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
+  try {
+    const contractRes = await global.db.get(`/contracts?id=eq.${req.params.id}&select=*`);
+    const contract = contractRes.data?.[0];
+    if (!contract) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
+    if (contract.status !== 'brouillon') {
+      return res.status(422).json({ success: false, message: `Ce contrat est au statut "${contract.status}", pas "brouillon".` });
+    }
+
+    const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${req.params.id}&status=eq.brouillon&select=*&order=created_at.asc`);
+    const lines: any[] = linesRes.data || [];
+    if (lines.length === 0) {
+      return res.status(422).json({ success: false, message: 'Ce contrat n\'a aucune ligne brouillon à confirmer.' });
+    }
+
+    // BR19 : vérifier les chevauchements pour toutes les lignes avant d'écrire quoi que ce soit
+    for (const line of lines) {
+      if (!line.car_id || !line.period_start || !line.period_end) continue;
+      const linesCheck = await global.db.get(
+        `/contract_lines?car_id=eq.${line.car_id}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end`
+      );
+      const overlap = (linesCheck.data || []).find((l: any) =>
+        line.period_start <= l.period_end && line.period_end >= l.period_start
+      );
+      if (overlap) {
+        return res.status(409).json({
+          success: false, error: 'vehicle_overlap',
+          message: `⚠ Le véhicule ${overlap.car_plate} est déjà engagé du ${overlap.period_start} au ${overlap.period_end} sur le contrat ${overlap.contract_id}. La ligne ${line.id} est en conflit.`,
+          conflictLineId: line.id,
+        });
+      }
+      const rsvCheck = await global.db.get(
+        `/reservations?car_id=eq.${line.car_id}&select=id,car_plate,start_date,end_date,status,contract_line_id`
+      );
+      const rsvOverlap = (rsvCheck.data || []).find((r: any) =>
+        r.status !== 'annulee' && r.status !== 'terminee' &&
+        r.contract_line_id !== line.id &&
+        line.period_start <= r.end_date && line.period_end >= r.start_date
+      );
+      if (rsvOverlap) {
+        return res.status(409).json({
+          success: false, error: 'vehicle_overlap',
+          message: `⚠ Le véhicule ${rsvOverlap.car_plate} est déjà réservé du ${rsvOverlap.start_date} au ${rsvOverlap.end_date} (réservation ${rsvOverlap.id}).`,
+          conflictLineId: line.id,
+        });
+      }
+    }
+
+    // Tous les contrôles passés → passer toutes les lignes à active
+    for (const line of lines) {
+      await global.db.patch(
+        `/contract_lines?id=eq.${line.id}`,
+        stampUpdate({ status: 'active' }, req),
+        { headers: { Prefer: 'return=minimal' } }
+      );
+    }
+
+    // Passer le contrat à active
+    await global.db.patch(
+      `/contracts?id=eq.${req.params.id}`,
+      stampUpdate({ status: 'active' }, req),
+      { headers: { Prefer: 'return=minimal' } }
+    );
+
+    // BR25 : créer/lier réservations pour chaque ligne
+    const reservations: any[] = [];
+    for (const line of lines) {
+      if (!line.car_id || !line.period_start || !line.period_end) continue;
+      try {
+        const contractInfoRes = await global.db.get(`/contracts?id=eq.${req.params.id}&select=customer_id,customer_name`);
+        const contractInfo = contractInfoRes.data?.[0] || {};
+        const rsvRes = await global.db.get(`/reservations?car_id=eq.${line.car_id}&select=id,start_date,end_date,status,contract_line_id`);
+        const active = (rsvRes.data || []).filter((r: any) => r.status !== 'annulee' && r.status !== 'terminee');
+        const exact   = active.find((r: any) => r.start_date === line.period_start && r.end_date === line.period_end);
+        const overlap = !exact && active.find((r: any) => line.period_start <= r.end_date && line.period_end >= r.start_date);
+        let reservationId: string;
+        if (exact) {
+          reservationId = exact.id;
+          await global.db.patch(`/reservations?id=eq.${exact.id}`, stampUpdate({ contract_line_id: line.id }, req), { headers: { Prefer: 'return=minimal' } });
+        } else if (overlap) {
+          reservationId = overlap.id;
+          await global.db.patch(`/reservations?id=eq.${overlap.id}`, stampUpdate({ start_date: line.period_start, end_date: line.period_end, contract_line_id: line.id }, req), { headers: { Prefer: 'return=minimal' } });
+        } else {
+          const rsvId = `RSV-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+          await global.db.post('/reservations', stampUpdate({
+            id: rsvId, car_id: line.car_id, car_plate: line.car_plate || '',
+            customer_id: contractInfo.customer_id || null, customer_name: contractInfo.customer_name || '',
+            start_date: line.period_start, end_date: line.period_end,
+            start_time: '09:00', end_time: '18:00', status: 'confirmee', contract_line_id: line.id,
+          }, req), { headers: { Prefer: 'return=minimal' } });
+          reservationId = rsvId;
+        }
+        await global.db.patch(`/contract_lines?id=eq.${line.id}`, stampUpdate({ reservation_id: reservationId }, req), { headers: { Prefer: 'return=minimal' } });
+        const finalRsv = await global.db.get(`/reservations?id=eq.${reservationId}&select=*`);
+        if (finalRsv.data?.[0]) reservations.push(finalRsv.data[0]);
+      } catch (e: any) { console.warn('[BR25/confirm]', e?.message); }
+    }
+
+    res.json({ success: true, linesConfirmed: lines.length, reservations });
+  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+});
+
 // Phase 2A : lignes d'un contrat (BR20, modele entete + lignes)
 router.get('/:id/lines', async (req: AuthRequest, res: Response) => {
   try {
