@@ -1515,6 +1515,10 @@
           <input id="contractsFilterQuery" placeholder="ID, client, vehicule" />
         </div>
         <div>
+          <label>Devis</label>
+          <input id="contractsFilterQuote" placeholder="ID devis" style="width:130px;" />
+        </div>
+        <div>
           <label>&nbsp;</label>
           <button id="contractsClearFiltersBtn" class="secondary">Reinitialiser filtres</button>
         </div>
@@ -1526,6 +1530,7 @@
             <th>ID</th>
             <th>Type</th>
             <th>Client</th>
+            <th>Devis d'origine</th>
             <th>Lignes</th>
             <th>Total (TND)</th>
             <th>Statut</th>
@@ -3107,7 +3112,7 @@
     const dashboardFilters = {
       cars: { status: "", query: "" },
       customers: { type: "", query: "" },
-      contracts: { type: "", query: "" },
+      contracts: { type: "", query: "", quoteId: "" },
       reservations: { status: "" },
       collections: { status: "", query: "" },
       maintenance: { carId: "", type: "", query: "" },
@@ -4060,11 +4065,13 @@
       renderCustomers();
     }
 
-    function applyContractsFilter({ type = "", query = "" } = {}) {
+    function applyContractsFilter({ type = "", query = "", quoteId = "" } = {}) {
       dashboardFilters.contracts.type = type;
       dashboardFilters.contracts.query = query;
+      dashboardFilters.contracts.quoteId = quoteId;
       if (byId("contractsFilterType")) byId("contractsFilterType").value = type;
       if (byId("contractsFilterQuery")) byId("contractsFilterQuery").value = query;
+      if (byId("contractsFilterQuote")) byId("contractsFilterQuote").value = quoteId;
       renderContracts();
     }
 
@@ -4191,12 +4198,17 @@
     }
     if (byId("contractsFilterQuery")) {
       byId("contractsFilterQuery").addEventListener("input", (e) => {
-        applyContractsFilter({ type: dashboardFilters.contracts.type, query: e.target.value || "" });
+        applyContractsFilter({ type: dashboardFilters.contracts.type, query: e.target.value || "", quoteId: dashboardFilters.contracts.quoteId });
+      });
+    }
+    if (byId("contractsFilterQuote")) {
+      byId("contractsFilterQuote").addEventListener("input", (e) => {
+        applyContractsFilter({ type: dashboardFilters.contracts.type, query: dashboardFilters.contracts.query, quoteId: e.target.value || "" });
       });
     }
     if (byId("contractsClearFiltersBtn")) {
       byId("contractsClearFiltersBtn").addEventListener("click", () => {
-        applyContractsFilter({ type: "", query: "" });
+        applyContractsFilter({ type: "", query: "", quoteId: "" });
       });
     }
 
@@ -10808,6 +10820,7 @@
       { key: "id" },
       { key: "type", filterType: "select", options: ["court", "long", "autre"] },
       { key: "customerName" },
+      { key: "quoteId" },
       { key: "lignes", sortType: "number", accessor: (c) => (state.contractLines || []).filter(l => l.contractId === c.id && l.status !== "annule").length },
       { key: "totalTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).totalTnd },
       { key: "status", filterType: "select", options: ["actif", "active", "termine", "annule", "brouillon"] },
@@ -10818,11 +10831,13 @@
       tbody.innerHTML = "";
       const typeFilter = dashboardFilters.contracts.type;
       const query = String(dashboardFilters.contracts.query || "").trim().toLowerCase();
+      const quoteFilter = String(dashboardFilters.contracts.quoteId || "").trim().toLowerCase();
       const filtered = state.contracts.filter((contract) => {
           const matchesType = typeFilter ? contract.type === typeFilter : true;
-          const haystack = `${contract.id || ""} ${contract.customerName || ""} ${contract.carPlate || ""} ${contract.status || ""}`.toLowerCase();
+          const haystack = `${contract.id || ""} ${contract.customerName || ""} ${contract.carPlate || ""} ${contract.status || ""} ${contract.quoteId || ""}`.toLowerCase();
           const matchesQuery = query ? haystack.includes(query) : true;
-          return matchesType && matchesQuery;
+          const matchesQuote = quoteFilter ? (contract.quoteId || "").toLowerCase().includes(quoteFilter) : true;
+          return matchesType && matchesQuery && matchesQuote;
         });
       const sorted = applySortAndColumnFilters(filtered, "contracts", CONTRACTS_COLUMNS);
       const { items, page, pages, total } = paginateArray(sorted, "contracts");
@@ -10837,6 +10852,9 @@
         });
         tr.addEventListener("dblclick", () => openContractDetail(contract.id));
         const lignesCount = (state.contractLines || []).filter(l => l.contractId === contract.id && l.status !== "annule").length;
+        const quoteCell = contract.quoteId
+          ? `<a href="#" data-open-quote-from-contract="${safe(contract.quoteId)}" style="font-family:monospace;font-size:12px;">${safe(contract.quoteId)}</a>`
+          : `<span style="color:var(--muted);">—</span>`;
         tr.innerHTML = `
           <td>
             <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a>
@@ -10844,6 +10862,7 @@
           </td>
           <td>${safe(contract.type)}</td>
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
+          <td>${quoteCell}</td>
           <td><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
           <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${safe(contract.status)}</td>
@@ -10864,6 +10883,14 @@
           e.stopPropagation();
           const id = e.target.getAttribute("data-open-contract-detail");
           openContractDetail(id);
+        });
+      });
+      tbody.querySelectorAll("[data-open-quote-from-contract]").forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const qId = link.getAttribute("data-open-quote-from-contract");
+          if (qId && typeof openQuoteDetail === "function") openQuoteDetail(qId);
         });
       });
       tbody.querySelectorAll("[data-goto-tab]").forEach((a) => {
