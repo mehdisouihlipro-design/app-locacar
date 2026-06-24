@@ -203,6 +203,7 @@ Un contrat est composé d'un **entête** (client, type, paiement) et de **lignes
    - **Type de contrat** : `court`, `long` ou `autre`
    - **Date de début**
    - **Paiement** : `début de location` ou `fin de location`
+   - **Mode brouillon** (case à cocher optionnelle) : cocher pour créer le contrat en statut `brouillon`. Les lignes ajoutées à un contrat brouillon ne déclenchent ni le contrôle de chevauchement BR19 ni la création de réservation automatique BR25 — utile pour préparer un contrat à l'avance sans bloquer les véhicules. Le contrat devra ensuite être **confirmé** (voir ci-dessous).
 3. Cliquer **"Créer contrat"** → le modal de détail s'ouvre automatiquement
 4. Dans le modal, cliquer **"+ Ajouter une ligne"** pour associer un ou plusieurs véhicules au contrat (voir ci-dessous)
 
@@ -223,10 +224,22 @@ Dans le modal de détail d'un contrat :
 - **Clic sur le badge "N ligne(s)"** → même action
 - Dans le modal : bouton **"Modifier entête"** pour éditer les informations du contrat
 
-#### États du Contrat
-- 🟢 **active:** En cours
-- 🔴 **termine:** Fini, compte clôturé
-- ⚫ **annule:** Annulé
+#### Confirmer un contrat brouillon
+Un contrat créé en mode **brouillon** affiche le statut **⚠ brouillon** en orange dans son entête, ainsi qu'un bouton vert **"✓ Confirmer le contrat"**.
+
+Cliquer ce bouton :
+1. Vérifie que chaque ligne du contrat ne chevauche aucun autre contrat ou réservation actif (BR19). Si un conflit existe, un message rouge explicite s'affiche — ajuster les dates ou choisir un autre véhicule avant de recommencer.
+2. Si toutes les lignes passent le contrôle : le contrat et toutes ses lignes passent au statut `active`, et une réservation est créée/liée automatiquement pour chaque ligne (BR25).
+
+#### États du Contrat et des lignes
+| Statut | Signification |
+|--------|---------------|
+| **brouillon** | En préparation, véhicules non réservés |
+| **active** | En cours, véhicules réservés |
+| **terminée** (ligne) | Période passée — badge gris, calculé à l'affichage |
+| **résiliée** | Résiliation anticipée avec prorata |
+| **termine** | Fini, compte clôturé |
+| **annule** | Annulé |
 
 #### Colonne "Lignes"
 Le badge affiché dans la colonne "Lignes" indique le nombre de lignes actives (hors lignes annulées) associées à ce contrat.

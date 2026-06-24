@@ -1237,7 +1237,7 @@ Sur le formulaire d'une ligne de contrat (`contract_lines`), deux champs liés *
 
 Les lignes de contrat au statut `brouillon` (contrat non confirmé, 9.3) ne sont soumises à **aucun** de ces trois niveaux ; le contrôle s'applique dès le passage `brouillon → active`.
 
-### 9.3 Contrat entête + lignes (BR20) — ✅ Phase 2A + 2B implémentées
+### 9.3 ✅ Contrat entête + lignes (BR20) — Phase 2A + 2B + 5 implémentées
 
 **Phase 2A (socle DB + backend)** ✅ Commit `a5b6b6c` :
 - Table `contract_lines` avec contrainte EXCLUDE `excl_contract_lines_car_period` (chevauchement véhicule-période pour lignes `active`)
