@@ -10257,6 +10257,8 @@
       tbody.innerHTML = "";
       const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
       byId("qdEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
+      const q = state.quotes.find(x => x.id === quoteId);
+      const isEditable = q && !["valide", "refuse"].includes(q.status);
       let sumHt = 0, sumTtc = 0;
       lines.forEach(l => {
         sumHt  += l.amountHt  || 0;
@@ -10265,6 +10267,10 @@
         const tr = document.createElement("tr");
         const vatRate = Number(state.settings.vatRate || 19) / 100;
         const rateTtc = l.rateTtc != null ? l.rateTtc : Math.round(l.rate * (1 + vatRate) * 100) / 100;
+        const actionBtns = isEditable
+          ? `<button class="ql-edit-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">✏️</button>
+             <button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`
+          : `<button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
           <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
@@ -10274,7 +10280,7 @@
           <td style="text-align:right;">${(l.amountHt||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${(l.vatAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${(l.amountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
-          <td style="text-align:center;"><button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button></td>
+          <td style="text-align:center;white-space:nowrap;">${actionBtns}</td>
         `;
         tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", e => {
           e.preventDefault(); e.stopPropagation();
@@ -10282,6 +10288,7 @@
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         }));
         tr.querySelector(".ql-delete-btn").addEventListener("click", () => deleteQuoteLine(quoteId, l.id));
+        if (isEditable) tr.querySelector(".ql-edit-btn")?.addEventListener("click", () => editInlineQuoteLine(quoteId, l.id, tr));
         tbody.appendChild(tr);
       });
       if (inlineRow) tbody.appendChild(inlineRow);
@@ -10359,6 +10366,131 @@
       byId("qlCar").focus();
     }
 
+    function editInlineQuoteLine(quoteId, lineId, displayTr) {
+      const line = (state.quoteLines || []).find(l => l.id === lineId);
+      if (!line) return;
+      // Annuler toute autre ligne en cours d'édition
+      byId("qdLinesBody").querySelectorAll(".ql-inline-edit").forEach(r => r.remove());
+      const carOptions = state.cars.map(c =>
+        `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand||c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
+      ).join("");
+      const vatRate = () => Number(state.settings.vatRate || 19) / 100;
+      const editTr = document.createElement("tr");
+      editTr.className = "ql-inline-edit";
+      editTr.style.cssText = "background:#fffbeb;border:2px solid #f59e0b;";
+      editTr.innerHTML = `
+        <td style="padding:4px;"><select id="qleqCar" style="width:100%;min-width:110px;font-size:12px;"><option value="">— véhicule —</option>${carOptions}</select></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <input id="qleqStart" type="date" value="${safe(line.periodStart)}" style="width:108px;font-size:12px;" />
+          <span style="margin:0 2px;">→</span>
+          <input id="qleqEnd" type="date" value="${safe(line.periodEnd)}" style="width:108px;font-size:12px;" />
+        </td>
+        <td id="qleqDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
+        <td style="padding:4px;"><input id="qleqRate"    type="number" step="0.01" min="0" value="${safe(line.rate||0)}"   placeholder="HT/j"  style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qleqRateTtc" type="number" step="0.01" min="0" value="${safe(line.rateTtc != null ? line.rateTtc : Math.round((line.rate||0)*(1+vatRate())*100)/100)}" placeholder="TTC/j" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qleqHt"  type="number" step="0.01" readonly tabindex="-1" value="${safe((line.amountHt||0).toFixed(2))}"  style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qleqVat" type="number" step="0.01" readonly tabindex="-1" value="${safe((line.vatAmount||0).toFixed(2))}" style="width:72px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qleqTtc" type="number" step="0.01" readonly tabindex="-1" value="${safe((line.amountTtc||0).toFixed(2))}" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;white-space:nowrap;">
+          <button id="qleqSaveBtn" style="padding:3px 10px;font-size:13px;">✓</button>
+          <button id="qleqCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;">✗</button>
+          <div id="qleqError" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
+        </td>
+      `;
+      displayTr.replaceWith(editTr);
+      const getDays = () => {
+        const s = byId("qleqStart").value, e = byId("qleqEnd").value;
+        return (s && e && e >= s) ? calcLineDuration(s, e).days : 0;
+      };
+      const recalc = () => {
+        const rHt  = Number(byId("qleqRate").value    || 0);
+        const rTtc = Number(byId("qleqRateTtc").value || 0);
+        const days = getDays();
+        const aHt  = Math.round(rHt  * days * 100) / 100;
+        const aTtc = Math.round(rTtc * days * 100) / 100;
+        byId("qleqHt").value  = days ? aHt.toFixed(2)  : "";
+        byId("qleqTtc").value = days ? aTtc.toFixed(2) : "";
+        byId("qleqVat").value = days ? (Math.round((aTtc-aHt)*100)/100).toFixed(2) : "";
+        byId("qleqDur").textContent = days ? `${days}j` : "—";
+      };
+      byId("qleqRate").oninput = () => {
+        byId("qleqRateTtc").value = (Math.round(Number(byId("qleqRate").value||0)*(1+vatRate())*100)/100).toFixed(2);
+        recalc();
+      };
+      byId("qleqRateTtc").oninput = () => {
+        byId("qleqRate").value = (Math.round(Number(byId("qleqRateTtc").value||0)/(1+vatRate())*100)/100).toFixed(2);
+        recalc();
+      };
+      byId("qleqStart").oninput = recalc;
+      byId("qleqEnd").oninput   = recalc;
+      recalc(); // init durée
+      byId("qleqSaveBtn").onclick   = () => saveEditQuoteLine(quoteId, lineId, editTr);
+      byId("qleqCancelBtn").onclick = () => { renderQuoteDetailLines(quoteId); };
+    }
+
+    async function saveEditQuoteLine(quoteId, lineId, editTr) {
+      const carId    = byId("qleqCar").value;
+      const startStr = byId("qleqStart").value, endStr = byId("qleqEnd").value;
+      const rate     = Number(byId("qleqRate").value    || 0);
+      const rateTtc  = Number(byId("qleqRateTtc").value || 0);
+      const amountHt  = Number(byId("qleqHt").value  || 0);
+      const amountTtc = Number(byId("qleqTtc").value || 0);
+      const vatAmount = Math.round((amountTtc - amountHt) * 100) / 100;
+      const errDiv = byId("qleqError");
+      errDiv.style.display = "none";
+      if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
+      if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
+      if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
+      // Contrôle disponibilité (exclure la ligne en cours d'édition)
+      const contractConflict = (state.contractLines || []).find(l =>
+        l.carId === carId && l.status === "active" &&
+        startStr <= l.periodEnd && endStr >= l.periodStart
+      );
+      if (contractConflict) {
+        const carObj = state.cars.find(c => c.id === carId);
+        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà engagé du ${contractConflict.periodStart} au ${contractConflict.periodEnd}.`;
+        errDiv.style.display = ""; return;
+      }
+      const rsvConflict = (state.reservations || []).find(r =>
+        r.carId === carId && !["annulee", "terminee"].includes(r.status) &&
+        startStr <= r.endDate && endStr >= r.startDate
+      );
+      if (rsvConflict) {
+        const carObj = state.cars.find(c => c.id === carId);
+        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà réservé du ${rsvConflict.startDate} au ${rsvConflict.endDate}.`;
+        errDiv.style.display = ""; return;
+      }
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(startStr, endStr);
+      const saveBtn = byId("qleqSaveBtn");
+      saveBtn.disabled = true; saveBtn.textContent = "…";
+      const result = await apiPutWithError(`/quote-lines/${lineId}`, {
+        car_id: carId, car_plate: car ? car.plate : "",
+        period_start: startStr, period_end: endStr, days, months,
+        rate, rate_currency: "TND",
+        amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+      });
+      if (!result.ok) {
+        saveBtn.disabled = false; saveBtn.textContent = "✓";
+        errDiv.textContent = result.errorMsg || "Erreur"; errDiv.style.display = ""; return;
+      }
+      // Mettre à jour l'état local
+      const idx = state.quoteLines.findIndex(l => l.id === lineId);
+      if (idx >= 0) Object.assign(state.quoteLines[idx], {
+        carId, carPlate: car ? car.plate : "", periodStart: startStr, periodEnd: endStr,
+        days, months, rate, rateTtc, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+      });
+      const qIdx = state.quotes.findIndex(q => q.id === quoteId);
+      if (qIdx >= 0) {
+        const allLines = state.quoteLines.filter(l => l.quoteId === quoteId);
+        state.quotes[qIdx].totalAmountHt  = allLines.reduce((s, l) => s + (l.amountHt  || 0), 0);
+        state.quotes[qIdx].totalAmountTtc = allLines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      }
+      renderQuoteDetailLines(quoteId);
+      renderQuoteDetailHeader(quoteId, false);
+      renderQuotes();
+    }
+
     async function submitInlineQuoteLine(quoteId, tr) {
       const carId    = byId("qlCar").value;
       const startStr = byId("qlStart").value, endStr = byId("qlEnd").value;
@@ -10372,6 +10504,25 @@
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
       if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
       if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
+      // Contrôle disponibilité : contrats actifs
+      const contractConflict = (state.contractLines || []).find(l =>
+        l.carId === carId && l.status === "active" &&
+        startStr <= l.periodEnd && endStr >= l.periodStart
+      );
+      if (contractConflict) {
+        const carObj = state.cars.find(c => c.id === carId);
+        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà engagé du ${contractConflict.periodStart} au ${contractConflict.periodEnd} (contrat actif).`;
+        errDiv.style.display = ""; return;
+      }
+      const rsvConflict = (state.reservations || []).find(r =>
+        r.carId === carId && !["annulee", "terminee"].includes(r.status) &&
+        startStr <= r.endDate && endStr >= r.startDate
+      );
+      if (rsvConflict) {
+        const carObj = state.cars.find(c => c.id === carId);
+        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà réservé du ${rsvConflict.startDate} au ${rsvConflict.endDate}.`;
+        errDiv.style.display = ""; return;
+      }
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(startStr, endStr);
       const saveBtn = byId("qlSaveBtn");
