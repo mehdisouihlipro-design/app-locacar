@@ -4517,25 +4517,52 @@
     };
 
     // ── Hash-based navigation ───────────────────────────────────────────
+    let _activeTab = "home";
+    let _refreshSeq = 0;
+
+    function renderForTab(tabId) {
+      switch (tabId) {
+        case "home":         renderHomeDashboard(); break;
+        case "cars":         renderCars(); break;
+        case "customers":    renderCustomers(); break;
+        case "contracts":    renderContracts(); break;
+        case "quotes":       renderQuotes(); break;
+        case "invoices":     renderInvoices(); renderCollections(); break;
+        case "collections":  renderCollections(); break;
+        case "payments":     renderPayments(); break;
+        case "reservations": renderReservationsTable(); renderReservationCalendar(); break;
+        case "maintenance":  renderMaintenance(); break;
+        case "inspections":  renderInspections(); break;
+        case "insurance":    renderInsurances(); renderInsuranceInstallments(); break;
+        case "leasing":      renderLeasingContracts(); renderLeasingInstallments(); break;
+        case "rentabilite":  renderRentabilite(); break;
+        case "alerts":       renderAlerts(); break;
+        case "gps":          renderGpsMap(); break;
+        case "settings":     populateSettingsFields(); break;
+        case "users":        renderUsers(); break;
+      }
+    }
+
+    async function refreshAndRenderTab(tabId) {
+      const seq = ++_refreshSeq;
+      try {
+        await loadDataFromAPI();
+        if (seq !== _refreshSeq) return; // supersédé par une navigation plus récente
+        renderForTab(tabId);
+      } catch (e) { console.warn("[refreshAndRenderTab]", tabId, e); }
+    }
+
     function switchToTab(tabId) {
       const tab = document.querySelector(`.tab[data-tab="${tabId}"]`);
       if (!tab) return;
+      _activeTab = tabId;
       tabs.forEach((t) => t.classList.remove("active"));
       panels.forEach((p) => p.classList.remove("active"));
       tab.classList.add("active");
       const panel = document.getElementById(tabId);
       if (panel) panel.classList.add("active");
-      // Re-render le contenu de l'onglet cible pour garantir la fraîcheur des données
-      switch (tabId) {
-        case "reservations": if (typeof renderReservations === "function") renderReservations(); break;
-        case "contracts":    if (typeof renderContracts    === "function") renderContracts();    break;
-        case "quotes":       if (typeof renderQuotes       === "function") renderQuotes();       break;
-        case "invoices":     if (typeof renderInvoices     === "function") renderInvoices();     break;
-        case "cars":         if (typeof renderCars         === "function") renderCars();         break;
-        case "customers":    if (typeof renderCustomers    === "function") renderCustomers();    break;
-        case "gps":          renderGpsMap(); break;
-        case "users":        renderUsers();  break;
-      }
+      renderForTab(tabId);          // affichage immédiat depuis l'état courant
+      refreshAndRenderTab(tabId);   // rechargement API en arrière-plan
     }
 
     tabs.forEach((tab) => {
@@ -7645,6 +7672,7 @@
         const result = await persistSettingsFromModal();
         if (!result.ok) { showSettingsModalStatus(result.message, result.ok); return; }
         byId("settingsModal").style.display = "none";
+        refreshAndRenderTab(_activeTab);
       });
     }
 
@@ -7654,6 +7682,7 @@
           const result = await persistSettingsFromModal();
           if (!result.ok) { showSettingsModalStatus(result.message, result.ok); return; }
           byId("settingsModal").style.display = "none";
+          refreshAndRenderTab(_activeTab);
         }
       });
     }
@@ -9669,11 +9698,11 @@
       else input.value = "";
     });
 
-    byId("udCloseBtn").addEventListener("click", () => { byId("userDetailModal").style.display = "none"; });
-    byId("userDetailModal").addEventListener("click", (e) => { if (e.target === byId("userDetailModal")) byId("userDetailModal").style.display = "none"; });
+    byId("udCloseBtn").addEventListener("click", () => { byId("userDetailModal").style.display = "none"; refreshAndRenderTab("users"); });
+    byId("userDetailModal").addEventListener("click", (e) => { if (e.target === byId("userDetailModal")) { byId("userDetailModal").style.display = "none"; refreshAndRenderTab("users"); } });
 
-    byId("cdlCloseBtn").addEventListener("click", () => { byId("contractDetailModal").style.display = "none"; });
-    byId("contractDetailModal").addEventListener("click", (e) => { if (e.target === byId("contractDetailModal")) byId("contractDetailModal").style.display = "none"; });
+    byId("cdlCloseBtn").addEventListener("click", () => { byId("contractDetailModal").style.display = "none"; refreshAndRenderTab("contracts"); });
+    byId("contractDetailModal").addEventListener("click", (e) => { if (e.target === byId("contractDetailModal")) { byId("contractDetailModal").style.display = "none"; refreshAndRenderTab("contracts"); } });
 
     // ── Car financial detail modal (revenue, expenses by category, balance — monthly & yearly) ──
     let _carFinanceLedger = null;
@@ -9755,8 +9784,8 @@
     };
 
     byId("carFinanceYear").addEventListener("change", (e) => renderCarFinanceForYear(Number(e.target.value)));
-    byId("carFinanceCloseBtn").addEventListener("click", () => { byId("carFinanceModal").style.display = "none"; });
-    byId("carFinanceModal").addEventListener("click", (e) => { if (e.target === byId("carFinanceModal")) byId("carFinanceModal").style.display = "none"; });
+    byId("carFinanceCloseBtn").addEventListener("click", () => { byId("carFinanceModal").style.display = "none"; refreshAndRenderTab("rentabilite"); });
+    byId("carFinanceModal").addEventListener("click", (e) => { if (e.target === byId("carFinanceModal")) { byId("carFinanceModal").style.display = "none"; refreshAndRenderTab("rentabilite"); } });
 
     byId("udSaveBtn").addEventListener("click", async () => {
       if (!_currentEditUserId) return;
@@ -10552,8 +10581,8 @@
       };
       byId("qdValidateBtn").onclick = () => validateQuote(quoteId);
       byId("qdPdfBtn").onclick      = () => generateQuotePdf(quoteId);
-      byId("qdCloseBtn").onclick    = () => { byId("quoteDetailModal").style.display = "none"; };
-      byId("qdCloseBtn2").onclick   = () => { byId("quoteDetailModal").style.display = "none"; };
+      byId("qdCloseBtn").onclick    = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
+      byId("qdCloseBtn2").onclick   = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
       renderQuoteDetailHeader(quoteId, false);
       renderQuoteDetailLines(quoteId);
       byId("quoteDetailModal").style.display = "flex";
@@ -11207,8 +11236,8 @@
       if (_currentEditInvoiceId) generateInvoicePdf(_currentEditInvoiceId);
     });
 
-    byId("ieCloseBtn").addEventListener("click", () => { byId("invoiceEditModal").style.display = "none"; });
-    byId("invoiceEditModal").addEventListener("click", (e) => { if (e.target === byId("invoiceEditModal")) byId("invoiceEditModal").style.display = "none"; });
+    byId("ieCloseBtn").addEventListener("click", () => { byId("invoiceEditModal").style.display = "none"; refreshAndRenderTab("invoices"); });
+    byId("invoiceEditModal").addEventListener("click", (e) => { if (e.target === byId("invoiceEditModal")) { byId("invoiceEditModal").style.display = "none"; refreshAndRenderTab("invoices"); } });
 
     function composeInvoiceReminderMailto(email, invoices, customerName) {
       const title = invoices.length > 1 ? "Rappel de paiement de factures" : "Rappel de paiement de facture";
