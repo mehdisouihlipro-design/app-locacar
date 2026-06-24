@@ -1267,6 +1267,20 @@
         </div>
       </div>
       <div class="dashboard-grid">
+        <div class="card">
+          <div class="muted">Devis en attente</div>
+          <div id="homeKpiPendingQuotes" class="kpi">0</div>
+        </div>
+        <div class="card">
+          <div class="muted">Devis expirant bientôt (&le;7 j)</div>
+          <div id="homeKpiExpiringQuotes" class="kpi">0</div>
+        </div>
+        <div class="card">
+          <div class="muted">Devis validés</div>
+          <div id="homeKpiValidatedQuotes" class="kpi">0</div>
+        </div>
+      </div>
+      <div class="dashboard-grid">
         <div id="homeCardRevenue" class="chart-card">
           <h4>Revenus (6 derniers mois)</h4>
           <div id="revenueBars" class="bars"></div>
@@ -4333,6 +4347,31 @@
       applyCollectionsFilter({ status: "", query: "" });
       openTab("collections");
     });
+
+    if (byId("homeKpiPendingQuotes")) {
+      byId("homeKpiPendingQuotes").parentElement.addEventListener("click", () => {
+        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "envoye";
+        const srch = byId("quotesSearch"); if (srch) srch.value = "";
+        openTab("quotes");
+        renderQuotes();
+      });
+    }
+    if (byId("homeKpiExpiringQuotes")) {
+      byId("homeKpiExpiringQuotes").parentElement.addEventListener("click", () => {
+        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "";
+        const srch = byId("quotesSearch"); if (srch) srch.value = "";
+        openTab("quotes");
+        renderQuotes();
+      });
+    }
+    if (byId("homeKpiValidatedQuotes")) {
+      byId("homeKpiValidatedQuotes").parentElement.addEventListener("click", () => {
+        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "valide";
+        const srch = byId("quotesSearch"); if (srch) srch.value = "";
+        openTab("quotes");
+        renderQuotes();
+      });
+    }
 
     if (byId("alertLateCount")) {
       byId("alertLateCount").parentElement.addEventListener("click", () => applyAlertsFilter({ level: "en_retard" }));
@@ -8286,9 +8325,22 @@
       const allAlerts = collectAlerts();
       const criticalAlerts = allAlerts.filter((a) => a.level === "en_retard" || a.level === "urgent").length;
 
+      const in7Days = new Date(today); in7Days.setDate(in7Days.getDate() + 7);
+      const in7DaysStr = in7Days.toISOString().slice(0, 10);
+      const pendingQuotes = (state.quotes || []).filter(q => getQuoteDisplayStatus(q) === "envoye").length;
+      const expiringQuotes = (state.quotes || []).filter(q => {
+        const ds = getQuoteDisplayStatus(q);
+        if (ds === "valide" || ds === "refuse" || ds === "expire") return false;
+        return q.validityDate && q.validityDate >= today && q.validityDate <= in7DaysStr;
+      }).length;
+      const validatedQuotes = (state.quotes || []).filter(q => q.status === "valide").length;
+
       byId("homeKpiAvailableCars").textContent = String(availableCars);
       byId("homeKpiActiveReservations").textContent = String(activeReservations);
       byId("homeKpiCriticalAlerts").textContent = String(criticalAlerts);
+      if (byId("homeKpiPendingQuotes")) byId("homeKpiPendingQuotes").textContent = String(pendingQuotes);
+      if (byId("homeKpiExpiringQuotes")) byId("homeKpiExpiringQuotes").textContent = String(expiringQuotes);
+      if (byId("homeKpiValidatedQuotes")) byId("homeKpiValidatedQuotes").textContent = String(validatedQuotes);
       if (byId("homeKpiTreasuryNow")) byId("homeKpiTreasuryNow").textContent = formatTnd(treasury.currentCashTnd);
       if (byId("homeKpiTreasury60d")) byId("homeKpiTreasury60d").textContent = formatTnd(treasury.projectedCashTnd);
       if (byId("homeKpiTreasuryMin")) byId("homeKpiTreasuryMin").textContent = formatTnd(treasury.minProjectedCashTnd);
