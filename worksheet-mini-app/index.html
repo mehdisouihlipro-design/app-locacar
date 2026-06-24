@@ -1519,6 +1519,14 @@
           <input id="contractsFilterQuote" placeholder="ID devis" style="width:130px;" />
         </div>
         <div>
+          <label>Du</label>
+          <input id="contractsFilterDateFrom" type="date" style="width:140px;" />
+        </div>
+        <div>
+          <label>Au</label>
+          <input id="contractsFilterDateTo" type="date" style="width:140px;" />
+        </div>
+        <div>
           <label>&nbsp;</label>
           <button id="contractsClearFiltersBtn" class="secondary">Reinitialiser filtres</button>
         </div>
@@ -1531,6 +1539,8 @@
             <th>Type</th>
             <th>Client</th>
             <th>Devis d'origine</th>
+            <th>Date début</th>
+            <th>Date fin</th>
             <th>Lignes</th>
             <th>Total (TND)</th>
             <th>Statut</th>
@@ -3112,7 +3122,7 @@
     const dashboardFilters = {
       cars: { status: "", query: "" },
       customers: { type: "", query: "" },
-      contracts: { type: "", query: "", quoteId: "" },
+      contracts: { type: "", query: "", quoteId: "", dateFrom: "", dateTo: "" },
       reservations: { status: "" },
       collections: { status: "", query: "" },
       maintenance: { carId: "", type: "", query: "" },
@@ -4065,13 +4075,17 @@
       renderCustomers();
     }
 
-    function applyContractsFilter({ type = "", query = "", quoteId = "" } = {}) {
+    function applyContractsFilter({ type = "", query = "", quoteId = "", dateFrom = "", dateTo = "" } = {}) {
       dashboardFilters.contracts.type = type;
       dashboardFilters.contracts.query = query;
       dashboardFilters.contracts.quoteId = quoteId;
+      dashboardFilters.contracts.dateFrom = dateFrom;
+      dashboardFilters.contracts.dateTo   = dateTo;
       if (byId("contractsFilterType")) byId("contractsFilterType").value = type;
       if (byId("contractsFilterQuery")) byId("contractsFilterQuery").value = query;
       if (byId("contractsFilterQuote")) byId("contractsFilterQuote").value = quoteId;
+      if (byId("contractsFilterDateFrom")) byId("contractsFilterDateFrom").value = dateFrom;
+      if (byId("contractsFilterDateTo"))   byId("contractsFilterDateTo").value   = dateTo;
       renderContracts();
     }
 
@@ -4203,12 +4217,22 @@
     }
     if (byId("contractsFilterQuote")) {
       byId("contractsFilterQuote").addEventListener("input", (e) => {
-        applyContractsFilter({ type: dashboardFilters.contracts.type, query: dashboardFilters.contracts.query, quoteId: e.target.value || "" });
+        applyContractsFilter({ ...dashboardFilters.contracts, quoteId: e.target.value || "" });
+      });
+    }
+    if (byId("contractsFilterDateFrom")) {
+      byId("contractsFilterDateFrom").addEventListener("input", (e) => {
+        applyContractsFilter({ ...dashboardFilters.contracts, dateFrom: e.target.value || "" });
+      });
+    }
+    if (byId("contractsFilterDateTo")) {
+      byId("contractsFilterDateTo").addEventListener("input", (e) => {
+        applyContractsFilter({ ...dashboardFilters.contracts, dateTo: e.target.value || "" });
       });
     }
     if (byId("contractsClearFiltersBtn")) {
       byId("contractsClearFiltersBtn").addEventListener("click", () => {
-        applyContractsFilter({ type: "", query: "", quoteId: "" });
+        applyContractsFilter({ type: "", query: "", quoteId: "", dateFrom: "", dateTo: "" });
       });
     }
 
@@ -10816,11 +10840,22 @@
     if (byId("quotesFilterStatus")) byId("quotesFilterStatus").addEventListener("change", renderQuotes);
     if (byId("quotesSearch")) byId("quotesSearch").addEventListener("input", renderQuotes);
 
+    function getContractPeriod(contractId) {
+      const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule" && l.periodStart && l.periodEnd);
+      if (!lines.length) return { start: null, end: null };
+      return {
+        start: lines.reduce((min, l) => l.periodStart < min ? l.periodStart : min, lines[0].periodStart),
+        end:   lines.reduce((max, l) => l.periodEnd   > max ? l.periodEnd   : max, lines[0].periodEnd),
+      };
+    }
+
     const CONTRACTS_COLUMNS = [
       { key: "id" },
       { key: "type", filterType: "select", options: ["court", "long", "autre"] },
       { key: "customerName" },
       { key: "quoteId" },
+      { key: "periodStart", sortType: "string", accessor: (c) => getContractPeriod(c.id).start || "" },
+      { key: "periodEnd",   sortType: "string", accessor: (c) => getContractPeriod(c.id).end   || "" },
       { key: "lignes", sortType: "number", accessor: (c) => (state.contractLines || []).filter(l => l.contractId === c.id && l.status !== "annule").length },
       { key: "totalTnd", sortType: "number", accessor: (c) => getContractTotals(c.id).totalTnd },
       { key: "status", filterType: "select", options: ["actif", "active", "termine", "annule", "brouillon"] },
@@ -10829,15 +10864,24 @@
     function renderContracts() {
       const tbody = byId("contractsTable");
       tbody.innerHTML = "";
-      const typeFilter = dashboardFilters.contracts.type;
-      const query = String(dashboardFilters.contracts.query || "").trim().toLowerCase();
+      const typeFilter  = dashboardFilters.contracts.type;
+      const query       = String(dashboardFilters.contracts.query   || "").trim().toLowerCase();
       const quoteFilter = String(dashboardFilters.contracts.quoteId || "").trim().toLowerCase();
+      const dateFrom    = dashboardFilters.contracts.dateFrom || "";
+      const dateTo      = dashboardFilters.contracts.dateTo   || "";
       const filtered = state.contracts.filter((contract) => {
-          const matchesType = typeFilter ? contract.type === typeFilter : true;
+          const matchesType  = typeFilter  ? contract.type === typeFilter : true;
           const haystack = `${contract.id || ""} ${contract.customerName || ""} ${contract.carPlate || ""} ${contract.status || ""} ${contract.quoteId || ""}`.toLowerCase();
-          const matchesQuery = query ? haystack.includes(query) : true;
+          const matchesQuery = query       ? haystack.includes(query) : true;
           const matchesQuote = quoteFilter ? (contract.quoteId || "").toLowerCase().includes(quoteFilter) : true;
-          return matchesType && matchesQuery && matchesQuote;
+          if (!matchesType || !matchesQuery || !matchesQuote) return false;
+          if (dateFrom || dateTo) {
+            const p = getContractPeriod(contract.id);
+            if (!p.start && !p.end) return false; // pas de lignes → exclu si filtre date actif
+            if (dateFrom && p.end   && p.end   < dateFrom) return false;
+            if (dateTo   && p.start && p.start > dateTo)   return false;
+          }
+          return true;
         });
       const sorted = applySortAndColumnFilters(filtered, "contracts", CONTRACTS_COLUMNS);
       const { items, page, pages, total } = paginateArray(sorted, "contracts");
@@ -10855,6 +10899,8 @@
         const quoteCell = contract.quoteId
           ? `<a href="#" data-open-quote-from-contract="${safe(contract.quoteId)}" style="font-family:monospace;font-size:12px;">${safe(contract.quoteId)}</a>`
           : `<span style="color:var(--muted);">—</span>`;
+        const period = getContractPeriod(contract.id);
+        const dateStyle = "white-space:nowrap;font-size:13px;";
         tr.innerHTML = `
           <td>
             <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a>
@@ -10863,6 +10909,8 @@
           <td>${safe(contract.type)}</td>
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
           <td>${quoteCell}</td>
+          <td style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
+          <td style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
           <td><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
           <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td>${safe(contract.status)}</td>
