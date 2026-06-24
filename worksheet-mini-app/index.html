@@ -4584,10 +4584,6 @@
       switchToTab(tabId);
     });
 
-    // Restore tab from URL on load
-    const _initialTab = location.hash.replace("#", "") || "home";
-    if (_initialTab !== "home") switchToTab(_initialTab);
-
     byId("cancelRecordBtn").addEventListener("click", closeRecordEditor);
     byId("saveRecordBtn").addEventListener("click", saveRecordEditor);
     byId("recordEditorModal").addEventListener("click", (e) => {
@@ -13736,6 +13732,12 @@
     setupAllSortableTables();
     initExcelExportButtons();
     render();
+
+    // Restore tab from URL on load — placed here so all const declarations
+    // (CARS_COLUMNS, CONTRACTS_COLUMNS, …) are initialized before switchToTab
+    // calls any render function. Moving this above their declarations caused a TDZ.
+    const _initialTab = location.hash.replace("#", "") || "home";
+    if (_initialTab !== "home") switchToTab(_initialTab);
   </script>
 </body>
 </html>
