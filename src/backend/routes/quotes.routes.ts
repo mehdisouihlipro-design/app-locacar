@@ -149,6 +149,7 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     const contractDate = new Date().toISOString().split('T')[0];
     const contractBody = stampCreate({
       id: contractId,
+      quote_id: req.params.id,
       customer_id: quote.customer_id,
       customer_name: quote.customer_name,
       car_id: null, car_plate: '',

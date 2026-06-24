@@ -5025,6 +5025,7 @@
         totalAmountTnd: c.total_amount_tnd || 0,
         paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
         status: c.status || "active",
+        quoteId: c.quote_id || null,
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
@@ -10614,6 +10615,7 @@
         totalAmountOriginal: c.total_amount_original || 0, totalAmountTnd: c.total_amount_tnd || 0,
         paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
         status: c.status || "active",
+        quoteId: c.quote_id || null,
       }));
       if (newLinesRaw) state.contractLines = newLinesRaw.map(l => ({
         id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
@@ -12912,15 +12914,27 @@
         const periodLabel = periodStart ? `${periodStart} → ${periodEnd}` : "—";
         const isBrouillon = contract.status === "brouillon";
         const statusStyle = isBrouillon ? "color:#d97706;font-weight:600;" : "";
+        const quoteLink = contract.quoteId
+          ? `<a class="xref" data-open-quote="${safe(contract.quoteId)}" href="#" style="font-family:monospace;">${safe(contract.quoteId)}</a>`
+          : "—";
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
           <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
           <div><span class="label-small">Statut</span><br><span style="${statusStyle}">${isBrouillon ? "⚠ brouillon" : safe(contract.status || "-")}</span></div>
+          <div><span class="label-small">Devis d'origine</span><br>${quoteLink}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
         `;
+        byId("cdlHeader").querySelectorAll("[data-open-quote]").forEach(a => {
+          a.addEventListener("click", e => {
+            e.preventDefault();
+            byId("contractDetailModal").style.display = "none";
+            const qId = a.getAttribute("data-open-quote");
+            if (qId && typeof openQuoteDetail === "function") openQuoteDetail(qId);
+          });
+        });
         editBtn.textContent = "✏ Modifier entête";
         editBtn.onclick = () => renderContractDetailHeader(contractId, true);
         cancelBtn.style.display = "none";
