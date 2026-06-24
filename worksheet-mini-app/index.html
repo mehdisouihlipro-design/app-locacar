@@ -1629,10 +1629,11 @@
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Plaque</th>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT/j</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif TTC/j</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant HT</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant TTC</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);"></th>
               </tr>
             </thead>
@@ -10233,11 +10234,14 @@
         sumTtc += l.amountTtc || 0;
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
+        const vatRate = Number(state.settings.vatRate || 19) / 100;
+        const rateTtc = l.rateTtc != null ? l.rateTtc : Math.round(l.rate * (1 + vatRate) * 100) / 100;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
           <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:right;">${rateTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${(l.amountHt||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${(l.vatAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${(l.amountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
@@ -10255,7 +10259,7 @@
       const tfoot = byId("qdLinesFoot");
       if (tfoot) {
         tfoot.innerHTML = lines.length
-          ? `<tr><td colspan="4"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td></tr>`
+          ? `<tr><td colspan="5"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td></tr>`
           : "";
       }
     }
@@ -10279,10 +10283,11 @@
           <input id="qlEnd" type="date" style="width:108px;font-size:12px;" />
         </td>
         <td id="qlDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="tarif/j" style="width:75px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlHt" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:75px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="qlTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="HT/j" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlHt" type="number" step="0.01" readonly tabindex="-1" placeholder="0" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:72px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlTtc" type="number" step="0.01" readonly tabindex="-1" placeholder="0" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <button id="qlSaveBtn" style="padding:3px 10px;font-size:13px;">✓</button>
           <button id="qlCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;">✗</button>
@@ -10291,57 +10296,55 @@
       `;
       tbody.appendChild(tr);
 
-      const recompute = () => {
-        const ht = Number(byId("qlHt").value || 0);
-        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
-        byId("qlVat").value = vatAmount.toFixed(2);
-        byId("qlTtc").value = amountTtc.toFixed(2);
-      };
-      const recomputeFromTtc = () => {
-        const { amountHt, vatAmount } = computeContractLineHt(Number(byId("qlTtc").value || 0));
-        byId("qlHt").value = amountHt.toFixed(2);
-        byId("qlVat").value = vatAmount.toFixed(2);
-      };
-      const updateDur = () => {
+      const vatRate = () => Number(state.settings.vatRate || 19) / 100;
+      const getDays = () => {
         const s = byId("qlStart").value, e = byId("qlEnd").value;
-        if (s && e && e >= s) {
-          const { days } = calcLineDuration(s, e);
-          byId("qlDur").textContent = days + "j";
-          const rate = Number(byId("qlRate").value || 0);
-          if (rate > 0) { byId("qlHt").value = (rate * days).toFixed(2); recompute(); }
-        } else { byId("qlDur").textContent = "—"; }
+        if (s && e && e >= s) return calcLineDuration(s, e).days;
+        return 0;
       };
-      byId("qlRate").oninput  = () => {
-        const s = byId("qlStart").value, e = byId("qlEnd").value;
-        const rate = Number(byId("qlRate").value || 0);
-        if (rate > 0 && s && e && e >= s) {
-          const { days } = calcLineDuration(s, e);
-          byId("qlHt").value = (rate * days).toFixed(2);
-          recompute();
-        }
+      const recalcMontants = () => {
+        const rHt  = Number(byId("qlRate").value    || 0);
+        const rTtc = Number(byId("qlRateTtc").value || 0);
+        const days = getDays();
+        const amtHt  = Math.round(rHt  * days * 100) / 100;
+        const amtTtc = Math.round(rTtc * days * 100) / 100;
+        const vat    = Math.round((amtTtc - amtHt) * 100) / 100;
+        byId("qlHt").value  = days ? amtHt.toFixed(2)  : "";
+        byId("qlTtc").value = days ? amtTtc.toFixed(2) : "";
+        byId("qlVat").value = days ? vat.toFixed(2)    : "";
       };
-      byId("qlHt").oninput    = recompute;
-      byId("qlTtc").oninput   = recomputeFromTtc;
-      byId("qlStart").oninput = updateDur;
-      byId("qlEnd").oninput   = updateDur;
+      byId("qlRate").oninput = () => {
+        const rHt = Number(byId("qlRate").value || 0);
+        byId("qlRateTtc").value = (Math.round(rHt * (1 + vatRate()) * 100) / 100).toFixed(2);
+        recalcMontants();
+      };
+      byId("qlRateTtc").oninput = () => {
+        const rTtc = Number(byId("qlRateTtc").value || 0);
+        byId("qlRate").value = (Math.round(rTtc / (1 + vatRate()) * 100) / 100).toFixed(2);
+        recalcMontants();
+      };
+      byId("qlStart").oninput = recalcMontants;
+      byId("qlEnd").oninput   = recalcMontants;
       byId("qlSaveBtn").onclick   = () => submitInlineQuoteLine(quoteId, tr);
       byId("qlCancelBtn").onclick = () => { tr.remove(); byId("qdAddLineBtn").textContent = "+ Ajouter une ligne"; renderQuoteDetailLines(quoteId); };
       byId("qlCar").focus();
     }
 
     async function submitInlineQuoteLine(quoteId, tr) {
-      const carId = byId("qlCar").value;
+      const carId    = byId("qlCar").value;
       const startStr = byId("qlStart").value, endStr = byId("qlEnd").value;
-      const amountHt = Number(byId("qlHt").value || 0);
-      const rate = Number(byId("qlRate").value || 0);
+      const rate     = Number(byId("qlRate").value    || 0);
+      const rateTtc  = Number(byId("qlRateTtc").value || 0);
+      const amountHt  = Number(byId("qlHt").value  || 0);
+      const amountTtc = Number(byId("qlTtc").value || 0);
+      const vatAmount = Math.round((amountTtc - amountHt) * 100) / 100;
       const errDiv = byId("qlError");
       errDiv.style.display = "none";
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
       if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
-      if (amountHt <= 0) { errDiv.textContent = "Montant HT requis"; errDiv.style.display = ""; return; }
+      if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(startStr, endStr);
-      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
       const saveBtn = byId("qlSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
       const result = await apiPostWithError("/quote-lines", {
@@ -10357,7 +10360,7 @@
       const lineData = result.data;
       state.quoteLines.push({
         id: lineData?.id || uid("QL"), quoteId, carId, carPlate: car ? car.plate : "",
-        periodStart: startStr, periodEnd: endStr, days, months, rate, rateCurrency: "TND",
+        periodStart: startStr, periodEnd: endStr, days, months, rate, rateTtc, rateCurrency: "TND",
         amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
       });
       // Mettre à jour les totaux du devis dans state
