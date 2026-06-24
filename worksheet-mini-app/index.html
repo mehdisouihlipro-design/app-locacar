@@ -10311,6 +10311,15 @@
           if (rate > 0) { byId("qlHt").value = (rate * days).toFixed(2); recompute(); }
         } else { byId("qlDur").textContent = "—"; }
       };
+      byId("qlRate").oninput  = () => {
+        const s = byId("qlStart").value, e = byId("qlEnd").value;
+        const rate = Number(byId("qlRate").value || 0);
+        if (rate > 0 && s && e && e >= s) {
+          const { days } = calcLineDuration(s, e);
+          byId("qlHt").value = (rate * days).toFixed(2);
+          recompute();
+        }
+      };
       byId("qlHt").oninput    = recompute;
       byId("qlTtc").oninput   = recomputeFromTtc;
       byId("qlStart").oninput = updateDur;
