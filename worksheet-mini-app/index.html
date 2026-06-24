@@ -1267,20 +1267,6 @@
         </div>
       </div>
       <div class="dashboard-grid">
-        <div class="card">
-          <div class="muted">Devis en attente</div>
-          <div id="homeKpiPendingQuotes" class="kpi">0</div>
-        </div>
-        <div class="card">
-          <div class="muted">Devis expirant bientôt (&le;7 j)</div>
-          <div id="homeKpiExpiringQuotes" class="kpi">0</div>
-        </div>
-        <div class="card">
-          <div class="muted">Devis validés</div>
-          <div id="homeKpiValidatedQuotes" class="kpi">0</div>
-        </div>
-      </div>
-      <div class="dashboard-grid">
         <div id="homeCardRevenue" class="chart-card">
           <h4>Revenus (6 derniers mois)</h4>
           <div id="revenueBars" class="bars"></div>
@@ -1301,6 +1287,10 @@
         <div id="homeCardProfitability" class="chart-card">
           <h4>Rentabilite par vehicule</h4>
           <div id="profitabilityBars" class="bars"></div>
+        </div>
+        <div id="homeCardQuotes" class="chart-card">
+          <h4>Statut devis</h4>
+          <div id="quoteStatusBars" class="bars"></div>
         </div>
       </div>
       <div class="chart-card">
@@ -4348,30 +4338,6 @@
       openTab("collections");
     });
 
-    if (byId("homeKpiPendingQuotes")) {
-      byId("homeKpiPendingQuotes").parentElement.addEventListener("click", () => {
-        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "envoye";
-        const srch = byId("quotesSearch"); if (srch) srch.value = "";
-        openTab("quotes");
-        renderQuotes();
-      });
-    }
-    if (byId("homeKpiExpiringQuotes")) {
-      byId("homeKpiExpiringQuotes").parentElement.addEventListener("click", () => {
-        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "";
-        const srch = byId("quotesSearch"); if (srch) srch.value = "";
-        openTab("quotes");
-        renderQuotes();
-      });
-    }
-    if (byId("homeKpiValidatedQuotes")) {
-      byId("homeKpiValidatedQuotes").parentElement.addEventListener("click", () => {
-        const sel = byId("quotesFilterStatus"); if (sel) sel.value = "valide";
-        const srch = byId("quotesSearch"); if (srch) srch.value = "";
-        openTab("quotes");
-        renderQuotes();
-      });
-    }
 
     if (byId("alertLateCount")) {
       byId("alertLateCount").parentElement.addEventListener("click", () => applyAlertsFilter({ level: "en_retard" }));
@@ -8321,22 +8287,9 @@
       const allAlerts = collectAlerts();
       const criticalAlerts = allAlerts.filter((a) => a.level === "en_retard" || a.level === "urgent").length;
 
-      const in7Days = new Date(today); in7Days.setDate(in7Days.getDate() + 7);
-      const in7DaysStr = in7Days.toISOString().slice(0, 10);
-      const pendingQuotes = (state.quotes || []).filter(q => getQuoteDisplayStatus(q) === "envoye").length;
-      const expiringQuotes = (state.quotes || []).filter(q => {
-        const ds = getQuoteDisplayStatus(q);
-        if (ds === "valide" || ds === "refuse" || ds === "expire") return false;
-        return q.validityDate && q.validityDate >= today && q.validityDate <= in7DaysStr;
-      }).length;
-      const validatedQuotes = (state.quotes || []).filter(q => q.status === "valide").length;
-
       byId("homeKpiAvailableCars").textContent = String(availableCars);
       byId("homeKpiActiveReservations").textContent = String(activeReservations);
       byId("homeKpiCriticalAlerts").textContent = String(criticalAlerts);
-      if (byId("homeKpiPendingQuotes")) byId("homeKpiPendingQuotes").textContent = String(pendingQuotes);
-      if (byId("homeKpiExpiringQuotes")) byId("homeKpiExpiringQuotes").textContent = String(expiringQuotes);
-      if (byId("homeKpiValidatedQuotes")) byId("homeKpiValidatedQuotes").textContent = String(validatedQuotes);
       if (byId("homeKpiTreasuryNow")) byId("homeKpiTreasuryNow").textContent = formatTnd(treasury.currentCashTnd);
       if (byId("homeKpiTreasury60d")) byId("homeKpiTreasury60d").textContent = formatTnd(treasury.projectedCashTnd);
       if (byId("homeKpiTreasuryMin")) byId("homeKpiTreasuryMin").textContent = formatTnd(treasury.minProjectedCashTnd);
@@ -8440,6 +8393,34 @@
             }
           }
         }));
+        // Quotes status chart — Doughnut
+        const quoteSeries = [
+          { label: "Brouillon",  status: "brouillon", value: (state.quotes||[]).filter(q => getQuoteDisplayStatus(q) === "brouillon").length,  color: "#94a3b8" },
+          { label: "Envoyé",     status: "envoye",    value: (state.quotes||[]).filter(q => getQuoteDisplayStatus(q) === "envoye").length,    color: "#f97316" },
+          { label: "Validé",     status: "valide",    value: (state.quotes||[]).filter(q => getQuoteDisplayStatus(q) === "valide").length,    color: "#16a34a" },
+          { label: "Refusé",     status: "refuse",    value: (state.quotes||[]).filter(q => getQuoteDisplayStatus(q) === "refuse").length,    color: "#dc2626" },
+          { label: "Expiré",     status: "expire",    value: (state.quotes||[]).filter(q => getQuoteDisplayStatus(q) === "expire").length,    color: "#9ca3af" },
+        ].filter(s => s.value > 0);
+        const quoteCanvas = cjsCanvas("cjsQuotes", "quoteStatusBars");
+        if (quoteCanvas && quoteSeries.length) cjsSave("cjsQuotes", new Chart(quoteCanvas, {
+          type: "doughnut",
+          data: { labels: quoteSeries.map(s => s.label), datasets: [{ data: quoteSeries.map(s => s.value), backgroundColor: quoteSeries.map(s => s.color), borderWidth: 2, borderColor: "#fff" }] },
+          options: {
+            responsive: true, cutout: "65%",
+            plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
+            onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
+            onClick(e, elements) {
+              if (!elements.length) return;
+              const seg = quoteSeries[elements[0].index];
+              if (!seg) return;
+              e.native?.stopPropagation();
+              const sel = byId("quotesFilterStatus"); if (sel) sel.value = seg.status;
+              const srch = byId("quotesSearch"); if (srch) srch.value = "";
+              history.pushState({ tab: "quotes" }, "", "#quotes");
+              switchToTab("quotes");
+            }
+          }
+        })) ;
       } else {
         renderBarChart("revenueBars", getRevenueSeries());
         renderBarChart("fleetBars", getFleetSeries());
