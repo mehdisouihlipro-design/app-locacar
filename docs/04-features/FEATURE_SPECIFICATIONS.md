@@ -1212,8 +1212,9 @@ Chaque pile/carte statistique (KPI), liste et graphique doit être cliquable et 
 | KPI "Contrats actifs" (dashboard) | `#contracts` filtré `status=active` |
 | Cellule "Nombre de véhicules" sur une ligne de la grille Contrats (9.3) | Détail du contrat → pavé `contract_lines` |
 | Graphique de rentabilité par véhicule (existant) | Détail du véhicule, filtré sur la période du graphique |
-| Future KPI "Devis en attente" (dashboard) | `#quotes` filtré `status=envoye` |
-| Future KPI "Devis expirant bientôt" | `#quotes` filtré `status=envoye` + tri par `validity_date` croissant |
+| ✅ KPI "Devis en attente" (dashboard, 2026-06) | `#quotes` filtré `status=envoye` |
+| ✅ KPI "Devis expirant bientôt ≤7 j" (dashboard, 2026-06) | `#quotes` sans filtre (tous statuts actifs) |
+| ✅ KPI "Devis validés" (dashboard, 2026-06) | `#quotes` filtré `status=valide` |
 | Ligne `contract_lines` au statut `resilie` (9.9) | Détail de la réservation associée (`reservations.contract_line_id`) |
 
 ### 9.1 Contrat : montant HT ⇄ TTC (BR18)
