@@ -4910,7 +4910,7 @@
     function renderForTab(tabId) {
       switch (tabId) {
         case "home":
-          if (!_dashLayoutLoaded) {
+          if (_dashLayoutLoadedForUser !== (currentUser?.id || null)) {
             loadDashboardLayout().then(() => { applyDashboardLayout(_dashboardLayout); renderHomeDashboard(); });
           } else {
             applyDashboardLayout(_dashboardLayout);
@@ -5267,12 +5267,6 @@
       }
       currentUser = null;
       authTransport = "supabase";
-      // Réinitialiser le cache dashboard — chaque utilisateur a son propre layout
-      _dashboardLayout = null;
-      _dashLayoutLoaded = false;
-      _dashControlsInited = false;
-      if (_dashSortableInstance) { _dashSortableInstance.destroy(); _dashSortableInstance = null; }
-      _dashSortableInited = false;
       setAppVisibility(false);
       setAuthStatus("Deconnecté.");
     }
@@ -8797,7 +8791,7 @@
 
     // ── Dashboard layout persistence (ordre + taille + masquage) ──────────
     let _dashboardLayout = null;
-    let _dashLayoutLoaded = false;
+    let _dashLayoutLoadedForUser = null; // ID de l'utilisateur pour lequel le layout est en cache
     let _dashSortableInited = false;
     let _dashControlsInited = false;
     let _dashSortableInstance = null;
@@ -8883,11 +8877,12 @@
     }
 
     async function loadDashboardLayout() {
+      const userId = currentUser?.id || null;
       try {
         const data = await apiGet('/preferences/dashboard-layout');
-        if (data?.data) _dashboardLayout = data.data;
-      } catch (e) { /* première visite — pas de layout sauvegardé */ }
-      _dashLayoutLoaded = true;
+        _dashboardLayout = data?.data || null;
+      } catch (e) { _dashboardLayout = null; }
+      _dashLayoutLoadedForUser = userId;
     }
 
     function initDashboardSortable() {
