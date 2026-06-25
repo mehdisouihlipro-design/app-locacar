@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { stampCreate, stampUpdate } from '../utils/audit';
+import { nextSequenceNumber } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -97,8 +98,13 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const id = req.body.id || uid('QUO');
+    let quoteNumber = req.body.quote_number || null;
+    if (!quoteNumber) {
+      try { quoteNumber = await nextSequenceNumber('quotes'); } catch { /* non bloquant si souche absente */ }
+    }
     const body = {
       ...req.body, id,
+      quote_number: quoteNumber,
       status: req.body.status || 'brouillon',
       total_amount_ht: 0, total_vat_amount: 0, total_amount_ttc: 0,
     };
@@ -147,6 +153,8 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     // Créer le contrat entête
     const contractId = uid('CTR');
     const contractDate = new Date().toISOString().split('T')[0];
+    const contractType = quote.type || 'court';
+    const paymentPlan = contractType === 'long' ? 'mensualite' : 'paiement client debut';
     const contractBody = stampCreate({
       id: contractId,
       quote_id: req.params.id,
@@ -154,11 +162,11 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       customer_name: quote.customer_name,
       car_id: null, car_plate: '',
       contract_date: contractDate,
-      type: 'court',
+      type: contractType,
       days: 0, months: 0, rate: 0, rate_currency: 'TND',
       quotient: 0, quotient_currency: 'TND', quotient_tnd: 0,
       total_amount_original: 0, total_amount_tnd: 0,
-      payment_moment: 'debut', payment_plan: 'paiement client debut',
+      payment_moment: 'debut', payment_plan: paymentPlan,
       status: 'active',
     }, req);
     await global.db.post('/contracts', contractBody, { headers: { Prefer: 'return=minimal' } });

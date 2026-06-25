@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>E-Drive - Gestion Locative</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;600;700;800&display=swap");
 
@@ -462,7 +463,53 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px;
+      position: relative;
     }
+
+    /* ── Dashboard drag / resize / hide ── */
+    .card  { position: relative; }
+    .dash-span-1 { grid-column: span 1; }
+    .dash-span-2 { grid-column: span 2; }
+    .dash-span-3 { grid-column: span 3; }
+    .dash-hidden { display: none !important; }
+
+    .card-toolbar {
+      position: absolute;
+      top: 6px; right: 6px;
+      display: flex; align-items: center; gap: 2px;
+      opacity: 0; transition: opacity .15s;
+      z-index: 2;
+    }
+    .card:hover .card-toolbar,
+    .chart-card:hover .card-toolbar { opacity: 1; }
+    .cbt {
+      background: none; border: none;
+      padding: 2px 5px; cursor: pointer;
+      color: #b0bcd0; font-size: 13px; line-height: 1;
+      border-radius: 4px; transition: color .1s, background .1s;
+    }
+    .cbt:hover { color: #3c4a6e; background: #edf0f8; }
+    .cbt.cbt-hide:hover { color: #c53030; background: #fff5f5; }
+    .drag-handle {
+      cursor: grab; color: #b0bcd0; font-size: 18px;
+      line-height: 1; user-select: none; padding: 1px 2px;
+    }
+    .drag-handle:hover { color: #7a90bb; }
+
+    #dashHiddenBar {
+      display: none; flex-wrap: wrap; gap: 6px; align-items: center;
+      padding: 7px 10px; margin-bottom: 10px;
+      background: #fffbf0; border: 1px solid #ffe082; border-radius: 8px;
+      font-size: 12px;
+    }
+    .dash-restore-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 20px;
+      padding: 3px 10px; cursor: pointer; font-size: 12px; transition: border-color .15s;
+    }
+    .dash-restore-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .sortable-ghost  { opacity: .35; }
+    .sortable-chosen { box-shadow: 0 4px 20px rgba(47,107,255,.22); }
 
     .bars {
       display: flex;
@@ -1234,83 +1281,197 @@
       <button class="tab" data-tab="gps">GPS</button>
       <button class="tab" data-tab="settings">Actions rapides</button>
       <button class="tab" data-tab="users">Utilisateurs</button>
+      <button class="tab" data-tab="data-management">Gestion des données</button>
     </div>
 
     <section id="home" class="panel active">
-      <h3>Dashboard E-Drive</h3>
-      <div class="dashboard-grid">
-        <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">Dashboard E-Drive</h3>
+        <span style="font-size:11px;color:var(--muted);user-select:none;">Survoler une carte : ⠿ déplacer · ◂▸ redimensionner · ✕ masquer</span>
+      </div>
+
+      <!-- Barre de restauration des widgets masqués -->
+      <div id="dashHiddenBar"></div>
+
+      <!-- Grille unique — KPIs + graphiques, tout déplaçable -->
+      <div id="dashboardGrid" class="dashboard-grid">
+
+        <!-- ── KPI cards ── -->
+        <div class="card dash-span-1" data-card-id="kpiAvailCars" data-default-span="1" data-label="Véhicules disponibles">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Vehicules disponibles</div>
           <div id="homeKpiAvailableCars" class="kpi">0</div>
         </div>
-        <div class="card">
+
+        <div class="card dash-span-1" data-card-id="kpiActiveRsv" data-default-span="1" data-label="Réservations actives">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Reservations actives</div>
           <div id="homeKpiActiveReservations" class="kpi">0</div>
         </div>
-        <div class="card">
+
+        <div class="card dash-span-1" data-card-id="kpiAlerts" data-default-span="1" data-label="Alertes critiques">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Alertes critiques</div>
           <div id="homeKpiCriticalAlerts" class="kpi">0</div>
         </div>
-      </div>
-      <div class="dashboard-grid">
-        <div class="card">
+
+        <div class="card dash-span-1" data-card-id="kpiTreasuryNow" data-default-span="1" data-label="Trésorerie actuelle">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Tresorerie actuelle (TND)</div>
           <div id="homeKpiTreasuryNow" class="kpi">0</div>
         </div>
-        <div class="card">
+
+        <div class="card dash-span-1" data-card-id="kpiTreasury1y" data-default-span="1" data-label="Projection trésorerie 1 an">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Projection tresorerie a 1 an</div>
           <div id="homeKpiTreasury60d" class="kpi">0</div>
         </div>
-        <div class="card">
+
+        <div class="card dash-span-1" data-card-id="kpiTreasuryMin" data-default-span="1" data-label="Point bas prévisionnel">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <div class="muted">Point bas previsionnel (1 an)</div>
           <div id="homeKpiTreasuryMin" class="kpi">0</div>
         </div>
-      </div>
-      <div class="dashboard-grid">
-        <div id="homeCardRevenue" class="chart-card">
+
+        <!-- ── Graphiques ── -->
+        <div id="homeCardRevenue" class="chart-card dash-span-1" data-card-id="chartRevenue" data-default-span="1" data-label="Revenus 6 mois">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Revenus (6 derniers mois)</h4>
           <div id="revenueBars" class="bars"></div>
         </div>
-        <div id="homeCardFleet" class="chart-card">
+
+        <div id="homeCardFleet" class="chart-card dash-span-1" data-card-id="chartFleet" data-default-span="1" data-label="État du parc">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Etat du parc</h4>
           <div id="fleetBars" class="bars"></div>
         </div>
-        <div id="homeCardAlerts" class="chart-card">
+
+        <div id="homeCardAlerts" class="chart-card dash-span-1" data-card-id="chartAlerts" data-default-span="1" data-label="Répartition alertes">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Repartition alertes</h4>
           <div id="alertsBars" class="bars"></div>
         </div>
-        <div id="homeCardTreasury" class="chart-card">
+
+        <div id="homeCardTreasury" class="chart-card dash-span-1" data-card-id="chartTreasury" data-default-span="1" data-label="Trésorerie 12 mois">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Tresorerie previsionnelle (12 mois)</h4>
           <div id="treasuryBars" class="bars"></div>
           <div id="treasuryRiskMessage" class="small"></div>
         </div>
-        <div id="homeCardProfitability" class="chart-card">
+
+        <div id="homeCardProfitability" class="chart-card dash-span-1" data-card-id="chartProfitability" data-default-span="1" data-label="Rentabilité véhicule">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Rentabilite par vehicule</h4>
           <div id="profitabilityBars" class="bars"></div>
         </div>
-        <div id="homeCardQuotes" class="chart-card">
+
+        <div id="homeCardQuotes" class="chart-card dash-span-1" data-card-id="chartQuotes" data-default-span="1" data-label="Statut devis">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
           <h4>Statut devis</h4>
           <div id="quoteStatusBars" class="bars"></div>
         </div>
-      </div>
-      <div class="chart-card">
-        <h4>Prevision journaliere tresorerie (365 jours)</h4>
-        <div class="small">Encaissements (paiements client) et decaissements (assurances, leasing, vignettes) avec solde cumule.</div>
-        <div class="forecast-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Encaissements prevus</th>
-                <th>Decaissements prevus</th>
-                <th>Variation nette</th>
-                <th>Solde projete</th>
-                <th>Etat</th>
-              </tr>
-            </thead>
-            <tbody id="treasuryForecastTable"></tbody>
-          </table>
+
+        <div id="homeCardOccupancy" class="chart-card dash-span-1" data-card-id="chartOccupancy" data-default-span="1" data-label="Occupation flotte">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <h4 style="margin:0;">Taux d'occupation flotte — 6 prochains mois</h4>
+            <span id="homeOccupancyKpi" style="font-size:13px;font-weight:600;color:var(--primary);"></span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pourcentage de véhicules occupés (réservations + contrats actifs) par rapport au parc total.</div>
+          <div id="occupancyBars" style="position:relative;height:220px;"></div>
         </div>
+
+        <div class="chart-card dash-span-3" data-card-id="cardForecast" data-default-span="3" data-label="Prévision trésorerie 365j">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
+          <h4>Prevision journaliere tresorerie (365 jours)</h4>
+          <div class="small">Encaissements (paiements client) et decaissements (assurances, leasing, vignettes) avec solde cumule.</div>
+          <div class="forecast-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Encaissements prevus</th>
+                  <th>Decaissements prevus</th>
+                  <th>Variation nette</th>
+                  <th>Solde projete</th>
+                  <th>Etat</th>
+                </tr>
+              </thead>
+              <tbody id="treasuryForecastTable"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -1566,6 +1727,14 @@
           <div>
             <label>Client</label>
             <select id="quoteCustomer"></select>
+          </div>
+          <div>
+            <label>Type</label>
+            <select id="quoteType">
+              <option value="court">Court terme</option>
+              <option value="long">Long terme</option>
+              <option value="autre">Autre</option>
+            </select>
           </div>
           <div>
             <label>Date du devis</label>
@@ -2541,9 +2710,80 @@
       </div>
 
       <p class="muted">Tu peux precharger des donnees de demo ou tout vider.</p>
-      <div class="actions">
+      <div class="actions" style="margin-bottom:32px;">
         <button class="secondary" id="seedBtn">Charger donnees demo</button>
         <button class="warn" id="resetBtn">Vider toutes les donnees</button>
+      </div>
+
+      <!-- ── Souches de numéros ──────────────────────────────────────────────── -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div>
+            <h4 style="margin:0 0 4px;font-size:15px;">Souches de numéros</h4>
+            <p style="margin:0;font-size:12px;color:var(--muted);">Configurez le préfixe, le séparateur et le nombre de chiffres de chaque numérotation automatique.</p>
+          </div>
+          <button class="secondary" style="font-size:12px;padding:5px 12px;" onclick="renderNumberSequences()">↺ Rafraîchir</button>
+        </div>
+        <div id="nsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;"></div>
+      </div>
+
+      <!-- Modal édition souche -->
+      <div id="nsEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px;">
+        <div class="modal-card" style="width:min(460px,100%);max-height:90vh;overflow:auto;">
+          <button type="button" class="modal-close-x" onclick="byId('nsEditModal').style.display='none'">&times;</button>
+          <h3 id="nsEditTitle" style="margin:0 0 20px;font-size:15px;"></h3>
+          <div class="row" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="font-size:12px;">Préfixe</label>
+              <input id="nsEditPrefix" type="text" maxlength="20" placeholder="ex: FAC" style="font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:12px;">Séparateur</label>
+              <select id="nsEditSeparator" style="font-size:13px;">
+                <option value="-">Tiret  —</option>
+                <option value="/">Barre oblique  /</option>
+                <option value=".">Point  .</option>
+                <option value="_">Underscore  _</option>
+                <option value="">Aucun</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;">Nombre de chiffres</label>
+              <input id="nsEditDigits" type="number" min="1" max="10" style="font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:12px;">Inclure l'année</label>
+              <select id="nsEditIncludeYear" style="font-size:13px;">
+                <option value="true">Oui</option>
+                <option value="false">Non</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;">Remise à zéro annuelle</label>
+              <select id="nsEditResetAnnually" style="font-size:13px;">
+                <option value="true">Oui (1er janvier)</option>
+                <option value="false">Non (incrémental)</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border-radius:6px;font-size:13px;">
+            Aperçu : <strong id="nsEditPreview" style="font-family:monospace;color:var(--primary);"></strong>
+          </div>
+          <div id="nsEditError" style="display:none;color:#c53030;font-size:13px;margin-top:8px;"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+            <button class="secondary" onclick="byId('nsEditModal').style.display='none'">Annuler</button>
+            <button id="nsEditSaveBtn">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal audit souche -->
+      <div id="nsAuditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px;">
+        <div class="modal-card" style="width:min(560px,100%);max-height:90vh;overflow:auto;">
+          <button type="button" class="modal-close-x" onclick="byId('nsAuditModal').style.display='none'">&times;</button>
+          <h3 id="nsAuditTitle" style="margin:0 0 16px;font-size:15px;"></h3>
+          <div id="nsAuditContent"></div>
+        </div>
       </div>
     </section>
 
@@ -2627,6 +2867,86 @@
         <thead><tr><th>Email</th><th>Nom</th><th>Rôle</th><th>Actif</th><th>Créé</th><th>Action</th></tr></thead>
         <tbody id="usersTable"></tbody>
       </table>
+    </section>
+
+    <!-- ── Gestion des données (DMF) ──────────────────────────────────────── -->
+    <section id="data-management" class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h3 style="margin:0 0 4px;">Gestion des données</h3>
+          <p style="margin:0;font-size:13px;color:var(--muted);">Importez et exportez le paramétrage et les référentiels par entité — format CSV compatible Excel.</p>
+        </div>
+      </div>
+
+      <!-- Grille d'entités -->
+      <div id="dmfEntityGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px;"></div>
+
+      <!-- Zone résultat import -->
+      <div id="dmfResultPanel" style="display:none;border:1px solid #e2e8f0;border-radius:10px;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h4 id="dmfResultTitle" style="margin:0;font-size:15px;"></h4>
+          <button class="secondary" style="font-size:12px;padding:4px 10px;" onclick="byId('dmfResultPanel').style.display='none'">✕ Fermer</button>
+        </div>
+        <!-- Stats badges -->
+        <div id="dmfResultStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;font-size:13px;"></div>
+        <!-- Dry run notice -->
+        <div id="dmfDryRunNotice" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;">
+          ⚠ Mode validation uniquement — aucune donnée n'a été écrite. Décochez "Valider sans importer" pour importer.
+        </div>
+        <!-- Error table -->
+        <div id="dmfErrorWrap" style="display:none;">
+          <p style="font-size:13px;font-weight:600;color:#c53030;margin:0 0 8px;">Erreurs détectées :</p>
+          <div style="max-height:300px;overflow-y:auto;border:1px solid #fed7d7;border-radius:6px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead style="background:#fff5f5;position:sticky;top:0;">
+                <tr><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #fed7d7;">Ligne</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #fed7d7;">Champ</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #fed7d7;">Erreur</th></tr>
+              </thead>
+              <tbody id="dmfErrorTable"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;" id="dmfSkipErrorWrap">
+            <button id="dmfImportAnywayBtn" style="font-size:13px;">Importer les lignes valides quand même</button>
+            <span style="font-size:12px;color:var(--muted);">Les lignes en erreur seront ignorées.</span>
+          </div>
+        </div>
+        <!-- Export report -->
+        <div id="dmfExportReportBtn" style="display:none;margin-top:8px;">
+          <button class="secondary" id="dmfDownloadReportBtn" style="font-size:12px;">↓ Télécharger rapport d'erreurs CSV</button>
+        </div>
+      </div>
+
+      <!-- Import modal (caché) -->
+      <div id="dmfImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px;">
+        <div class="modal-card" style="width:min(520px,100%);max-height:90vh;overflow:auto;">
+          <button type="button" class="modal-close-x" onclick="byId('dmfImportModal').style.display='none'">&times;</button>
+          <h3 id="dmfModalTitle" style="margin:0 0 16px;font-size:16px;"></h3>
+
+          <!-- Step 1: template download -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+            <p style="margin:0 0 8px;font-size:13px;font-weight:600;">Étape 1 — Télécharger le template</p>
+            <button id="dmfDownloadTemplateBtn" class="secondary" style="font-size:12px;">↓ Télécharger le template CSV</button>
+            <p style="margin:6px 0 0;font-size:11px;color:var(--muted);">Remplissez le fichier avec vos données (conservez les en-têtes).</p>
+          </div>
+
+          <!-- Step 2: upload -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+            <p style="margin:0 0 8px;font-size:13px;font-weight:600;">Étape 2 — Sélectionner le fichier</p>
+            <input type="file" id="dmfFileInput" accept=".csv,.txt" style="font-size:13px;width:100%;" />
+            <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="dmfDryRunCheck" />
+              <label for="dmfDryRunCheck" style="font-size:13px;">Valider sans importer (simulation)</label>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="secondary" onclick="byId('dmfImportModal').style.display='none'">Annuler</button>
+            <button id="dmfSubmitImportBtn">↑ Lancer l'import</button>
+          </div>
+          <div id="dmfImportSpinner" style="display:none;text-align:center;padding:12px;font-size:13px;color:var(--muted);">⏳ Import en cours…</div>
+          <div id="dmfImportError" style="display:none;color:#c53030;font-size:13px;margin-top:8px;"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Modal détail utilisateur -->
@@ -2767,6 +3087,33 @@
           </table>
         </div>
         <div id="cdlEmptyMsg" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucune ligne — cliquez sur "+ Ajouter une ligne" pour commencer.</div>
+
+        <!-- Échéancier de facturation (BR27 — contrats long terme uniquement) -->
+        <div id="cdlScheduleSection" style="display:none;margin-top:24px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <h4 style="margin:0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Échéancier de facturation</h4>
+            <button id="cdlGenerateScheduleBtn" style="font-size:12px;padding:4px 12px;">Générer l'échéancier</button>
+            <button id="cdlRegenerateScheduleBtn" class="secondary" style="font-size:12px;padding:4px 12px;display:none;">↺ Régénérer</button>
+          </div>
+          <div id="cdlScheduleError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px;"></div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
+                  <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Libellé</th>
+                  <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">HT</th>
+                  <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                  <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
+                  <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Action</th>
+                </tr>
+              </thead>
+              <tbody id="cdlScheduleBody"></tbody>
+            </table>
+          </div>
+          <div id="cdlScheduleEmpty" style="display:none;text-align:center;padding:16px;color:var(--muted);font-size:13px;">Aucun échéancier — cliquez sur "Générer l'échéancier" pour créer les entrées mensuelles.</div>
+        </div>
+
         <div class="actions" style="margin-top:16px;">
           <button id="cdlCloseBtn" class="secondary">Fermer</button>
         </div>
@@ -3091,6 +3438,8 @@
     state.contractLines = []; // chargé depuis API au login (non persisté en localStorage)
     state.quotes = [];
     state.quoteLines = [];
+    state.invoiceLines = [];
+    state.invoiceSchedule = [];
     const reservationCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let supabaseClient = null;
     let currentUser = null;
@@ -4558,7 +4907,16 @@
 
     function renderForTab(tabId) {
       switch (tabId) {
-        case "home":         renderHomeDashboard(); break;
+        case "home":
+          if (!_dashLayoutLoaded) {
+            loadDashboardLayout().then(() => { applyDashboardLayout(_dashboardLayout); renderHomeDashboard(); });
+          } else {
+            applyDashboardLayout(_dashboardLayout);
+            renderHomeDashboard();
+          }
+          initDashboardSortable();
+          initCardControls();
+          break;
         case "cars":         renderCars(); break;
         case "customers":    renderCustomers(); break;
         case "contracts":    renderContracts(); break;
@@ -4574,8 +4932,9 @@
         case "rentabilite":  renderRentabilite(); break;
         case "alerts":       renderAlerts(); break;
         case "gps":          renderGpsMap(); break;
-        case "settings":     populateSettingsFields(); break;
-        case "users":        renderUsers(); break;
+        case "settings":     populateSettingsFields(); renderNumberSequences(); break;
+        case "users":            renderUsers(); break;
+        case "data-management":  renderDataManagement(); break;
       }
     }
 
@@ -4975,6 +5334,18 @@
       }
     }
 
+    async function apiDeleteWithError(path) {
+      const token = localStorage.getItem("locacar-jwt");
+      if (!token || !API_URL) return { ok: false, status: 0, errorMsg: "Non authentifié" };
+      try {
+        const res = await fetch(`${API_URL}${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) return { ok: true, status: res.status };
+        const errorMsg = data.message || data.error || JSON.stringify(data);
+        return { ok: false, status: res.status, errorMsg };
+      } catch (e) { return { ok: false, status: 0, errorMsg: String(e) }; }
+    }
+
     // Variante de apiPost qui retourne { ok, data, status, errorMsg } pour les erreurs 409 (BR19)
     async function apiPostWithError(path, body) {
       const token = localStorage.getItem("locacar-jwt");
@@ -4995,11 +5366,12 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
+      const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, invoiceLinesRaw, invoiceScheduleRaw, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/contract-lines"),
         apiGet("/quotes"), apiGet("/quote-lines"),
-        apiGet("/invoices"), apiGet("/payments"), apiGet("/maintenance"),
+        apiGet("/invoices"), apiGet("/invoice-lines"), apiGet("/invoice-schedule"),
+        apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
         apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
         apiGet("/users"),
@@ -5082,6 +5454,7 @@
         id: q.id, customerId: q.customer_id, customerName: q.customer_name || "",
         quoteDate: q.quote_date || "", validityDate: q.validity_date || "",
         status: q.status || "brouillon", notes: q.notes || "",
+        type: q.type || "court",
         totalAmountHt: q.total_amount_ht || 0, totalVatAmount: q.total_vat_amount || 0,
         totalAmountTtc: q.total_amount_ttc || 0,
         convertedContractId: q.converted_contract_id || null,
@@ -5102,6 +5475,7 @@
         amountTnd: i.amount_tnd || 0, paidAmountTnd: i.paid_amount_tnd || 0,
         dueAmountTnd: i.due_amount_tnd || 0, label: i.label || "",
         dueDate: i.due_date || "", status: i.status || "en_attente",
+        invoiceNumber: i.invoice_number || null, scheduleId: i.schedule_id || null,
         reminderCount: i.reminder_count || 0,
         amountHt: i.amount_ht || 0, vatAmount: i.vat_amount || 0,
         dailyTaxAmount: i.daily_tax_amount || 0, stampDutyAmount: i.stamp_duty_amount || 0,
@@ -5110,6 +5484,31 @@
         rib: i.rib || "", ribLabel: i.rib_label || "",
         createdAt: i.created_at || "", createdBy: i.created_by || null,
         updatedAt: i.updated_at || "", updatedBy: i.updated_by || null,
+      }));
+
+      if (invoiceLinesRaw) state.invoiceLines = invoiceLinesRaw.map(l => ({
+        id: l.id, invoiceId: l.invoice_id,
+        contractLineId: l.contract_line_id || null, contractId: l.contract_id || null,
+        carPlate: l.car_plate || "", designation: l.designation || "",
+        amountOriginal: l.amount_original || 0, currency: l.currency || "TND",
+        amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+        dailyTaxAmount: l.daily_tax_amount || 0, days: l.days || 0,
+        periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        lineTtc: l.line_ttc || 0,
+        createdAt: l.created_at || "", createdBy: l.created_by || null,
+        updatedAt: l.updated_at || "", updatedBy: l.updated_by || null,
+      }));
+
+      if (invoiceScheduleRaw) state.invoiceSchedule = invoiceScheduleRaw.map(s => ({
+        id: s.id, contractId: s.contract_id,
+        scheduledDate: s.scheduled_date || "",
+        periodStart: s.period_start || "", periodEnd: s.period_end || "",
+        amountHt: Number(s.amount_ht || 0), vatAmount: Number(s.vat_amount || 0),
+        dailyTaxAmount: Number(s.daily_tax_amount || 0), lineTtc: Number(s.line_ttc || 0),
+        label: s.label || "", status: s.status || "planifie",
+        invoiceId: s.invoice_id || null,
+        createdAt: s.created_at || "", createdBy: s.created_by || null,
+        updatedAt: s.updated_at || "", updatedBy: s.updated_by || null,
       }));
 
       if (payments) state.payments = payments.map(p => ({
@@ -5533,6 +5932,21 @@
         });
         if (savedInv && savedInv.id) invId = savedInv.id;
 
+        // Fetch invoice_lines created by backend (BR21)
+        const createdInvLines = await apiGet(`/invoice-lines?invoice_id=${encodeURIComponent(invId)}`);
+        if (createdInvLines) {
+          (state.invoiceLines = state.invoiceLines || []).push(...createdInvLines.map(l => ({
+            id: l.id, invoiceId: l.invoice_id,
+            contractLineId: l.contract_line_id || null, contractId: l.contract_id || null,
+            carPlate: l.car_plate || "", designation: l.designation || "",
+            amountOriginal: l.amount_original || 0, currency: l.currency || "TND",
+            amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+            dailyTaxAmount: l.daily_tax_amount || 0, days: l.days || 0,
+            periodStart: l.period_start || "", periodEnd: l.period_end || "",
+            lineTtc: l.line_ttc || 0,
+          })));
+        }
+
         state.invoices.push({
           id: invId,
           contractId: primaryContractId,
@@ -5547,7 +5961,7 @@
           rentalDays: totalDays,
           periodStart,
           periodEnd,
-          lines,
+          lines: [],
           paidAmountTnd: 0,
           dueAmountTnd: totalTnd,
           label,
@@ -5843,7 +6257,11 @@
       let lineRowsHtml;
       let contractsLabel;
 
-      if (invoice.lines && invoice.lines.length) {
+      // Prefer relational invoice_lines; fall back to JSONB for legacy invoices
+      const pdfLines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoiceId));
+      const usedLines = pdfLines.length > 0 ? pdfLines : (invoice.lines || []);
+
+      if (usedLines && usedLines.length) {
         breakdown = {
           amountHt: Number(invoice.amountHt || 0),
           vatAmount: Number(invoice.vatAmount || 0),
@@ -5851,8 +6269,8 @@
           stampDutyAmount: Number(invoice.stampDutyAmount || 0),
           amountTtc: Number(invoice.amountTnd || 0),
         };
-        contractsLabel = invoice.lines.map((l) => l.contractId || "-").join(", ");
-        lineRowsHtml = invoice.lines.map((line) => {
+        contractsLabel = usedLines.map((l) => l.contractId || "-").join(", ");
+        lineRowsHtml = usedLines.map((line) => {
           const lineContract = state.contracts.find((c) => String(c.id) === String(line.contractId || ""));
           const lineCar = lineContract ? state.cars.find((c) => String(c.id) === String(lineContract.carId || "")) : null;
           const lineDesignation = safe((lineCar && lineCar.model) || line.designation || "Vehicule");
@@ -7477,6 +7895,25 @@
             contracts: (state.contracts || []).map(mapContract),
             contract_lines: (state.contractLines || []).map(mapContractLine),
             invoices: (state.invoices || []).map(mapInvoice),
+            invoice_lines: (state.invoiceLines || []).map(l => ({
+              id: l.id, invoice_id: l.invoiceId,
+              contract_id: l.contractId || null, contract_line_id: l.contractLineId || null,
+              car_plate: l.carPlate || "", designation: l.designation || "",
+              amount_original: l.amountOriginal || 0, currency: l.currency || "TND",
+              amount_ht: l.amountHt || 0, vat_amount: l.vatAmount || 0,
+              daily_tax_amount: l.dailyTaxAmount || 0, days: l.days || 0,
+              period_start: l.periodStart || null, period_end: l.periodEnd || null,
+              line_ttc: l.lineTtc || 0,
+            })),
+            invoice_schedule: (state.invoiceSchedule || []).map(s => ({
+              id: s.id, contract_id: s.contractId,
+              scheduled_date: s.scheduledDate || null,
+              period_start: s.periodStart || null, period_end: s.periodEnd || null,
+              amount_ht: s.amountHt || 0, vat_amount: s.vatAmount || 0,
+              daily_tax_amount: s.dailyTaxAmount || 0, line_ttc: s.lineTtc || 0,
+              label: s.label || "", status: s.status || "planifie",
+              invoice_id: s.invoiceId || null,
+            })),
             payments: (state.payments || []).map(mapPayment),
             maintenance: (state.maintenanceCosts || []).map(mapMaint),
             vignettes: (state.vignettes || []).map(mapVignette),
@@ -7486,6 +7923,7 @@
             quotes: (state.quotes || []).map(q => ({
               id: q.id, customer_id: q.customerId, customer_name: q.customerName || "",
               quote_date: q.quoteDate, validity_date: q.validityDate, status: q.status || "brouillon",
+              type: q.type || "court",
               notes: q.notes || "", total_amount_ht: q.totalAmountHt || 0,
               total_vat_amount: q.totalVatAmount || 0, total_amount_ttc: q.totalAmountTtc || 0,
               converted_contract_id: q.convertedContractId || null,
@@ -7603,6 +8041,8 @@
       state.quotes = [];
       state.quoteLines = [];
       state.invoices = [];
+      state.invoiceLines = [];
+      state.invoiceSchedule = [];
       state.payments = [];
       state.reservations = [];
       state.maintenanceCosts = [];
@@ -8347,6 +8787,143 @@
     }
     function cjsSave(id, chart) { _cjsInstances[id] = chart; }
 
+    // ── Dashboard layout persistence (ordre + taille + masquage) ──────────
+    let _dashboardLayout = null;
+    let _dashLayoutLoaded = false;
+    let _dashSortableInited = false;
+    let _dashControlsInited = false;
+
+    function _dashSpan(el) {
+      const cls = [...el.classList].find(c => c.startsWith('dash-span-'));
+      return cls ? parseInt(cls.replace('dash-span-', '')) : parseInt(el.dataset.defaultSpan || '1');
+    }
+
+    function _setDashSpan(el, n) {
+      const clamped = Math.max(1, Math.min(3, n));
+      [...el.classList].filter(c => c.startsWith('dash-span-')).forEach(c => el.classList.remove(c));
+      el.classList.add(`dash-span-${clamped}`);
+    }
+
+    function renderHiddenBar() {
+      const bar = byId('dashHiddenBar');
+      if (!bar) return;
+      const grid = byId('dashboardGrid');
+      const hiddenEls = grid ? [...grid.querySelectorAll('[data-card-id].dash-hidden')] : [];
+      if (!hiddenEls.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+      bar.style.display = 'flex';
+      bar.innerHTML = '<span style="color:#888;font-size:11px;align-self:center;margin-right:4px;">Masqués :</span>';
+      hiddenEls.forEach(el => {
+        const chip = document.createElement('button');
+        chip.className = 'dash-restore-chip';
+        chip.textContent = `👁 ${el.dataset.label || el.dataset.cardId}`;
+        chip.title = 'Réafficher';
+        chip.onclick = () => { el.classList.remove('dash-hidden'); renderHiddenBar(); saveDashboardLayout(); };
+        bar.appendChild(chip);
+      });
+    }
+
+    function applyDashboardLayout(layout) {
+      const grid = byId('dashboardGrid');
+      if (!grid) return;
+      // Reset all to default
+      grid.querySelectorAll('[data-card-id]').forEach(el => {
+        el.classList.remove('dash-hidden');
+        _setDashSpan(el, parseInt(el.dataset.defaultSpan || '1'));
+      });
+      if (!layout) { renderHiddenBar(); return; }
+      const { order, spans, hidden } = layout;
+      // Apply order
+      if (Array.isArray(order) && order.length) {
+        order.forEach(id => {
+          const el = grid.querySelector(`[data-card-id="${id}"]`);
+          if (el) grid.appendChild(el);
+        });
+      }
+      // Apply spans
+      if (spans && typeof spans === 'object') {
+        Object.entries(spans).forEach(([id, n]) => {
+          const el = grid.querySelector(`[data-card-id="${id}"]`);
+          if (el) _setDashSpan(el, Number(n));
+        });
+      }
+      // Apply hidden
+      if (Array.isArray(hidden)) {
+        hidden.forEach(id => {
+          const el = grid.querySelector(`[data-card-id="${id}"]`);
+          if (el) el.classList.add('dash-hidden');
+        });
+      }
+      renderHiddenBar();
+    }
+
+    async function saveDashboardLayout() {
+      const grid = byId('dashboardGrid');
+      if (!grid) return;
+      const order = [], spans = {}, hidden = [];
+      grid.querySelectorAll('[data-card-id]').forEach(el => {
+        const id = el.dataset.cardId;
+        order.push(id);
+        spans[id] = _dashSpan(el);
+        if (el.classList.contains('dash-hidden')) hidden.push(id);
+      });
+      _dashboardLayout = { order, spans, hidden };
+      try { await apiPut('/preferences/dashboard-layout', { value: _dashboardLayout }); }
+      catch (e) { console.warn('[saveDashboardLayout]', e); }
+    }
+
+    async function loadDashboardLayout() {
+      try {
+        const data = await apiGet('/preferences/dashboard-layout');
+        if (data?.data) _dashboardLayout = data.data;
+      } catch (e) { /* première visite — pas de layout sauvegardé */ }
+      _dashLayoutLoaded = true;
+    }
+
+    function initDashboardSortable() {
+      if (typeof Sortable === 'undefined' || _dashSortableInited) return;
+      const grid = byId('dashboardGrid');
+      if (!grid) return;
+      Sortable.create(grid, {
+        animation: 150,
+        handle: '.drag-handle',
+        filter: '.dash-hidden',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd() { saveDashboardLayout(); }
+      });
+      _dashSortableInited = true;
+    }
+
+    function initCardControls() {
+      if (_dashControlsInited) return;
+      _dashControlsInited = true;
+      const grid = byId('dashboardGrid');
+      if (!grid) return;
+      grid.querySelectorAll('[data-card-id]').forEach(card => {
+        // Expand
+        card.querySelector('.cbt-expand')?.addEventListener('click', e => {
+          e.stopPropagation();
+          _setDashSpan(card, _dashSpan(card) + 1);
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+          saveDashboardLayout();
+        });
+        // Shrink
+        card.querySelector('.cbt-shrink')?.addEventListener('click', e => {
+          e.stopPropagation();
+          _setDashSpan(card, _dashSpan(card) - 1);
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+          saveDashboardLayout();
+        });
+        // Hide
+        card.querySelector('.cbt-hide')?.addEventListener('click', e => {
+          e.stopPropagation();
+          card.classList.add('dash-hidden');
+          renderHiddenBar();
+          saveDashboardLayout();
+        });
+      });
+    }
+
     function renderHomeDashboard() {
       const availableCars = state.cars.filter((c) => c.status === "dispo").length;
       const activeReservations = state.reservations.filter((r) => ["en_attente", "confirmee"].includes(r.status)).length;
@@ -8488,6 +9065,55 @@
             }
           }
         })) ;
+        // Occupancy chart — Stacked bar (reservations + contracts)
+        const occ = getOccupancySeries(6);
+        const occCanvas = cjsCanvas("cjsOccupancy", "occupancyBars");
+        if (occCanvas && occ.length) cjsSave("cjsOccupancy", new Chart(occCanvas, {
+          type: "bar",
+          data: {
+            labels: occ.map(s => s.label),
+            datasets: [{
+              label: "Véhicules occupés",
+              data: occ.map(s => s.rate),
+              backgroundColor: occ.map(s =>
+                s.rate >= 80 ? "rgba(220,38,38,.75)" :
+                s.rate >= 50 ? "rgba(249,115,22,.75)" :
+                               "rgba(22,163,74,.65)"
+              ),
+              borderRadius: 6, borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: {
+                label: ctx => {
+                  const s = occ[ctx.dataIndex];
+                  return `${s.occupiedCount} / ${s.totalCars} véhicules — ${s.rate}%`;
+                }
+              }}
+            },
+            scales: {
+              y: { beginAtZero: true, max: 100, grid: { color: "#f0f0f0" },
+                   ticks: { callback: v => v + "%" } },
+              x: { grid: { display: false } }
+            },
+            onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
+            onClick(_, elements) {
+              history.pushState({ tab: "reservations" }, "", "#reservations");
+              switchToTab("reservations");
+            }
+          }
+        }));
+
+        // KPI : taux occupation mois en cours
+        if (occ[0] !== undefined && byId("homeOccupancyKpi")) {
+          const cur = occ[0];
+          byId("homeOccupancyKpi").textContent = `${cur.rate}% ce mois (${cur.occupiedCount}/${cur.totalCars} véhicules)`;
+          byId("homeOccupancyKpi").style.color = cur.rate >= 80 ? "#dc2626" : cur.rate >= 50 ? "#f97316" : "#16a34a";
+        }
+
       } else {
         renderBarChart("revenueBars", getRevenueSeries());
         renderBarChart("fleetBars", getFleetSeries());
@@ -8873,6 +9499,49 @@
         { label: "urgent", value: alerts.filter((a) => a.level === "urgent").length },
         { label: "proche", value: alerts.filter((a) => a.level === "proche").length },
       ];
+    }
+
+    function getOccupancySeries(months = 6) {
+      const activeCars = (state.cars || []).filter(c => c.status !== 'indisponible');
+      const totalCars = activeCars.length;
+      if (!totalCars) return [];
+
+      const FR_MONTHS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+      const today = new Date();
+      const series = [];
+
+      for (let m = 0; m < months; m++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + m, 1);
+        const y = d.getFullYear(), mo = d.getMonth();
+        const lastDay = new Date(y, mo + 1, 0).getDate();
+        const pad = n => String(n).padStart(2, '0');
+        const monthStart = `${y}-${pad(mo + 1)}-01`;
+        const monthEnd   = `${y}-${pad(mo + 1)}-${lastDay}`;
+        const label      = `${FR_MONTHS[mo]} ${y}`;
+
+        const occupiedCars = new Set();
+
+        // Réservations non annulées / non terminées
+        for (const r of (state.reservations || [])) {
+          if (['annulee', 'terminee'].includes(r.status)) continue;
+          const start = r.startDate || r.start_date || '';
+          const end   = r.endDate   || r.end_date   || '';
+          if (start <= monthEnd && end >= monthStart && r.carId) occupiedCars.add(r.carId);
+        }
+
+        // Lignes de contrat actives
+        for (const cl of (state.contractLines || [])) {
+          if (cl.status !== 'active') continue;
+          const start = cl.periodStart || '';
+          const end   = cl.periodEnd   || '';
+          if (start <= monthEnd && end >= monthStart && cl.carId) occupiedCars.add(cl.carId);
+        }
+
+        const occupiedCount = Math.min(occupiedCars.size, totalCars);
+        const rate = Math.round(occupiedCount / totalCars * 100);
+        series.push({ label, monthStart, monthEnd, occupiedCount, totalCars, rate });
+      }
+      return series;
     }
 
     function renderReservationOptions() {
@@ -10674,6 +11343,29 @@
       renderContracts();
       if (typeof renderReservations === "function") renderReservations();
       openContractDetail(contractId);
+
+      // Contrat long terme → proposer de générer l'échéancier immédiatement
+      const newContract = state.contracts.find(c => c.id === contractId);
+      if (newContract && newContract.type === "long") {
+        setTimeout(async () => {
+          if (!confirm("Ce contrat est de type long terme.\nGénérer l'échéancier de facturation maintenant ?")) return;
+          const schedRes = await apiPostWithError(`/contracts/${contractId}/generate-schedule`, {});
+          if (!schedRes.ok) {
+            alert("Échéancier : " + (schedRes.errorMsg || "Erreur inattendue."));
+            return;
+          }
+          const raw = await apiGet("/invoice-schedule");
+          if (raw) state.invoiceSchedule = raw.map(s => ({
+            id: s.id, contractId: s.contract_id,
+            scheduledDate: s.scheduled_date || "", periodStart: s.period_start || "",
+            periodEnd: s.period_end || "", amountHt: Number(s.amount_ht || 0),
+            vatAmount: Number(s.vat_amount || 0), dailyTaxAmount: Number(s.daily_tax_amount || 0),
+            lineTtc: Number(s.line_ttc || 0), label: s.label || "",
+            status: s.status || "planifie", invoiceId: s.invoice_id || null,
+          }));
+          renderContractSchedule(contractId);
+        }, 300);
+      }
     }
 
     // ── PDF devis ─────────────────────────────────────────────────────────────
@@ -10814,6 +11506,7 @@
     if (byId("addQuoteBtn")) {
       byId("addQuoteBtn").addEventListener("click", async () => {
         const customerId = byId("quoteCustomer").value;
+        const quoteType = byId("quoteType").value || "court";
         const quoteDate = byId("quoteDate").value;
         const validityDate = byId("quoteValidityDate").value;
         const notes = byId("quoteNotes").value.trim();
@@ -10825,10 +11518,11 @@
           id: quoteId, customer_id: customerId,
           customer_name: customer ? customer.name : "",
           quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
+          type: quoteType,
         });
         state.quotes.push({
           id: quoteId, customerId, customerName: customer ? customer.name : "",
-          quoteDate, validityDate, status: "brouillon", notes,
+          quoteDate, validityDate, status: "brouillon", notes, type: quoteType,
           totalAmountHt: 0, totalVatAmount: 0, totalAmountTtc: 0, convertedContractId: null,
         });
         byId("quoteLegacyForm").style.display = "none";
@@ -10952,6 +11646,7 @@
     }
 
     function getInvoiceStatusInfo(invoice) {
+      if (invoice.status === "brouillon") return { css: "reserve", label: "brouillon" };
       const paid = Number(invoice.dueAmountTnd || 0) <= 0;
       if (paid) return { css: "dispo", label: "paye" };
       if (Number(invoice.paidAmountTnd || 0) > 0) return { css: "maintenance", label: "partiel" };
@@ -11087,13 +11782,16 @@
 
       const inlineRow = tbody.querySelector(".inline-new-line");
       tbody.innerHTML = "";
-      const lines = invoice.lines || [];
+
+      // Prefer relational invoice_lines; fall back to JSONB for legacy invoices not yet migrated
+      const relLines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoiceId));
+      const lines = relLines.length > 0 ? relLines : (invoice.lines || []);
 
       emptyMsg && (emptyMsg.style.display = (lines.length === 0 && !inlineRow) ? "block" : "none");
 
-      lines.forEach((line, idx) => {
+      lines.forEach((line) => {
         const tr = document.createElement("tr");
-        tr.dataset.lineIdx = idx;
+        tr.dataset.lineId = line.id || "";
         tr.innerHTML = `
           <td style="padding:6px 8px;">${safe(line.contractId || "-")} &mdash; ${safe(line.carPlate || "-")} <span style="color:var(--muted);">${safe(line.designation || "")}</span></td>
           <td style="padding:6px 8px;">${safe(line.periodStart || "-")}</td>
@@ -11103,10 +11801,12 @@
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.dailyTaxAmount || 0)}</td>
           <td style="padding:6px 8px;text-align:right;font-weight:600;">${formatTnd(line.lineTtc || 0)}</td>
           <td style="padding:6px 4px;text-align:center;white-space:nowrap;">
-            <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;"
-              onclick="editInvoiceDetailLine('${safe(String(invoiceId))}', ${idx})">&#x270E;</button>
-            <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;color:#c53030;"
-              onclick="deleteInvoiceDetailLine('${safe(String(invoiceId))}', ${idx})">&#x2715;</button>
+            ${line.id ? `
+              <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;"
+                onclick="editInvoiceDetailLine('${safe(String(invoiceId))}', '${safe(String(line.id))}')">&#x270E;</button>
+              <button type="button" class="secondary" style="font-size:11px;padding:2px 7px;color:#c53030;"
+                onclick="deleteInvoiceDetailLine('${safe(String(invoiceId))}', '${safe(String(line.id))}')">&#x2715;</button>
+            ` : `<span style="font-size:11px;color:var(--muted);">—</span>`}
           </td>
         `;
         tbody.appendChild(tr);
@@ -11131,16 +11831,15 @@
       `;
     }
 
-    window.editInvoiceDetailLine = function(invoiceId, lineIdx) {
-      const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
-      if (!invoice || !invoice.lines || !invoice.lines[lineIdx]) return;
+    window.editInvoiceDetailLine = function(invoiceId, lineId) {
+      const line = (state.invoiceLines || []).find(l => l.id === lineId);
+      if (!line) return;
       const tbody = byId("ieLinesBody");
-      const tr = tbody ? tbody.querySelector(`tr[data-line-idx="${lineIdx}"]`) : null;
+      const tr = tbody ? tbody.querySelector(`tr[data-line-id="${lineId}"]`) : null;
       if (!tr) return;
-      const line = invoice.lines[lineIdx];
 
       const contractOpts = state.contracts
-        .map(c => `<option value="${safe(c.id)}"${String(c.id) === String(line.contractId) ? " selected" : ""}>${safe(c.id)} &mdash; ${safe(c.customerName)}</option>`).join("");
+        .map(c => `<option value="${safe(c.id)}"${String(c.id) === String(line.contractId || "") ? " selected" : ""}>${safe(c.id)} &mdash; ${safe(c.customerName)}</option>`).join("");
 
       tr.style.background = "#fffbea";
       tr.innerHTML = `
@@ -11167,12 +11866,12 @@
         </td>
         <td style="padding:4px 6px;white-space:nowrap;">
           <button type="button" style="font-size:11px;padding:3px 8px;"
-            onclick="saveInvoiceLineEdit('${safe(String(invoiceId))}', ${lineIdx}, this.closest('tr'))">&#x2713;</button>
+            onclick="saveInvoiceLineEdit('${safe(String(invoiceId))}', '${safe(String(lineId))}', this.closest('tr'))">&#x2713;</button>
           <button type="button" class="secondary" style="font-size:11px;padding:3px 8px;"
             onclick="renderInvoiceDetailLines('${safe(String(invoiceId))}')">&#x2715;</button>
         </td>
       `;
-      tr.dataset.lineIdx = lineIdx;
+      tr.dataset.lineId = lineId;
 
       const recompute = () => {
         const ht   = Number(tr.querySelector(".ilAmountHt").value || 0);
@@ -11199,9 +11898,10 @@
       tr.querySelector(".ilTtc").oninput       = recomputeFromTtc;
     };
 
-    window.saveInvoiceLineEdit = async function(invoiceId, lineIdx, tr) {
+    window.saveInvoiceLineEdit = async function(invoiceId, lineId, tr) {
       const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
-      if (!invoice || !invoice.lines || !invoice.lines[lineIdx]) return;
+      const lineIdx = (state.invoiceLines || []).findIndex(l => l.id === lineId);
+      if (!invoice || lineIdx < 0) return;
       const contractId  = tr.querySelector(".ilContractSel").value || null;
       const periodStart = tr.querySelector(".ilPeriodStart").value;
       const days        = Number(tr.querySelector(".ilDays").value || 0);
@@ -11211,33 +11911,45 @@
       const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
       const bd       = computeLineBreakdown(amountHt, days);
       const periodEnd = addDaysToIsoDate(periodStart, days);
-      invoice.lines[lineIdx] = {
-        contractId: contractId || null,
-        carPlate:    contract ? (contract.carPlate || "") : "",
+      const result = await apiPutWithError(`/invoice-lines/${lineId}`, {
+        contract_id: contractId || null,
+        car_plate:   contract ? (contract.carPlate || "") : "",
         designation: car      ? (car.model || "")        : "",
+        amount_original: amountHt, currency: "TND",
+        amount_ht: bd.amountHt, vat_amount: bd.vatAmount, daily_tax_amount: bd.dailyTaxAmount,
+        days, period_start: periodStart, period_end: periodEnd, line_ttc: bd.lineTtc,
+      });
+      if (!result.ok) { alert(result.errorMsg || "Erreur lors de l'enregistrement."); return; }
+      state.invoiceLines[lineIdx] = {
+        ...state.invoiceLines[lineIdx],
+        contractId: contractId || null,
+        carPlate: contract ? (contract.carPlate || "") : "",
+        designation: car ? (car.model || "") : "",
         amountOriginal: amountHt, currency: "TND",
         amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
         days, periodStart, periodEnd, lineTtc: bd.lineTtc,
       };
-      await saveInvoiceLines(invoice);
+      await saveInvoiceLinesTotals(invoice);
       renderInvoiceDetailLines(invoiceId);
       renderInvoiceDetailHeader(invoiceId, false);
       renderInvoices();
     };
 
-    window.deleteInvoiceDetailLine = async function(invoiceId, lineIdx) {
+    window.deleteInvoiceDetailLine = async function(invoiceId, lineId) {
       if (!confirm("Supprimer cette ligne de facture ?")) return;
       const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
       if (!invoice) return;
-      invoice.lines = (invoice.lines || []).filter((_, i) => i !== lineIdx);
-      await saveInvoiceLines(invoice);
+      const result = await apiDeleteWithError(`/invoice-lines/${lineId}`);
+      if (!result.ok) { alert(result.errorMsg || "Impossible de supprimer la ligne."); return; }
+      state.invoiceLines = (state.invoiceLines || []).filter(l => l.id !== lineId);
+      await saveInvoiceLinesTotals(invoice);
       renderInvoiceDetailHeader(invoiceId, false);
       renderInvoiceDetailLines(invoiceId);
       renderInvoices();
     };
 
-    async function saveInvoiceLines(invoice) {
-      const lines = invoice.lines || [];
+    async function saveInvoiceLinesTotals(invoice) {
+      const lines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoice.id));
       const totalHt  = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
       const totalVat = lines.reduce((s, l) => s + (l.vatAmount || 0), 0);
       const totalTax = lines.reduce((s, l) => s + (l.dailyTaxAmount || 0), 0);
@@ -11252,7 +11964,6 @@
       invoice.dueAmountTnd = Math.max(0, totalTtc - Number(invoice.paidAmountTnd || 0));
       invoice.rentalDays = totalDays; invoice.periodStart = periodStart; invoice.periodEnd = periodEnd;
       await apiPut(`/invoices/${invoice.id}`, {
-        lines: invoice.lines,
         amount_ht: totalHt, vat_amount: totalVat, daily_tax_amount: totalTax,
         stamp_duty_amount: stamp, amount_tnd: totalTtc,
         due_amount_tnd: invoice.dueAmountTnd, rental_days: totalDays,
@@ -11352,18 +12063,37 @@
       const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
       const bd       = computeLineBreakdown(amountHt, days);
       const periodEnd = addDaysToIsoDate(periodStart, days);
+      const lineId = uid("ILN");
 
-      if (!invoice.lines) invoice.lines = [];
-      invoice.lines.push({
-        contractId: contractId || null,
-        carPlate:    contract ? (contract.carPlate || "") : "",
+      const result = await apiPostWithError("/invoice-lines", {
+        id: lineId,
+        invoice_id: invoiceId,
+        contract_id: contractId || null,
+        car_plate:   contract ? (contract.carPlate || "") : "",
         designation: car      ? (car.model || "")        : "",
+        amount_original: amountHt, currency: "TND",
+        amount_ht: bd.amountHt, vat_amount: bd.vatAmount, daily_tax_amount: bd.dailyTaxAmount,
+        days, period_start: periodStart, period_end: periodEnd, line_ttc: bd.lineTtc,
+      });
+
+      if (!result.ok) {
+        errDiv.style.display = "block";
+        errDiv.textContent = result.errorMsg || "Erreur lors de l'enregistrement.";
+        return;
+      }
+
+      const raw = result.data || {};
+      (state.invoiceLines = state.invoiceLines || []).push({
+        id: raw.id || lineId, invoiceId: String(invoiceId),
+        contractId: contractId || null,
+        carPlate:   contract ? (contract.carPlate || "") : "",
+        designation: car     ? (car.model || "")        : "",
         amountOriginal: amountHt, currency: "TND",
         amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
         days, periodStart, periodEnd, lineTtc: bd.lineTtc,
       });
 
-      await saveInvoiceLines(invoice);
+      await saveInvoiceLinesTotals(invoice);
       tr.remove();
       byId("ieAddLineBtn").textContent = "+ Ajouter une ligne";
       renderInvoiceDetailLines(invoiceId);
@@ -11371,39 +12101,111 @@
       renderInvoices();
     };
 
-    window.openInvoiceEditModal = (invoiceId) => {
+    window.openInvoiceEditModal = async (invoiceId) => {
       const invoice = state.invoices.find((i) => String(i.id) === String(invoiceId));
       if (!invoice) return;
       _currentEditInvoiceId = invoice.id;
 
-      // Si la facture n'a pas encore de lignes (format ancien : données scalaires),
-      // synthétiser une ligne initiale depuis les champs scalaires pour affichage.
-      // Cette ligne sera persistée en JSONB lors de la prochaine modification.
-      if ((!invoice.lines || invoice.lines.length === 0) && Number(invoice.amountHt || 0) > 0) {
-        const contract = invoice.contractId
-          ? state.contracts.find(c => String(c.id) === String(invoice.contractId)) : null;
-        const car = contract && contract.carId
-          ? state.cars.find(c => String(c.id) === String(contract.carId)) : null;
-        const lineTtc = Number(invoice.amountHt || 0)
-                      + Number(invoice.vatAmount || 0)
-                      + Number(invoice.dailyTaxAmount || 0);
-        invoice.lines = [{
-          contractId:    invoice.contractId || null,
-          carPlate:      car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
-          designation:   car ? (car.model || "") : "",
-          amountOriginal: Number(invoice.amountHt || 0),
-          currency:      "TND",
-          amountHt:      Number(invoice.amountHt || 0),
-          vatAmount:     Number(invoice.vatAmount || 0),
-          dailyTaxAmount: Number(invoice.dailyTaxAmount || 0),
-          days:          Number(invoice.rentalDays || 0),
-          periodStart:   invoice.periodStart || "",
-          periodEnd:     invoice.periodEnd || "",
-          lineTtc,
-        }];
+      // Auto-migrate JSONB lines to invoice_lines table if not yet migrated (BR21)
+      const existingRelLines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoiceId));
+      if (existingRelLines.length === 0) {
+        // Build source lines: JSONB if any, else synthesize from scalars
+        let srcLines = invoice.lines && invoice.lines.length > 0 ? invoice.lines : null;
+        if (!srcLines && Number(invoice.amountHt || 0) > 0) {
+          const contract = invoice.contractId
+            ? state.contracts.find(c => String(c.id) === String(invoice.contractId)) : null;
+          const car = contract && contract.carId
+            ? state.cars.find(c => String(c.id) === String(contract.carId)) : null;
+          srcLines = [{
+            contractId:    invoice.contractId || null,
+            carPlate:      car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
+            designation:   car ? (car.model || "") : "",
+            amountOriginal: Number(invoice.amountHt || 0),
+            currency:      "TND",
+            amountHt:      Number(invoice.amountHt || 0),
+            vatAmount:     Number(invoice.vatAmount || 0),
+            dailyTaxAmount: Number(invoice.dailyTaxAmount || 0),
+            days:          Number(invoice.rentalDays || 0),
+            periodStart:   invoice.periodStart || "",
+            periodEnd:     invoice.periodEnd || "",
+            lineTtc:       Number(invoice.amountHt || 0) + Number(invoice.vatAmount || 0) + Number(invoice.dailyTaxAmount || 0),
+          }];
+        }
+        if (srcLines) {
+          for (const line of srcLines) {
+            const lineId = uid("ILN");
+            const res = await apiPostWithError("/invoice-lines", {
+              id: lineId, invoice_id: invoiceId,
+              contract_id: line.contractId || null,
+              car_plate: line.carPlate || "", designation: line.designation || "",
+              amount_original: line.amountOriginal || line.amountHt || 0,
+              currency: line.currency || "TND",
+              amount_ht: line.amountHt || 0, vat_amount: line.vatAmount || 0,
+              daily_tax_amount: line.dailyTaxAmount || 0,
+              days: line.days || 0,
+              period_start: line.periodStart || null, period_end: line.periodEnd || null,
+              line_ttc: line.lineTtc || 0,
+            });
+            if (res.ok) {
+              const raw = res.data || {};
+              (state.invoiceLines = state.invoiceLines || []).push({
+                id: raw.id || lineId, invoiceId: String(invoiceId),
+                contractId: line.contractId || null, carPlate: line.carPlate || "",
+                designation: line.designation || "", amountOriginal: line.amountOriginal || line.amountHt || 0,
+                currency: line.currency || "TND",
+                amountHt: line.amountHt || 0, vatAmount: line.vatAmount || 0,
+                dailyTaxAmount: line.dailyTaxAmount || 0, days: line.days || 0,
+                periodStart: line.periodStart || "", periodEnd: line.periodEnd || "",
+                lineTtc: line.lineTtc || 0,
+              });
+            }
+          }
+        }
       }
 
-      byId("ieNumber").textContent = invoice.id;
+      // Afficher le numéro officiel si confirmé, sinon l'ID avec mention brouillon
+      const displayNumber = invoice.invoiceNumber
+        ? invoice.invoiceNumber
+        : invoice.status === "brouillon" ? `${invoice.id} (brouillon)` : invoice.id;
+      byId("ieNumber").textContent = displayNumber;
+
+      // Bouton "Confirmer" — visible uniquement pour les brouillons
+      let ieConfirmBtn = byId("ieConfirmBtn");
+      if (!ieConfirmBtn) {
+        ieConfirmBtn = document.createElement("button");
+        ieConfirmBtn.id = "ieConfirmBtn";
+        ieConfirmBtn.style.cssText = "background:var(--success,#22c55e);color:#fff;font-weight:600;";
+        byId("ieAddLineBtn").parentNode.insertBefore(ieConfirmBtn, byId("ieAddLineBtn").nextSibling);
+      }
+      if (invoice.status === "brouillon") {
+        ieConfirmBtn.style.display = "";
+        ieConfirmBtn.textContent = "✓ Confirmer la facture";
+        ieConfirmBtn.onclick = async () => {
+          if (!confirm("Confirmer cette facture ? Un numéro séquentiel lui sera attribué et elle ne pourra plus être supprimée.")) return;
+          const res = await apiPostWithError(`/invoices/${invoice.id}/confirm`, {});
+          if (!res.ok) { alert(res.errorMsg || "Erreur lors de la confirmation."); return; }
+          const confirmed = res.data;
+          const idx = state.invoices.findIndex(i => String(i.id) === String(invoice.id));
+          if (idx >= 0) {
+            state.invoices[idx].status = "en_attente";
+            state.invoices[idx].invoiceNumber = confirmed.invoice_number || res.invoiceNumber;
+          }
+          // Mettre à jour l'entrée d'échéancier dans le state local
+          if (invoice.scheduleId) {
+            const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
+            if (sIdx >= 0) state.invoiceSchedule[sIdx].status = "confirme";
+          }
+          ieConfirmBtn.style.display = "none";
+          byId("ieNumber").textContent = confirmed.invoice_number || res.invoiceNumber || invoice.id;
+          renderInvoiceDetailHeader(invoice.id, false);
+          renderInvoices();
+          // Rafraîchir l'échéancier si le modal contrat est ouvert
+          if (invoice.contractId) renderContractSchedule(invoice.contractId);
+        };
+      } else {
+        ieConfirmBtn.style.display = "none";
+      }
+
       byId("ieAddLineBtn").textContent = "+ Ajouter une ligne";
       byId("ieAddLineBtn").onclick = () => appendInlineInvoiceLineRow(invoice.id);
 
@@ -11586,8 +12388,8 @@
         tr.addEventListener("dblclick", () => openInvoiceEditModal(invoice.id));
         tr.innerHTML = `
           <td>
-            <a href="#" class="xref" data-open-invoice="${safe(invoice.id)}">${safe(invoice.id)}</a>
-            <div class="small">${safe(invoice.label || "")}</div>
+            <a href="#" class="xref" data-open-invoice="${safe(invoice.id)}">${safe(invoice.invoiceNumber || invoice.id)}</a>
+            ${invoice.status === "brouillon" ? '<div class="small" style="color:#854d0e;">brouillon — non confirmé</div>' : `<div class="small">${safe(invoice.label || "")}</div>`}
           </td>
           <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
           <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
@@ -13587,13 +14389,172 @@
     // ── Ouvrir le modal de détail ────────────────────────────────────────────────
 
     function openContractDetail(contractId) {
-      if (!state.contracts.find(c => c.id === contractId)) return;
+      const contract = state.contracts.find(c => c.id === contractId);
+      if (!contract) return;
       byId("cdlContractId").textContent = contractId;
       byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
       byId("cdlAddLineToggleBtn").onclick = () => appendInlineLineRow(contractId);
       renderContractDetailHeader(contractId, false);
       renderContractDetailLines(contractId);
+
+      // Échéancier : visible uniquement pour les contrats long terme
+      const scheduleSection = byId("cdlScheduleSection");
+      if (contract.type === "long") {
+        scheduleSection.style.display = "";
+        renderContractSchedule(contractId);
+
+        byId("cdlGenerateScheduleBtn").onclick = async () => {
+          byId("cdlScheduleError").style.display = "none";
+          const res = await apiPostWithError(`/contracts/${contractId}/generate-schedule`, {});
+          if (!res.ok) {
+            byId("cdlScheduleError").textContent = res.errorMsg || "Erreur lors de la génération de l'échéancier.";
+            byId("cdlScheduleError").style.display = "";
+            return;
+          }
+          // Recharger l'échéancier depuis l'API
+          const fresh = await apiGet(`/invoice-schedule?contract_id=${contractId}`);
+          if (fresh) {
+            state.invoiceSchedule = (state.invoiceSchedule || []).filter(s => s.contractId !== contractId);
+            state.invoiceSchedule.push(...fresh.map(s => ({
+              id: s.id, contractId: s.contract_id,
+              scheduledDate: s.scheduled_date || "",
+              periodStart: s.period_start || "", periodEnd: s.period_end || "",
+              amountHt: Number(s.amount_ht || 0), vatAmount: Number(s.vat_amount || 0),
+              dailyTaxAmount: Number(s.daily_tax_amount || 0), lineTtc: Number(s.line_ttc || 0),
+              label: s.label || "", status: s.status || "planifie", invoiceId: s.invoice_id || null,
+            })));
+          }
+          renderContractSchedule(contractId);
+        };
+
+        byId("cdlRegenerateScheduleBtn").onclick = async () => {
+          if (!confirm("Régénérer l'échéancier supprimera toutes les entrées planifiées existantes. Continuer ?")) return;
+          byId("cdlScheduleError").style.display = "none";
+          const res = await apiPostWithError(`/contracts/${contractId}/generate-schedule`, { override: true });
+          if (!res.ok) {
+            byId("cdlScheduleError").textContent = res.errorMsg || "Erreur lors de la régénération.";
+            byId("cdlScheduleError").style.display = "";
+            return;
+          }
+          const fresh = await apiGet(`/invoice-schedule?contract_id=${contractId}`);
+          if (fresh) {
+            state.invoiceSchedule = (state.invoiceSchedule || []).filter(s => s.contractId !== contractId);
+            state.invoiceSchedule.push(...fresh.map(s => ({
+              id: s.id, contractId: s.contract_id,
+              scheduledDate: s.scheduled_date || "",
+              periodStart: s.period_start || "", periodEnd: s.period_end || "",
+              amountHt: Number(s.amount_ht || 0), vatAmount: Number(s.vat_amount || 0),
+              dailyTaxAmount: Number(s.daily_tax_amount || 0), lineTtc: Number(s.line_ttc || 0),
+              label: s.label || "", status: s.status || "planifie", invoiceId: s.invoice_id || null,
+            })));
+          }
+          renderContractSchedule(contractId);
+        };
+      } else {
+        scheduleSection.style.display = "none";
+      }
+
       byId("contractDetailModal").style.display = "flex";
+    }
+
+    function renderContractSchedule(contractId) {
+      const entries = (state.invoiceSchedule || []).filter(s => s.contractId === contractId)
+        .sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+
+      const tbody = byId("cdlScheduleBody");
+      const emptyMsg = byId("cdlScheduleEmpty");
+      const generateBtn = byId("cdlGenerateScheduleBtn");
+      const regenBtn = byId("cdlRegenerateScheduleBtn");
+
+      const hasAny = entries.length > 0;
+      generateBtn.style.display = hasAny ? "none" : "";
+      regenBtn.style.display = hasAny ? "" : "none";
+      emptyMsg.style.display = hasAny ? "none" : "";
+
+      const statusBadge = {
+        planifie:  { label: "Planifié",  bg: "#e0f2fe", color: "#0369a1" },
+        brouillon: { label: "Brouillon", bg: "#fefce8", color: "#854d0e" },
+        confirme:  { label: "Confirmé",  bg: "#dcfce7", color: "#166534" },
+        annule:    { label: "Annulé",    bg: "#f1f5f9", color: "#64748b" },
+      };
+
+      tbody.innerHTML = entries.map(s => {
+        const badge = statusBadge[s.status] || statusBadge.planifie;
+        const badgeHtml = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.color};">${badge.label}</span>`;
+        let actionHtml = "";
+        if (s.status === "planifie") {
+          actionHtml = `<button class="secondary" style="font-size:11px;padding:3px 10px;" onclick="generateInvoiceFromSchedule('${safe(s.id)}','${safe(contractId)}')">Générer facture</button>`;
+        } else if (s.status === "brouillon" && s.invoiceId) {
+          actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">Voir brouillon →</a>`;
+        } else if (s.status === "confirme" && s.invoiceId) {
+          actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">${s.invoiceId}</a>`;
+        }
+        return `<tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:7px 8px;">${safe(s.periodStart)} → ${safe(s.periodEnd)}</td>
+          <td style="padding:7px 8px;">${safe(s.label)}</td>
+          <td style="padding:7px 8px;text-align:right;">${formatTnd(s.amountHt)}</td>
+          <td style="padding:7px 8px;text-align:right;">${formatTnd(s.lineTtc)}</td>
+          <td style="padding:7px 8px;text-align:center;">${badgeHtml}</td>
+          <td style="padding:7px 8px;text-align:center;">${actionHtml}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    async function generateInvoiceFromSchedule(scheduleId, contractId) {
+      const res = await apiPostWithError(`/invoice-schedule/${scheduleId}/generate`, {});
+      if (!res.ok) {
+        alert(res.errorMsg || "Erreur lors de la génération de la facture.");
+        return;
+      }
+      const invoiceId = res.data && res.data.invoiceId;
+      // Recharger la facture et l'échéancier
+      const [freshSchedule, freshInvoices, freshLines] = await Promise.all([
+        apiGet(`/invoice-schedule?contract_id=${contractId}`),
+        apiGet("/invoices"),
+        apiGet("/invoice-lines"),
+      ]);
+      if (freshSchedule) {
+        state.invoiceSchedule = (state.invoiceSchedule || []).filter(s => s.contractId !== contractId);
+        state.invoiceSchedule.push(...freshSchedule.map(s => ({
+          id: s.id, contractId: s.contract_id,
+          scheduledDate: s.scheduled_date || "",
+          periodStart: s.period_start || "", periodEnd: s.period_end || "",
+          amountHt: Number(s.amount_ht || 0), vatAmount: Number(s.vat_amount || 0),
+          dailyTaxAmount: Number(s.daily_tax_amount || 0), lineTtc: Number(s.line_ttc || 0),
+          label: s.label || "", status: s.status || "planifie", invoiceId: s.invoice_id || null,
+        })));
+      }
+      if (freshInvoices) state.invoices = freshInvoices.map(i => ({
+        id: i.id, contractId: i.contract_id, customerName: i.customer_name || "",
+        label: i.label || "", amountOriginal: Number(i.amount_original || 0),
+        currency: i.currency || "TND", amountTnd: Number(i.amount_tnd || 0),
+        amountHt: Number(i.amount_ht || 0), vatAmount: Number(i.vat_amount || 0),
+        dailyTaxAmount: Number(i.daily_tax_amount || 0), stampDutyAmount: Number(i.stamp_duty_amount || 0),
+        rentalDays: Number(i.rental_days || 0), periodStart: i.period_start || "", periodEnd: i.period_end || "",
+        paidAmountTnd: Number(i.paid_amount_tnd || 0), dueAmountTnd: Number(i.due_amount_tnd || 0),
+        dueDate: i.due_date || "", status: i.status || "en_attente",
+        invoiceNumber: i.invoice_number || null, scheduleId: i.schedule_id || null,
+        rib: i.rib || "", ribLabel: i.rib_label || "",
+        lines: i.lines || [], reminderCount: i.reminder_count || 0,
+        createdAt: i.created_at || "", createdBy: i.created_by || null,
+        updatedAt: i.updated_at || "", updatedBy: i.updated_by || null,
+      }));
+      if (freshLines) state.invoiceLines = freshLines.map(l => ({
+        id: l.id, invoiceId: l.invoice_id,
+        contractLineId: l.contract_line_id || null, contractId: l.contract_id || null,
+        carPlate: l.car_plate || "", designation: l.designation || "",
+        amountOriginal: l.amount_original || 0, currency: l.currency || "TND",
+        amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+        dailyTaxAmount: l.daily_tax_amount || 0, days: l.days || 0,
+        periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        lineTtc: l.line_ttc || 0,
+      }));
+      renderContractSchedule(contractId);
+      renderInvoices();
+      if (invoiceId) {
+        // Ouvrir directement le brouillon
+        openInvoiceEditModal(invoiceId);
+      }
     }
 
     // ── openRecordEditor ────────────────────────────────────────────────────────
@@ -13989,6 +14950,331 @@
       setupSortableTable(byId("quotesTable")?.closest("table"), "quotes", QUOTES_COLUMNS, renderQuotes);
       setupSortableTable(byId("rentabiliteTable")?.closest("table"), "rentabilite", RENTABILITE_COLUMNS, renderRentabilite);
       setupSortableTable(byId("treasuryForecastTable")?.closest("table"), "treasuryForecast", TREASURY_FORECAST_COLUMNS, rerenderTreasuryForecastTable);
+    }
+
+    // ── Souches de numéros ───────────────────────────────────────────────────
+
+    const NS_ICONS = { invoices: '🧾', contracts: '📄', quotes: '📝', reservations: '📅' };
+
+    async function renderNumberSequences() {
+      const grid = byId("nsGrid");
+      if (!grid) return;
+      grid.innerHTML = '<p style="font-size:13px;color:var(--muted);">Chargement…</p>';
+      try {
+        const token = localStorage.getItem("locacar-jwt");
+        const res = await fetch(`${API_URL}/number-sequences`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        const seqs = data.data || [];
+        if (!seqs.length) { grid.innerHTML = '<p style="font-size:13px;color:var(--muted);">Aucune souche configurée. Exécutez la migration 009 dans Supabase.</p>'; return; }
+
+        grid.innerHTML = seqs.map(s => `
+          <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px;background:#fff;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:20px;">${NS_ICONS[s.id] || '🔢'}</span>
+                <div>
+                  <div style="font-weight:600;font-size:14px;">${safe(s.label)}</div>
+                  <div style="font-size:11px;color:var(--muted);">dernier : ${s.last_number || 0}${s.last_year ? ' ('+s.last_year+')' : ''}</div>
+                </div>
+              </div>
+              <span style="font-family:monospace;font-size:13px;background:#f0f9ff;color:#0369a1;padding:3px 8px;border-radius:4px;">${safe(s.next_preview)}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+              Préfixe : <b>${safe(s.prefix) || '—'}</b> &nbsp;|&nbsp;
+              Sep : <b>${safe(s.separator) || 'aucun'}</b> &nbsp;|&nbsp;
+              Digits : <b>${s.digits}</b> &nbsp;|&nbsp;
+              Année : <b>${s.include_year ? 'oui' : 'non'}</b> &nbsp;|&nbsp;
+              Reset annuel : <b>${s.reset_annually ? 'oui' : 'non'}</b>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsOpenEdit('${s.id}')">✏ Configurer</button>
+              <button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsResync('${s.id}','${safe(s.label)}')">↺ Resynchroniser</button>
+              ${['invoices','contracts','quotes'].includes(s.id) ? `<button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsOpenAudit('${s.id}','${safe(s.label)}')">🔍 Audit trous</button>` : ''}
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        grid.innerHTML = `<p style="color:#c53030;font-size:13px;">Erreur : ${err}</p>`;
+      }
+    }
+
+    let _nsCurrentId = null;
+
+    async function nsOpenEdit(seqId) {
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/number-sequences/${seqId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const s = data.data;
+      if (!s) { alert("Souche introuvable."); return; }
+
+      _nsCurrentId = seqId;
+      byId("nsEditTitle").textContent = `Configurer — ${s.label}`;
+      byId("nsEditPrefix").value = s.prefix || '';
+      byId("nsEditSeparator").value = s.separator || '-';
+      byId("nsEditDigits").value = s.digits || 4;
+      byId("nsEditIncludeYear").value = s.include_year ? 'true' : 'false';
+      byId("nsEditResetAnnually").value = s.reset_annually ? 'true' : 'false';
+      byId("nsEditError").style.display = 'none';
+      nsUpdatePreview();
+      byId("nsEditModal").style.display = 'flex';
+
+      const inputs = ['nsEditPrefix','nsEditSeparator','nsEditDigits','nsEditIncludeYear','nsEditResetAnnually'];
+      inputs.forEach(id => { byId(id).oninput = nsUpdatePreview; byId(id).onchange = nsUpdatePreview; });
+
+      byId("nsEditSaveBtn").onclick = async () => {
+        byId("nsEditError").style.display = 'none';
+        const body = {
+          prefix: byId("nsEditPrefix").value.trim(),
+          separator: byId("nsEditSeparator").value,
+          digits: parseInt(byId("nsEditDigits").value, 10),
+          include_year: byId("nsEditIncludeYear").value === 'true',
+          reset_annually: byId("nsEditResetAnnually").value === 'true',
+        };
+        const saveRes = await fetch(`${API_URL}/number-sequences/${_nsCurrentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const saveData = await saveRes.json();
+        if (!saveRes.ok) { byId("nsEditError").textContent = saveData.message || "Erreur."; byId("nsEditError").style.display = ''; return; }
+        byId("nsEditModal").style.display = 'none';
+        renderNumberSequences();
+      };
+    }
+
+    function nsUpdatePreview() {
+      const prefix = byId("nsEditPrefix").value.trim();
+      const sep = byId("nsEditSeparator").value;
+      const digits = parseInt(byId("nsEditDigits").value, 10) || 4;
+      const includeYear = byId("nsEditIncludeYear").value === 'true';
+      const year = new Date().getFullYear();
+      let preview = '';
+      if (prefix) preview += prefix + sep;
+      if (includeYear) preview += year + sep;
+      preview += '1'.padStart(digits, '0');
+      byId("nsEditPreview").textContent = preview;
+    }
+
+    async function nsResync(seqId, label) {
+      if (!confirm(`Resynchroniser la souche "${label}" ?\nLe compteur sera calé sur le numéro maximum réel en base.`)) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/number-sequences/${seqId}/resync`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) { alert("Erreur : " + (data.message || "Resync échoué.")); return; }
+      alert(`✅ ${data.message}`);
+      renderNumberSequences();
+    }
+
+    async function nsOpenAudit(seqId, label) {
+      byId("nsAuditTitle").textContent = `Audit — ${label}`;
+      byId("nsAuditContent").innerHTML = '<p style="font-size:13px;color:var(--muted);">Analyse en cours…</p>';
+      byId("nsAuditModal").style.display = 'flex';
+
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/number-sequences/${seqId}/audit`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { byId("nsAuditContent").innerHTML = `<p style="color:#c53030;">${data.message || "Erreur."}</p>`; return; }
+      const d = data.data;
+
+      const statsHtml = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;font-size:13px;">
+          <span style="background:#f0fdf4;color:#166534;padding:4px 10px;border-radius:20px;">${d.total} numéros utilisés</span>
+          <span style="background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;">min : ${d.min ?? '—'} &nbsp; max : ${d.max ?? '—'}</span>
+          <span style="background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;">last_number en base : ${d.last_number ?? '—'}</span>
+        </div>`;
+
+      const gapsHtml = d.gaps?.length
+        ? `<div style="margin-bottom:12px;">
+            <p style="font-size:13px;font-weight:600;color:#c53030;margin:0 0 6px;">⚠ ${d.gaps.length} trou(s) détecté(s) :</p>
+            <div style="background:#fff5f5;border:1px solid #fed7d7;border-radius:6px;padding:10px;font-family:monospace;font-size:12px;max-height:150px;overflow-y:auto;">
+              ${d.gaps.map(n => `N°${n}`).join(' · ')}
+            </div>
+           </div>`
+        : '<p style="font-size:13px;color:#166534;">✅ Aucun trou détecté dans la séquence.</p>';
+
+      const dupsHtml = d.duplicates?.length
+        ? `<p style="font-size:13px;color:#c53030;">⚠ Doublons : ${d.duplicates.join(', ')}</p>`
+        : '';
+
+      const driftHtml = d.last_number > (d.max || 0)
+        ? `<p style="font-size:13px;color:#854d0e;background:#fffbeb;padding:8px;border-radius:6px;">⚠ Le compteur (${d.last_number}) est supérieur au max réel (${d.max || 0}) — utilisez Resynchroniser pour corriger.</p>`
+        : '';
+
+      byId("nsAuditContent").innerHTML = statsHtml + gapsHtml + dupsHtml + driftHtml;
+    }
+
+    // ── Gestion des données (DMF) ────────────────────────────────────────────
+
+    let _dmfCurrentEntity = null;
+    let _dmfLastErrors    = [];
+
+    async function renderDataManagement() {
+      const grid = byId("dmfEntityGrid");
+      if (!grid) return;
+      grid.innerHTML = '<p style="font-size:13px;color:var(--muted);">Chargement…</p>';
+      try {
+        const token = localStorage.getItem("locacar-jwt");
+        const res = await fetch(`${API_URL}/data-management/entities`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        const entities = data.data || [];
+
+        const ICONS = {
+          customers: '👥', cars: '🚗', insurances: '🛡️',
+          leasing_contracts: '📋', vignettes: '🏷️', maintenance_costs: '🔧',
+        };
+
+        grid.innerHTML = entities.map(e => `
+          <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;background:#fff;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+              <span style="font-size:24px;">${ICONS[e.key] || '📂'}</span>
+              <div>
+                <div style="font-weight:600;font-size:14px;">${safe(e.label)}</div>
+                <div style="font-size:11px;color:var(--muted);">${e.count} enregistrement(s) en base</div>
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${safe(e.description)}</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="secondary" style="font-size:12px;padding:5px 12px;" onclick="dmfExport('${e.key}','${safe(e.label)}')">↓ Exporter CSV</button>
+              <button style="font-size:12px;padding:5px 12px;" onclick="dmfOpenImport('${e.key}','${safe(e.label)}')">↑ Importer CSV</button>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        grid.innerHTML = `<p style="color:#c53030;font-size:13px;">Erreur de chargement : ${err}</p>`;
+      }
+    }
+
+    async function dmfExport(entityKey, label) {
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/data-management/${entityKey}/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { alert("Erreur lors de l'export."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${entityKey}_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function dmfOpenImport(entityKey, label) {
+      _dmfCurrentEntity = entityKey;
+      _dmfLastErrors = [];
+      byId("dmfModalTitle").textContent = `Importer — ${label}`;
+      byId("dmfFileInput").value = "";
+      byId("dmfDryRunCheck").checked = false;
+      byId("dmfImportError").style.display = "none";
+      byId("dmfImportSpinner").style.display = "none";
+      byId("dmfImportModal").style.display = "flex";
+
+      byId("dmfDownloadTemplateBtn").onclick = async () => {
+        const token = localStorage.getItem("locacar-jwt");
+        const res = await fetch(`${API_URL}/data-management/${entityKey}/template`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) { alert("Erreur lors du téléchargement du template."); return; }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = `${entityKey}_template.csv`; a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      byId("dmfSubmitImportBtn").onclick = () => dmfSubmitImport(entityKey, label);
+    }
+
+    async function dmfSubmitImport(entityKey, label, skipErrors = false) {
+      const fileInput = byId("dmfFileInput");
+      if (!fileInput.files[0]) { byId("dmfImportError").textContent = "Veuillez sélectionner un fichier CSV."; byId("dmfImportError").style.display = ""; return; }
+      const dryRun = byId("dmfDryRunCheck").checked;
+
+      byId("dmfImportSpinner").style.display = "";
+      byId("dmfImportError").style.display = "none";
+      byId("dmfSubmitImportBtn").disabled = true;
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      const token = localStorage.getItem("locacar-jwt");
+      const params = new URLSearchParams({ dry_run: dryRun, skip_errors: skipErrors });
+      const res = await fetch(`${API_URL}/data-management/${entityKey}/import?${params}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData,
+      });
+
+      byId("dmfImportSpinner").style.display = "none";
+      byId("dmfSubmitImportBtn").disabled = false;
+
+      const result = await res.json().catch(() => ({}));
+
+      // Close modal
+      byId("dmfImportModal").style.display = "none";
+
+      // Show result panel
+      _dmfLastErrors = result.errors || [];
+      dmfShowResult(entityKey, label, result, dryRun);
+
+      if (result.success && !dryRun) renderDataManagement(); // refresh counts
+    }
+
+    function dmfShowResult(entityKey, label, result, dryRun) {
+      const panel = byId("dmfResultPanel");
+      const stats = result.stats || {};
+
+      byId("dmfResultTitle").textContent = `Résultat import — ${label}`;
+      panel.style.display = "";
+
+      // Stats badges
+      const badges = [];
+      if (stats.imported)  badges.push(`<span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:20px;font-weight:600;">${stats.imported} créé(s)</span>`);
+      if (stats.updated)   badges.push(`<span style="background:#dbeafe;color:#1e40af;padding:4px 10px;border-radius:20px;font-weight:600;">${stats.updated} mis à jour</span>`);
+      if (stats.skipped)   badges.push(`<span style="background:#fef9c3;color:#854d0e;padding:4px 10px;border-radius:20px;font-weight:600;">${stats.skipped} ignoré(s)</span>`);
+      if (stats.dbErrors)  badges.push(`<span style="background:#fee2e2;color:#c53030;padding:4px 10px;border-radius:20px;font-weight:600;">${stats.dbErrors} erreur(s) base</span>`);
+      if (stats.invalid)   badges.push(`<span style="background:#fee2e2;color:#c53030;padding:4px 10px;border-radius:20px;font-weight:600;">${stats.invalid} ligne(s) invalide(s)</span>`);
+      byId("dmfResultStats").innerHTML = badges.join('') || '<span style="color:var(--muted);font-size:13px;">Aucune donnée</span>';
+
+      byId("dmfDryRunNotice").style.display = dryRun ? "" : "none";
+
+      // Errors
+      const errors = result.errors || [];
+      if (errors.length) {
+        byId("dmfErrorWrap").style.display = "";
+        byId("dmfErrorTable").innerHTML = errors.map(e =>
+          `<tr style="border-bottom:1px solid #fed7d7;">
+            <td style="padding:5px 10px;">${e.row || '—'}</td>
+            <td style="padding:5px 10px;">${safe(e.field || '—')}</td>
+            <td style="padding:5px 10px;">${safe(e.message)}</td>
+          </tr>`).join('');
+        // Show "import anyway" button only if there are validation errors (not DB errors) and not already skip mode
+        const hasValidErrors = errors.some(e => e.field);
+        byId("dmfSkipErrorWrap").style.display = hasValidErrors && !dryRun ? "" : "none";
+        byId("dmfImportAnywayBtn").onclick = () => {
+          byId("dmfFileInput").value = "";
+          dmfOpenImport(entityKey, label);
+          setTimeout(() => dmfSubmitImport(entityKey, label, true), 200);
+        };
+        byId("dmfExportReportBtn").style.display = "";
+        byId("dmfDownloadReportBtn").onclick = () => dmfDownloadErrorReport(errors, entityKey);
+      } else {
+        byId("dmfErrorWrap").style.display = "none";
+        byId("dmfExportReportBtn").style.display = "none";
+      }
+
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function dmfDownloadErrorReport(errors, entityKey) {
+      const header = "ligne;champ;erreur";
+      const rows = errors.map(e => `${e.row || ''};${e.field || ''};${String(e.message).replace(/;/g, ',')}`);
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `${entityKey}_erreurs_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+      URL.revokeObjectURL(url);
     }
 
     setupAllSortableTables();

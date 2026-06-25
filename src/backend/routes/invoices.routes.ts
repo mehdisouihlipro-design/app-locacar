@@ -3,6 +3,7 @@ import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { stampCreate, stampUpdate } from '../utils/audit';
+import { nextSequenceNumber } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -27,12 +28,39 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const result = await global.db.post('/invoices', stampCreate({
-      ...req.body,
-      id: req.body.id || uuidv4(),
-      status: req.body.status || 'en_attente'
-    }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
-    res.status(201).json({ success: true, data: result.data[0] });
+    const { lines = [], ...invoiceBody } = req.body;
+
+    if (lines.length === 0) {
+      return res.status(400).json({ success: false, message: 'Une facture doit avoir au moins une ligne.' });
+    }
+
+    const id = invoiceBody.id || uuidv4();
+    const body = stampCreate({ ...invoiceBody, id, status: invoiceBody.status || 'en_attente', lines: [] }, req);
+    await global.db.post('/invoices', body, { headers: { Prefer: 'resolution=merge-duplicates' } });
+
+    // Insert each line into invoice_lines table (BR21)
+    for (const line of lines) {
+      const lineId = line.id || `ILN-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      await global.db.post('/invoice_lines', stampCreate({
+        id: lineId,
+        invoice_id: id,
+        contract_id:      line.contractId      || line.contract_id      || null,
+        contract_line_id: line.contractLineId  || line.contract_line_id || null,
+        car_plate:        line.carPlate        || line.car_plate        || '',
+        designation:      line.designation     || '',
+        amount_original:  line.amountOriginal  || line.amount_original  || 0,
+        currency:         line.currency        || 'TND',
+        amount_ht:        line.amountHt        || line.amount_ht        || 0,
+        vat_amount:       line.vatAmount       || line.vat_amount       || 0,
+        daily_tax_amount: line.dailyTaxAmount  || line.daily_tax_amount || 0,
+        days:             line.days            || 0,
+        period_start:     line.periodStart     || line.period_start     || null,
+        period_end:       line.periodEnd       || line.period_end       || null,
+        line_ttc:         line.lineTtc         || line.line_ttc         || 0,
+      }, req), { headers: { Prefer: 'return=minimal' } });
+    }
+
+    res.status(201).json({ success: true, data: { id, ...body } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
@@ -52,8 +80,48 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=id,status`);
+    const inv = check.data?.[0];
+    if (!inv) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    if (inv.status !== 'brouillon')
+      return res.status(422).json({ success: false, message: 'Seules les factures en brouillon peuvent être supprimées.' });
     await global.db.delete(`/invoices?id=eq.${req.params.id}`);
     res.json({ success: true, message: 'Invoice deleted', data: { id: req.params.id } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// ── Confirmer un brouillon → en_attente + attribution du numéro séquentiel ───
+// POST /invoices/:id/confirm
+router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=*`);
+    const invoice = check.data?.[0];
+    if (!invoice) return res.status(404).json({ success: false, message: 'Facture introuvable.' });
+    if (invoice.status !== 'brouillon')
+      return res.status(422).json({ success: false, message: `Cette facture est au statut "${invoice.status}", pas "brouillon".` });
+
+    // Générer le numéro séquentiel via la souche (atomique, FOR UPDATE)
+    const invoiceNumber = await nextSequenceNumber('invoices');
+
+    // Mettre à jour la facture
+    const result = await global.db.patch(
+      `/invoices?id=eq.${req.params.id}`,
+      stampUpdate({ status: 'en_attente', invoice_number: invoiceNumber }, req),
+      { headers: { Prefer: 'return=representation' } }
+    );
+
+    // Si la facture vient d'un échéancier, mettre à jour son statut
+    if (invoice.schedule_id) {
+      await global.db.patch(
+        `/invoice_schedule?id=eq.${invoice.schedule_id}`,
+        stampUpdate({ status: 'confirme' }, req),
+        { headers: { Prefer: 'return=minimal' } }
+      );
+    }
+
+    res.json({ success: true, data: result.data?.[0], invoiceNumber });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }

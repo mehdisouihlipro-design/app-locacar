@@ -86,7 +86,36 @@ https://web-production-b4967.up.railway.app
 - **Alertes par mois:** Tendance des écheances critiques
 - **Trésorerie 12 mois:** Projection solde mensuel
 
+### Taux d'occupation flotte (vue macro)
+
+Le graphique pleine largeur **"Taux d'occupation flotte — 6 prochains mois"** affiche, mois par mois, le pourcentage de véhicules actifs occupés par au moins une réservation ou une ligne de contrat active.
+
+| Couleur de barre | Signification |
+|------------------|---------------|
+| 🟢 Vert | < 50 % — flotte sous-utilisée |
+| 🟠 Orange | 50 – 80 % — occupation normale |
+| 🔴 Rouge | ≥ 80 % — flotte très chargée |
+
+- **KPI en-tête** : taux du mois en cours affiché en haut à droite de la carte (ex. `65% ce mois (13/20 véhicules)`).
+- **Tooltip** : survoler une barre → `N / M véhicules (X%)`.
+- **Cliquer** sur une barre → onglet **Réservations** pour voir le détail.
+
+> Les véhicules `indisponible` sont exclus du calcul ; un véhicule apparaissant dans plusieurs réservations sur le même mois n'est compté qu'une fois.
+
 💡 **Cliquer sur un graphique** = vue détaillée du mois
+
+### Personnaliser le dashboard
+
+Survolez n'importe quelle carte KPI ou graphique : une barre d'outils apparaît dans son coin supérieur droit avec trois boutons.
+
+| Bouton | Action |
+|--------|--------|
+| `⠿` | **Déplacer** — cliquer-glisser pour repositionner la carte. KPIs et graphiques partagent la même grille : vous pouvez placer un KPI sous les graphiques ou l'inverse. |
+| `▸` | **Élargir** — augmente la largeur d'un cran (1/3 → 2/3 → pleine largeur). Les graphiques se recalibrent automatiquement. |
+| `◂` | **Rétrécir** — réduit la largeur d'un cran (minimum 1/3). |
+| `✕` | **Masquer** — cache la carte. Une barre jaune **« Masqués »** apparaît en haut du dashboard avec un bouton `👁 Nom` pour la restaurer. |
+
+**Tout est sauvegardé sur votre compte** (position, taille, visibilité) et restauré à chaque connexion, quel que soit le navigateur ou l'appareil.
 
 ### Message Trésorerie
 - 🟢 **Vert:** "Projection stable à 1 an" + solde minimum
@@ -148,14 +177,18 @@ https://web-production-b4967.up.railway.app
 
 ### Onglet: Devis
 
-L'onglet **Devis** permet de créer des propositions commerciales pour vos clients avant de les convertir en contrats. Un devis est composé d'un **entête** (client, date, date de validité, statut, notes) et de **lignes** (chaque ligne représente un véhicule sur une période avec son tarif).
+L'onglet **Devis** permet de créer des propositions commerciales pour vos clients avant de les convertir en contrats. Un devis est composé d'un **entête** (client, type, date, date de validité, statut, notes) et de **lignes** (chaque ligne représente un véhicule sur une période avec son tarif).
 
 #### Créer un devis
 
 1. Cliquer sur **"+ Nouveau devis"**
 2. Sélectionner le **client**, la **date du devis** et la **date de validité** (par défaut +30 jours)
-3. Ajouter des notes optionnelles puis cliquer **"Créer le devis"**
-4. La modale de détail s'ouvre — cliquer **"+ Ajouter une ligne"** pour ajouter les véhicules et périodes
+3. Choisir le **Type** du devis :
+   - **Court terme** (défaut) : location courte durée, paiement en début de contrat
+   - **Long terme** : location longue durée, facturation mensuelle par échéancier (BR32)
+   - **Autre** : cas particulier
+4. Ajouter des notes optionnelles puis cliquer **"Créer le devis"**
+5. La modale de détail s'ouvre — cliquer **"+ Ajouter une ligne"** pour ajouter les véhicules et périodes
 
 #### Ajouter une ligne de devis
 
@@ -183,6 +216,7 @@ Le bouton **"✓ Valider → Contrat"** convertit le devis en contrat de locatio
 2. Vérification des chevauchements (BR19) — si un véhicule est déjà engagé sur la période, la validation échoue avec un message d'erreur rouge
 3. Si OK : création automatique du contrat + lignes de contrat + réservations (BR25)
 4. Le devis passe en statut "validé" et un lien vers le nouveau contrat apparaît dans son entête
+5. **Devis long terme** : une boîte de dialogue s'affiche automatiquement — "Générer l'échéancier de facturation maintenant ?" — cliquer **OK** pour créer immédiatement l'échéancier mensuel, ou **Annuler** pour le faire plus tard depuis le détail du contrat
 
 #### Générer le PDF
 
@@ -244,16 +278,45 @@ Cliquer ce bouton :
 #### Colonne "Lignes"
 Le badge affiché dans la colonne "Lignes" indique le nombre de lignes actives (hors lignes annulées) associées à ce contrat.
 
+#### Échéancier de facturation (contrats long terme)
+Pour les contrats de **type long terme**, le modal de détail affiche une section **"Échéancier de facturation"** en bas.
+
+**Générer l'échéancier :**
+1. S'assurer que le contrat a au moins une ligne active
+2. Cliquer **"Générer l'échéancier"** → une entrée par mois est créée pour toute la durée du contrat (statut `Planifié`)
+3. Les montants sont calculés automatiquement depuis les tarifs des lignes actives
+
+**Tableau de l'échéancier :**
+| Statut | Signification |
+|--------|---------------|
+| **Planifié** (bleu) | Prévision — pas encore de facture |
+| **Brouillon** (jaune) | Facture brouillon générée, à confirmer |
+| **Confirmé** (vert) | Facture officielle émise avec numéro séquentiel |
+| **Annulé** (gris) | Entrée annulée (ex. résiliation) |
+
+**Générer une facture depuis l'échéancier :**
+- Cliquer **"Générer facture"** sur une entrée `Planifié` → une **facture brouillon** est créée et s'ouvre automatiquement
+- La facture brouillon peut être vérifiée, modifiée (lignes, montants) avant envoi
+
+**Confirmer la facture :**
+- Dans le modal facture, cliquer **"✓ Confirmer la facture"** → le numéro séquentiel `AAAA-NNNN` est attribué dans l'ordre chronologique de confirmation
+- Une fois confirmée, la facture passe en `En attente` et ne peut plus être supprimée
+
+**Régénérer l'échéancier :**
+Si le contrat est modifié (nouvelles lignes, tarif changé), cliquer **"↺ Régénérer"** → les entrées `Planifié` sont supprimées et recréées. Les entrées déjà en `Brouillon` ou `Confirmé` **ne sont jamais touchées**.
+
 ---
 
 ## Factures & Paiements
 
 ### Onglet: Factures
 
-#### Factures Créées Automatiquement
-- Location court terme = 1 facture
-- Location long terme = 1 facture/mois
-- Statut: `non_payee` → `partiellement_payee` → `payee`
+#### Cycle de vie d'une facture
+- **Brouillon** : facture générée depuis l'échéancier, pas encore de numéro officiel, librement modifiable et supprimable
+- **En attente** : facture confirmée, numéro séquentiel `AAAA-NNNN` attribué, plus supprimable
+- **Partiellement payée / Payée** : progression via les paiements enregistrés
+
+Pour les contrats long terme, les factures sont générées à la demande depuis l'**échéancier de facturation** (voir section [Onglet: Contrats](#onglet-contrats)).
 
 #### Créer une Facture Manuelle
 1. Cliquer **"Nouvelle facture"** pour afficher le formulaire
@@ -267,6 +330,7 @@ Le badge affiché dans la colonne "Lignes" indique le nombre de lignes actives (
    - Pour chaque ligne : contrat (véhicule associé), date de début de période, nombre de jours, montant HT
    - Cliquer **"+ Ajouter une ligne"** pour facturer plusieurs contrats/véhicules sur la même facture
    - La taxe journalière (paramétrable en Paramètres, ex: 2 dt/jour) est calculée **par ligne** ; le timbre fiscal n'est compté **qu'une seule fois** pour toute la facture
+   - ⚠️ **Au moins une ligne est obligatoire** — la création est bloquée si aucune ligne n'est saisie
 4. Cliquer **"Créer facture"**
 
 #### Modifier / Imprimer une Facture
@@ -277,9 +341,13 @@ Cliquer sur le bouton **"Facture"** d'une ligne pour ouvrir la fiche détaillée
 - Bouton **"✏ Modifier entête"** → les champs passent en mode saisie dans le même pavé (sans fenêtre secondaire) : Libellé, Échéance, Statut, RIB. Bouton **"✓ Enregistrer"** sauvegarde. **"✗ Annuler"** revient en lecture.
 
 **Grille des lignes de facturation** :
-- Chaque ligne affiche : Contrat/Véhicule, Début de période, Jours, Montant HT, TVA, Taxe journalière, Montant TTC, bouton ✕ (supprimer la ligne).
-- Le pied de tableau récapitule les totaux + timbre fiscal.
-- Bouton **"+ Ajouter une ligne"** → une ligne vide apparaît directement dans le tableau. Renseigner le contrat, la date de début, les jours et le montant HT (le TTC se calcule automatiquement dans l'autre sens). Cliquer **✓** pour valider, **✗** pour annuler.
+- Chaque ligne affiche : Contrat/Véhicule, Début de période, Jours, Montant HT, TVA, Taxe journalière, Montant TTC, bouton **✏** (modifier) et bouton **✕** (supprimer).
+- Le pied de tableau récapitule les totaux + timbre fiscal ; ils sont recalculés automatiquement après chaque ajout, modification ou suppression de ligne.
+- **Ajouter une ligne** : cliquer **"+ Ajouter une ligne"** → une ligne bleue apparaît dans le tableau. Renseigner le contrat, la date de début, les jours et le montant HT (le TTC se calcule dans l'autre sens, et inversement). Cliquer **✓** pour valider, **✗** pour annuler.
+- **Modifier une ligne** : cliquer **✏** → la ligne passe en mode édition (fond ambré) avec tous les champs modifiables. Valider avec **✓**.
+- **Supprimer une ligne** : cliquer **✕** → confirmation requise. ⚠️ La suppression est **bloquée si c'est la dernière ligne** de la facture (une facture doit toujours avoir au moins une ligne).
+
+> **Note sur les anciennes factures** : les factures créées avant la mise à jour BR21 affichent leurs lignes normalement. Lors de la première ouverture du modal, elles sont automatiquement migrées vers le nouveau stockage relationnel — l'opération est transparente et n'affecte pas les données.
 
 Bouton **"Télécharger PDF"** : génère l'aperçu imprimable de la facture.
 
@@ -734,6 +802,102 @@ Le numéro (identifiant) d'un contrat ou d'une facture peut être modifié depui
 
 ### Q: Comment recharger des données de démonstration?
 **A:** Depuis la page d'accueil, cliquer sur **"Charger données demo"**.
+
+---
+
+## Souches de numéros
+
+### Section : Paramètres → Souches de numéros
+
+La section **Souches de numéros** dans l'onglet "Actions rapides" vous permet de configurer la numérotation automatique des Factures, Contrats et Devis.
+
+> **Prérequis** : la migration SQL 009 doit avoir été exécutée dans Supabase (`src/backend/migrations/009_number_sequences.sql`).
+
+#### Format d'un numéro
+
+Chaque souche génère un numéro de la forme :
+```
+{Préfixe}{Séparateur}{Année}{Séparateur}{00001}
+Exemple : FAC-2026-0042
+```
+
+#### Configurer une souche
+
+1. Dans l'onglet **"Actions rapides"**, section **"Souches de numéros"**, cliquer **"✏ Configurer"** sur la souche souhaitée
+2. Modifier les champs :
+   - **Préfixe** : lettres avant le numéro (ex. `FAC`, `CTR`, `DEV`) — laisser vide pour aucun préfixe
+   - **Séparateur** : caractère entre les parties (`-`, `/`, `.`, `_`, ou aucun)
+   - **Nombre de chiffres** : longueur du compteur avec zéros (`4` → `0001`, `6` → `000001`)
+   - **Inclure l'année** : ajoute l'année courante dans le numéro (ex. `FAC-2026-0001`)
+   - **Remise à zéro annuelle** : recommandé pour les factures — le compteur repart à 1 le 1er janvier
+3. L'**aperçu** du prochain numéro se met à jour en temps réel
+4. Cliquer **"Enregistrer"**
+
+#### Resynchroniser un compteur
+
+Si le compteur est décalé par rapport à la réalité (ex. après un import CSV ou une manipulation directe en base), cliquer **"↺ Resynchroniser"** : le compteur est recalé sur le numéro maximum réel présent en base. Le prochain numéro généré sera max + 1.
+
+#### Auditer les trous de séquence
+
+Le bouton **"🔍 Audit trous"** (disponible pour Factures, Contrats, Devis) analyse la séquence et signale :
+- Les **trous** (numéros manquants) — normaux si une facture brouillon a été supprimée
+- Les **doublons** éventuels
+- Un **décalage** entre le compteur et le max réel
+
+> Les trous de séquence sont fiscalement acceptables. Ne renumérotez jamais des factures déjà émises.
+
+---
+
+## Gestion des données — Import / Export
+
+### Onglet: Gestion des données
+
+L'onglet **Gestion des données** vous permet d'importer et d'exporter les référentiels et le paramétrage de l'application (clients, véhicules, assurances, leasings, vignettes, maintenance) au format CSV, compatible Excel.
+
+> **Périmètre** : uniquement les données de référence (master data). Les données transactionnelles (contrats, factures, paiements, devis, réservations) ne sont pas exportables/importables par ce module — elles se gèrent depuis leurs onglets dédiés.
+
+#### Exporter une entité
+
+1. Cliquer sur **"↓ Exporter CSV"** sur la carte de l'entité souhaitée
+2. Le fichier `<entité>_export_AAAA-MM-JJ.csv` est téléchargé automatiquement
+3. Ouvrir dans Excel (séparateur `;`, encodage UTF-8 — Excel détecte automatiquement)
+
+> Les colonnes du fichier exporté sont identiques au template d'import : vous pouvez modifier le fichier puis le réimporter.
+
+#### Importer un fichier CSV
+
+**Étape 1 — Préparer le fichier**
+1. Cliquer sur **"↑ Importer CSV"** sur la carte de l'entité
+2. Cliquer **"↓ Télécharger le template CSV"** — le fichier contient les colonnes attendues, les valeurs acceptées pour chaque champ, et une ligne d'exemple
+3. Remplir le template dans Excel (ne pas modifier les en-têtes)
+4. Enregistrer sous **CSV (séparateur: point-virgule)** depuis Excel
+
+**Étape 2 — Uploader et importer**
+1. Cliquer sur **"↑ Importer CSV"**, sélectionner votre fichier
+2. Option **"Valider sans importer"** : cocher pour vérifier les erreurs sans écrire en base (simulation)
+3. Cliquer **"↑ Lancer l'import"**
+
+**Résultat**
+- Badges de résultat : **créés** (nouveaux enregistrements), **mis à jour** (enregistrements existants reconnus par leur clé), **ignorés** (lignes invalides)
+- Si des erreurs sont détectées : tableau ligne/champ/message + bouton **"↓ Télécharger rapport d'erreurs CSV"**
+- Bouton **"Importer les lignes valides quand même"** : importe les lignes sans erreur, ignore les autres
+
+#### Règles de déduplication
+
+Le module ne crée pas de doublons : si un enregistrement avec la même clé naturelle existe déjà en base, il est **mis à jour** (pas créé en double).
+
+| Entité | Clé de déduplication |
+|--------|----------------------|
+| Clients | Téléphone |
+| Véhicules | Immatriculation |
+| Assurances | Immatriculation + N° police |
+| Leasings | Immatriculation + N° contrat |
+| Vignettes | Immatriculation + Année fiscale |
+| Maintenance | Immatriculation + Date + Type |
+
+#### Format des dates
+
+Toutes les dates doivent être au format **AAAA-MM-JJ** (ex. `2024-01-15`). Dans Excel, formater la colonne en "Texte" avant de saisir les dates pour éviter la conversion automatique.
 
 ---
 

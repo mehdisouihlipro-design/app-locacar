@@ -16,6 +16,11 @@ import contractLinesRoutes from './routes/contract-lines.routes';
 import quotesRoutes from './routes/quotes.routes';
 import quoteLinesRoutes from './routes/quote-lines.routes';
 import invoicesRoutes from './routes/invoices.routes';
+import invoiceLinesRoutes from './routes/invoice-lines.routes';
+import invoiceScheduleRoutes from './routes/invoice-schedule.routes';
+import dataManagementRoutes from './routes/data-management.routes';
+import numberSequencesRoutes from './routes/number-sequences.routes';
+import preferencesRoutes from './routes/preferences.routes';
 import paymentsRoutes from './routes/payments.routes';
 import reservationsRoutes from './routes/reservations.routes';
 import maintenanceRoutes from './routes/maintenance.routes';
@@ -119,6 +124,8 @@ app.use('/api/v1/contract-lines', contractLinesRoutes);
 app.use('/api/v1/quotes', quotesRoutes);
 app.use('/api/v1/quote-lines', quoteLinesRoutes);
 app.use('/api/v1/invoices', invoicesRoutes);
+app.use('/api/v1/invoice-lines', invoiceLinesRoutes);
+app.use('/api/v1/invoice-schedule', invoiceScheduleRoutes);
 app.use('/api/v1/payments', paymentsRoutes);
 app.use('/api/v1/reservations', reservationsRoutes);
 app.use('/api/v1/maintenance', maintenanceRoutes);
@@ -128,6 +135,9 @@ app.use('/api/v1/leasing', leasingRoutes);
 app.use('/api/v1/vignettes', vignettesRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/demo', demoRoutes);
+app.use('/api/v1/data-management', dataManagementRoutes);
+app.use('/api/v1/number-sequences', numberSequencesRoutes);
+app.use('/api/v1/preferences', preferencesRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

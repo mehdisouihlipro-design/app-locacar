@@ -444,9 +444,37 @@ Lot de règles métier pour la prochaine version (spécification, développement
 
 - **BR26 — Résiliation anticipée d'une ligne de contrat** : une ligne de contrat active peut être résiliée avant son terme (statut `resilie` + `actual_end_date`, avec `period_start ≤ actual_end_date ≤ period_end`). La résiliation libère automatiquement la réservation associée (raccourcie à `actual_end_date` ou annulée si la date est passée), rend le véhicule disponible/réservable à partir du lendemain de `actual_end_date`, et recalcule le montant HT/TTC de la ligne au prorata de la durée réelle pour la prochaine facturation.
 
-- **BR27 — Devis (entête + lignes), validation et conversion en contrat** : un devis (`quotes`/`quote_lines`) reprend la structure entête + lignes du contrat (BR20) — un client, une ou plusieurs lignes véhicule/période/tarif avec ventilation HT/TVA/TTC (BR18) — et peut être exporté en PDF avec les mêmes informations que le contrat (coordonnées agence/client, lignes détaillées, totaux HT/TVA/TTC), pour envoi au client, avec en plus une **date de validité**. **Correction** : tant qu'il n'est pas validé, un devis ne bloque **pas** de véhicule — il n'est **pas** soumis au contrôle de chevauchement (BR19) et ne déclenche **pas** de réservation automatique (BR25), pour ne pas immobiliser un véhicule sur un simple devis non confirmé. Statuts : `brouillon`, `envoye`, `valide`, `refuse`, `expire`. La **validation** d'un devis (`valide`) déclenche la création automatique d'un contrat (entête `contracts` + lignes `contract_lines`) reprenant les données du devis ; ce nouveau contrat est alors soumis normalement au contrôle de chevauchement (BR19) et à la réservation automatique (BR25). Le devis validé est associé au contrat créé via `quotes.converted_contract_id` et devient lecture seule (non modifiable, non re-convertible).
+- **BR27 — Devis (entête + lignes), validation et conversion en contrat** — ✅ **Implémenté (2026-06)** : un devis (`quotes`/`quote_lines`) reprend la structure entête + lignes du contrat (BR20) — un client, une ou plusieurs lignes véhicule/période/tarif avec ventilation HT/TVA/TTC (BR18) — et peut être exporté en PDF avec les mêmes informations que le contrat (coordonnées agence/client, lignes détaillées, totaux HT/TVA/TTC), pour envoi au client, avec en plus une **date de validité**. **Correction** : tant qu'il n'est pas validé, un devis ne bloque **pas** de véhicule — il n'est **pas** soumis au contrôle de chevauchement (BR19) et ne déclenche **pas** de réservation automatique (BR25), pour ne pas immobiliser un véhicule sur un simple devis non confirmé. Statuts : `brouillon`, `envoye`, `valide`, `refuse`, `expire`. La **validation** d'un devis (`valide`) déclenche la création automatique d'un contrat (entête `contracts` + lignes `contract_lines`) reprenant les données du devis ; ce nouveau contrat est alors soumis normalement au contrôle de chevauchement (BR19) et à la réservation automatique (BR25). Le devis validé est associé au contrat créé via `quotes.converted_contract_id` et devient lecture seule (non modifiable, non re-convertible).
 
   La **date de validité** (`validity_date`) est **obligatoire** (`NOT NULL`) : à la création du devis, l'application propose par défaut `quote_date + 30 jours` (valeur par défaut applicative, et non une valeur par défaut de colonne SQL), modifiable par l'utilisateur. La transition `envoye → expire` lorsque `validity_date < date du jour` suit le même mécanisme de transition calculée à l'affichage / persistée à la prochaine action que pour les lignes de contrat (BR20).
+
+- **BR32 — Échéancier de facturation pour contrats long terme** — ✅ **Implémenté (2026-06)** : pour un contrat de `type=long`, la génération directe de factures à la création du contrat est remplacée par un **échéancier** (`invoice_schedule`) — une entrée par mois prévue, sans facture attachée.
+
+  **Principes fondamentaux** :
+  - L'échéancier est la *promesse* ; la facture est le *document officiel*. Une facture n'est créée que lorsque l'utilisateur le décide, à la date de son choix.
+  - Le **numéro de facture** (`invoice_number`, format `AAAA-NNNN`) n'est **jamais** attribué à la création. Il est attribué à la **confirmation** (`brouillon → en_attente`), garantissant une souche séquentielle strictement chronologique.
+
+  **Cycle de vie d'une entrée d'échéancier** :
+  `planifie` → `brouillon` (facture brouillon générée) → `confirme` (facture confirmée avec numéro)
+
+  **Règles** :
+  - La génération de l'échéancier (`POST /contracts/:id/generate-schedule`) nécessite au moins une ligne de contrat `active` ; le montant mensuel est la somme des `rate` de toutes les lignes actives.
+  - Une entrée `planifie` peut être supprimée ou régénérée librement ; une entrée `brouillon`/`confirme` est intangible (la facture existe).
+  - Si le contrat est modifié (tarif, résiliation BR26, ajout de ligne), régénérer l'échéancier (`override: true`) ne touche que les entrées `planifie` — jamais les factures déjà créées.
+  - La suppression d'une facture (`DELETE /invoices/:id`) n'est autorisée que si son statut est `brouillon` (422 sinon) ; la suppression repasse l'entrée d'échéancier à `planifie`.
+
+- **BR33 — Gestion des souches de numéros** — ✅ **Implémenté (2026-06)** : la numérotation automatique de chaque entité métier (factures, contrats, devis) est configurable via une table `number_sequences` et une fonction PostgreSQL atomique (`next_sequence_number`, `FOR UPDATE`).
+
+  **Format paramétrable par souche** : `{prefix}{sep}{année?}{sep}{N zéros…}` (ex. `FAC-2026-0042`).
+
+  **Champs configurables** : `prefix`, `separator`, `digits` (1–10), `include_year`, `reset_annually`.
+
+  **Règles** :
+  - La génération est **atomique** : verrou `FOR UPDATE` sur la ligne de souche → incrément → formatage → retour en une seule transaction PostgreSQL. Aucun doublon possible sous charge concurrente.
+  - Un numéro réservé (mais dont la création d'entité a échoué ensuite) crée un **trou intentionnel** — fiscalement acceptable ; ne jamais renuméroter.
+  - **Resynchronisation** (`POST /number-sequences/:id/resync`) : recalcule `last_number` sur le max réel en base (correction après import CSV ou manipulation directe en DB).
+  - **Audit** (`GET /number-sequences/:id/audit`) : liste les trous, doublons et tout décalage entre `last_number` et le max réel.
+  - Les contrats (`contract_number`) et devis (`quote_number`) reçoivent leur numéro à la **création** ; les factures (`invoice_number`) le reçoivent à la **confirmation** (BR32 — cohérence chronologique).
 
 ---
 

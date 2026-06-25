@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { stampCreate, stampUpdate } from '../utils/audit';
+import { nextSequenceNumber } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -23,8 +24,13 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const id = req.body.id || uuidv4();
-    await global.db.post('/contracts', stampCreate({ ...req.body, id, status: req.body.status || 'active' }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
-    res.status(201).json({ success: true, data: { id, ...req.body } });
+    // Générer un numéro de contrat séquentiel si pas déjà fourni
+    let contractNumber = req.body.contract_number || null;
+    if (!contractNumber) {
+      try { contractNumber = await nextSequenceNumber('contracts'); } catch { /* non bloquant si la souche n'est pas encore créée */ }
+    }
+    await global.db.post('/contracts', stampCreate({ ...req.body, id, contract_number: contractNumber, status: req.body.status || 'active' }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
+    res.status(201).json({ success: true, data: { id, contract_number: contractNumber, ...req.body } });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
@@ -149,6 +155,100 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
     res.json({ success: true, linesConfirmed: lines.length, reservations });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
+
+// BR27 : générer l'échéancier mensuel d'un contrat long terme
+// POST /contracts/:id/generate-schedule
+// Body optionnel : { override: true } pour regénérer en supprimant les entrées planifiées existantes
+router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) => {
+  try {
+    const contractRes = await global.db.get(`/contracts?id=eq.${req.params.id}&select=*`);
+    const contract = contractRes.data?.[0];
+    if (!contract) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
+    if (contract.type !== 'long')
+      return res.status(422).json({ success: false, message: 'L\'échéancier ne s\'applique qu\'aux contrats long terme.' });
+
+    const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${req.params.id}&status=eq.active&select=*&order=period_start.asc`);
+    const lines: any[] = linesRes.data || [];
+    if (lines.length === 0)
+      return res.status(422).json({ success: false, message: 'Ce contrat n\'a aucune ligne active. Ajoutez des lignes avant de générer l\'échéancier.' });
+
+    // Calcul de la plage globale du contrat
+    const globalStart = lines.reduce((min, l) => (!min || l.period_start < min ? l.period_start : min), '');
+    const globalEnd   = lines.reduce((max, l) => (!max || l.period_end   > max ? l.period_end   : max), '');
+    if (!globalStart || !globalEnd)
+      return res.status(422).json({ success: false, message: 'Les lignes du contrat n\'ont pas de dates de période valides.' });
+
+    // Supprimer les entrées planifiées existantes si override
+    if (req.body.override) {
+      const existing = await global.db.get(`/invoice_schedule?contract_id=eq.${req.params.id}&status=eq.planifie&select=id`);
+      for (const e of existing.data || []) {
+        await global.db.delete(`/invoice_schedule?id=eq.${e.id}`);
+      }
+    } else {
+      // Vérifier qu'il n'y a pas déjà un échéancier
+      const existing = await global.db.get(`/invoice_schedule?contract_id=eq.${req.params.id}&select=id`);
+      if (existing.data && existing.data.length > 0)
+        return res.status(409).json({ success: false, message: 'Un échéancier existe déjà pour ce contrat. Utilisez override:true pour régénérer.' });
+    }
+
+    // Montant HT mensuel total = somme des tarifs (rate) de toutes les lignes actives
+    // Pour un contrat long terme, rate = tarif mensuel par ligne
+    const monthlyAmountHt = lines.reduce((sum, l) => sum + Number(l.amount_ht || l.rate || 0), 0);
+    const vatRate = 0.19; // TODO: lire depuis settings si besoin
+    const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
+    const lineTtc   = Math.round((monthlyAmountHt + vatAmount) * 1000) / 1000;
+
+    // Générer une entrée par mois entre globalStart et globalEnd
+    const entries: any[] = [];
+    let current = new Date(globalStart);
+    const end    = new Date(globalEnd);
+
+    while (current <= end) {
+      const periodStart = toIso(current);
+
+      // Fin de la période = même jour du mois suivant - 1
+      const nextMonth = new Date(current);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      // Ne pas dépasser globalEnd
+      const periodEnd = toIso(nextMonth > end ? end : new Date(nextMonth.getTime() - 86400000));
+
+      const carPlates = lines.map(l => l.car_plate || '').filter(Boolean).join(', ');
+      const label = `Loyer ${formatMonthLabel(periodStart)}${carPlates ? ' — ' + carPlates : ''}`;
+
+      const id = `SCH-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const entry = stampCreate({
+        id,
+        contract_id:      req.params.id,
+        scheduled_date:   periodStart,
+        period_start:     periodStart,
+        period_end:       periodEnd,
+        amount_ht:        monthlyAmountHt,
+        vat_amount:       vatAmount,
+        daily_tax_amount: 0,
+        line_ttc:         lineTtc,
+        label,
+        status:           'planifie',
+        invoice_id:       null,
+      }, req);
+      await global.db.post('/invoice_schedule', entry, { headers: { Prefer: 'return=minimal' } });
+      entries.push(entry);
+
+      // Avancer d'un mois
+      current = nextMonth > end ? new Date(end.getTime() + 86400000) : nextMonth;
+    }
+
+    res.status(201).json({ success: true, count: entries.length, data: entries });
+  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+});
+
+function toIso(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function formatMonthLabel(isoDate: string): string {
+  if (!isoDate) return '';
+  return new Date(isoDate).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
 
 // Phase 2A : lignes d'un contrat (BR20, modele entete + lignes)
 router.get('/:id/lines', async (req: AuthRequest, res: Response) => {

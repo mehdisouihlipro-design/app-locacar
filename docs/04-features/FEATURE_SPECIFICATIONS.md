@@ -1200,7 +1200,7 @@ Les deux règles absolues du projet (`CLAUDE.md`) s'appliquent à **toute** nouv
 | Entité | Chargement (`loadDataFromAPI`) | Écriture (formulaires) | `syncStateToAPI` / `/demo/reset` |
 |---|---|---|---|
 | `contract_lines` | À ajouter (avec `contracts`) | Formulaire "+ Ajouter une ligne" (9.3) | À ajouter |
-| `invoice_lines` | À ajouter (avec `invoices`) | Auto-remplissage + édition (9.4) | À ajouter |
+| `invoice_lines` | ✅ Chargé via `GET /invoice-lines` | ✅ POST/PUT/DELETE `/invoice-lines` + modal édition | ✅ `syncStateToAPI` + `/demo/reset` |
 | `quotes` | À ajouter | Écran Devis (9.10) | À ajouter |
 | `quote_lines` | À ajouter (avec `quotes`) | Écran Devis (9.10) | À ajouter |
 
@@ -1269,15 +1269,15 @@ Les lignes de contrat au statut `brouillon` (contrat non confirmé, 9.3) ne sont
 - Bouton "Confirmer le contrat" : passe `contracts.status` de `brouillon` à `active`, et bascule toutes ses `contract_lines` de `brouillon` à `active`. Ce passage déclenche alors, pour chaque ligne, le contrôle 9.2/BR19 (si conflit, la confirmation est bloquée ligne par ligne avec le message d'erreur rouge inline habituel) puis la recherche/création de réservation (9.8/BR25).
 - **Transition automatique `active → termine`** : à l'affichage de la grille `contract_lines` (liste Contrats ou détail), toute ligne `status = 'active'` dont `period_end < aujourd'hui` est affichée avec le statut `termine` (badge), sans écriture immédiate en base. Le statut est persisté (`UPDATE contract_lines SET status = 'termine'`) à la prochaine action effectuée sur la ligne (résiliation, modification, génération de facture) — même mécanisme que l'expiration automatique des devis (9.10/BR27).
 
-### 9.4 Facture entête + lignes, auto-remplissage depuis un contrat (BR21)
+### 9.4 ✅ Facture entête + lignes, auto-remplissage depuis un contrat (BR21) — Implémenté (2026-06)
 
-- `invoices.lines` (JSONB, BR15bis) est remplacé par la table relationnelle `invoice_lines` (mêmes champs + `contract_line_id`).
-- Sur le formulaire de création/édition de facture, le sélecteur "Contrat" référence un **contrat entête**. Dès qu'un contrat est sélectionné :
-  - Le système crée automatiquement **une ligne de facture par ligne de ce contrat** (`contract_lines`), pré-remplie avec véhicule, immatriculation, période, montant HT (`contract_lines.amount_ht`).
-  - L'utilisateur peut ensuite modifier ou supprimer ces lignes générées avant validation (ex. facturation d'une période partielle, ou montant ajusté après résiliation anticipée, cf. 9.9).
-- Le calcul par ligne reste celui de BR15bis : TVA et taxe journalière (2dt/jour) par ligne ; timbre fiscal une seule fois pour la facture entière (entête).
-- `generateInvoicePdf` est mis à jour pour lire `invoice_lines` (avec repli sur `invoices.lines` pour les factures existantes non migrées).
-- **Facture sans ligne interdite (BR21)** : le bouton "Enregistrer" du formulaire facture est désactivé (ou affiche une erreur rouge inline) si `invoice_lines` est vide — message : « Une facture doit contenir au moins une ligne. ». Le backend (`POST`/`PUT /invoices` et `/rpc/create_invoice_with_lines`, 9.11) applique le même contrôle et renvoie une erreur 400 si la liste de lignes est vide, pour empêcher la création via appel API direct.
+- `invoices.lines` (JSONB) est remplacé par la table relationnelle `invoice_lines`. Migration `006_br21_invoice_lines.sql` à exécuter dans Supabase.
+- **Table `invoice_lines`** : colonnes `id`, `invoice_id` (FK → invoices CASCADE), `contract_line_id` (FK optionnel), `contract_id`, `car_plate`, `designation`, `amount_ht`, `vat_amount`, `daily_tax_amount`, `days`, `period_start`, `period_end`, `line_ttc`, `currency`, `amount_original` + audit fields.
+- **Backend** : nouveau fichier `invoice-lines.routes.ts` — `GET /invoice-lines`, `POST /invoice-lines`, `PUT /invoice-lines/:id`, `DELETE /invoice-lines/:id`. Chaque PUT/POST/DELETE recalcule automatiquement les totaux de la facture parente. `POST /invoices` crée les `invoice_lines` à partir du tableau `lines` transmis dans le body (les nouvelles factures n'utilisent plus le JSONB).
+- **Frontend** : `state.invoiceLines` chargé dans `loadDataFromAPI`. `renderInvoiceDetailLines` préfère `state.invoiceLines`, repli sur JSONB pour les anciennes factures. L'ouverture du modal de détail d'une facture ancienne (JSONB) migre automatiquement ses lignes en `invoice_lines` (migration lazy on first open).
+- **Facture sans ligne interdite** : `POST /invoices` retourne 400 si aucune ligne transmise. `DELETE /invoice-lines/:id` retourne 422 si suppression de la dernière ligne.
+- **PDF** : `generateInvoicePdf` lit `state.invoiceLines` (repli JSONB pour les anciennes factures non encore migrées).
+- **`demo/reset`** : `invoice_lines` inclus dans le body envoyé à `/demo/reset` et inséré après les `invoices` dans `demo.routes.ts`.
 
 ### 9.5 Sélection du RIB à la facturation (BR22) — ✅ Implémenté (Phase 1A)
 
@@ -1352,6 +1352,27 @@ Sur la grille des lignes de contrat (9.3), bouton **"Résilier"** disponible pou
   6. L'écran bascule sur le contrat nouvellement créé (ou affiche un lien "Voir le contrat {id}").
 - Boutons "Marquer comme envoyé" (`envoye`) et "Refuser" (`refuse`) disponibles pour le suivi commercial ; un devis dont `validity_date < aujourd'hui` et non encore validé passe automatiquement à `expire` à l'affichage de la liste (calcul côté client, sans tâche planifiée, persisté à la prochaine action — cf. ci-dessus).
 
+### 9.12 ✅ Implémenté (2026-06) — Échéancier de facturation pour contrats long terme (BR32)
+
+**Problème résolu** : la génération immédiate de 12 factures à la création d'un contrat long terme était rigide (modification du contrat → factures incohérentes, numérotation non chronologique).
+
+**Principe** : l'échéancier (`invoice_schedule`) est la *planification*, la facture est le *document officiel*. Le numéro de facture est attribué uniquement à la confirmation.
+
+**Flux complet** :
+1. Contrat long terme créé avec ses lignes actives
+2. "Générer l'échéancier" → `POST /contracts/:id/generate-schedule` → N entrées `planifie` (une par mois)
+3. Au moment de facturer → "Générer facture" sur une entrée → `POST /invoice-schedule/:id/generate` → facture `brouillon` créée (sans numéro)
+4. Vérifier/modifier le brouillon (lignes, montants)
+5. "✓ Confirmer" → `POST /invoices/:id/confirm` → `invoice_number = AAAA-NNNN` attribué, statut `en_attente`
+
+**Règles métier** :
+- La suppression d'une facture (`DELETE`) n'est autorisée que si `status = brouillon`
+- `POST /contracts/:id/generate-schedule?override=true` régénère uniquement les entrées `planifie` ; les brouillons/confirmés ne sont pas touchés
+- Le montant mensuel = somme des `rate` des `contract_lines` actives au moment de la génération
+- Statuts d'une entrée d'échéancier : `planifie` → `brouillon` → `confirme` (ou `annule`)
+
+**Fichiers** : `src/backend/routes/invoice-schedule.routes.ts`, `src/backend/migrations/007_invoice_schedule.sql`, `state.invoiceSchedule` dans le frontend, section "Échéancier" dans `openContractDetail`.
+
 ### 9.11 Atomicité des opérations entête + lignes (BR20bis)
 
 Trois opérations métier sont multi-tables et doivent être **atomiques** (tout ou rien) : la création d'un contrat avec ses lignes (9.3/BR20), la création d'une facture avec ses lignes (9.4/BR21), et la validation d'un devis avec conversion en contrat (9.10/BR27). Elles sont implémentées via des **fonctions PostgreSQL exposées en RPC par PostgREST** (`docs/03-data-model/SCHEMA_REFERENCE.md`, section "Fonctions RPC") :
@@ -1364,8 +1385,82 @@ Trois opérations métier sont multi-tables et doivent être **atomiques** (tout
 
 Le backend (`src/backend/routes/`) appelle ces fonctions via `POST /rpc/<nom_fonction>` au lieu d'enchaîner plusieurs `INSERT`/`UPDATE` séparés, ce qui évite les états intermédiaires incohérents (ex. entête créée sans ses lignes, ou ligne de contrat sans réservation) en cas d'erreur ou d'accès concurrent. Voir `docs/05-api/API_REFERENCE.md` section 13 pour les endpoints correspondants.
 
+### 9.13 ✅ Implémenté (2026-06) — Module Gestion des données (DMF) — Import / Export par entité
+
+Inspiré du Data Management Framework (DMF) de Dynamics 365 F&O. Accessible via l'onglet **"Gestion des données"**.
+
+**Entités couvertes (master data + paramétrage uniquement — hors transactionnel) :**
+
+| Entité | Table | Clé de déduplication |
+|--------|-------|----------------------|
+| Clients | `customers` | `phone` |
+| Véhicules | `cars` | `plate` |
+| Assurances | `insurances` | `car_plate + policy_number` |
+| Leasings | `leasing_contracts` | `car_plate + contract_number` |
+| Vignettes | `vignettes` | `car_plate + fiscal_year` |
+| Maintenance | `maintenance_costs` | `car_plate + date + type` |
+
+**Flux export :** `GET /api/v1/data-management/:entity/export` → CSV UTF-8 avec BOM (compatible Excel) contenant l'intégralité des enregistrements, triés par `created_at`. Colonnes = mêmes en-têtes que le template import → roundtrip parfait (export → modifier → réimporter).
+
+**Flux import :**
+1. Télécharger le template : `GET /api/v1/data-management/:entity/template` → CSV avec commentaires `#`, en-têtes obligatoires et 1 ligne exemple
+2. Upload du fichier rempli : `POST /api/v1/data-management/:entity/import` (multipart/form-data, champ `file`)
+3. Validation complète de toutes les lignes avant toute écriture (champs requis, types, formats date `AAAA-MM-JJ`, valeurs d'enum)
+4. Résolution FK : `car_plate → car_id` pour les entités liées à un véhicule
+5. Déduplication : si la clé naturelle existe déjà en base → `UPDATE`, sinon → `INSERT` (idempotent)
+6. Paramètres : `?dry_run=true` (validation sans écriture), `?skip_errors=true` (importer les lignes valides, ignorer les invalides)
+7. Réponse : `{ imported, updated, skipped, dbErrors, errors: [{row, field, message}] }`
+
+**UI :**
+- Grille de cartes par entité avec compteur d'enregistrements en base
+- Bouton "↓ Exporter CSV" → téléchargement direct
+- Bouton "↑ Importer CSV" → modal en 2 étapes (1. télécharger template, 2. uploader fichier) + option "Valider sans importer"
+- Panneau de résultat avec badges (créés / mis à jour / ignorés / erreurs), tableau d'erreurs par ligne/champ, bouton "Télécharger rapport d'erreurs CSV", option "Importer les lignes valides quand même"
+
+**Fichiers :** `src/backend/routes/data-management.routes.ts` (nouveau) — librairies : `multer` + `csv-parse`.
+
+### 9.14 ✅ Implémenté (2026-06) — Graphique taux d'occupation flotte (macro dashboard)
+
+**Problème résolu** : le diagramme de Gantt existant (vue par véhicule/jours) ne donnait pas de vision agrégée sur l'occupation globale de la flotte.
+
+**Vue ajoutée** : carte pleine largeur dans le dashboard sous les autres KPIs — graphique en barres des **6 prochains mois** indiquant le pourcentage de véhicules occupés (réservations non-annulées/terminées + lignes de contrat actives).
+
+**Calcul** : pour chaque mois `[monthStart, monthEnd]`, on collecte l'ensemble des `carId` uniques dont la période de réservation ou de ligne de contrat chevauche ce mois. Le taux = `occupiedCount / totalCars` (véhicules en statut `!= indisponible`).
+
+**Couleurs dynamiques** : vert < 50 %, orange 50–80 %, rouge ≥ 80 %.
+
+**KPI inline** : le taux du mois courant est affiché à droite du titre (coloré selon les mêmes seuils).
+
+**Interactivité** : clic sur n'importe quelle barre → navigation vers l'onglet Réservations (règle widgets cliquables).
+
+**Fichier :** `worksheet-mini-app/index.html` — fonctions `getOccupancySeries()` + bloc Chart.js dans `renderHomeDashboard()`.
+
+### 9.15 ✅ Implémenté (2026-06) — Dashboard entièrement personnalisable par utilisateur
+
+**Problème résolu** : l'ordre des KPIs et graphiques était figé, la taille fixe et rien ne pouvait être masqué.
+
+**Grille unifiée** : KPIs (6) et graphiques (8 incl. occupation + prévision) sont dans une seule grille `#dashboardGrid` (`repeat(3, 1fr)`). Les KPIs peuvent être déplacés sous les graphiques et vice-versa.
+
+**Trois actions disponibles** (toolbar au survol de chaque carte) :
+| Action | Contrôle | Comportement |
+|--------|----------|--------------|
+| Déplacer | `⠿` (drag handle) | SortableJS déplace le nœud DOM dans la grille |
+| Redimensionner | `◂` rétrécir / `▸` élargir | Cycle span 1 → 2 → 3 colonnes (1/3 · 2/3 · pleine largeur) ; `window.resize` déclenché pour que Chart.js se recalibres |
+| Masquer | `✕` | Carte cachée (`dash-hidden`) ; une barre de restauration apparaît au-dessus du dashboard avec des chips cliquables `👁 Nom` |
+
+**Persistance** : après chaque action, `saveDashboardLayout()` envoie `PUT /api/v1/preferences/dashboard-layout` avec `{ order: [...ids], spans: { id: n }, hidden: [...ids] }` lié au `user_id` JWT → personnalisation identique sur tous les appareils.
+
+**Restauration** : `loadDashboardLayout()` (appelé une seule fois au premier accès à l'onglet, résultat mis en cache) → `applyDashboardLayout()` réordonne le DOM, applique les spans et masque les cartes avant le rendu Chart.js.
+
+**Table DB :** `user_preferences(user_id TEXT, key TEXT, value JSONB, updated_at TIMESTAMPTZ)` — PK `(user_id, key)`.
+
+**Fichiers :**
+- `src/backend/migrations/010_user_preferences.sql`
+- `src/backend/routes/preferences.routes.ts` (GET + PUT `/:key`)
+- `worksheet-mini-app/index.html` — fonctions `initDashboardSortable()`, `initCardControls()`, `saveDashboardLayout()`, `applyDashboardLayout()`, `loadDashboardLayout()`, `renderHiddenBar()`
+
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: May 2026  
-**Next Review**: June 2026
+**Last Updated**: June 2026  
+**Next Review**: September 2026

@@ -860,6 +860,43 @@ CREATE INDEX idx_invoice_lines_contract ON invoice_lines(contract_id);
 - `daily_tax_amount` reste calculé par ligne (BR15bis) ; le timbre fiscal (`invoices.stamp_duty_amount`, au niveau entête) reste compté une seule fois par facture.
 - `line_ttc` = `amount_ht + vat_amount + daily_tax_amount` (somme des `line_ttc` + `stamp_duty_amount` = `invoices.amount_tnd`).
 
+### INVOICE_SCHEDULE — Échéancier de facturation — ✅ Implémenté (2026-06, BR32)
+
+```sql
+CREATE TABLE IF NOT EXISTS invoice_schedule (
+  id                TEXT         PRIMARY KEY,
+  contract_id       TEXT         NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+  scheduled_date    DATE         NOT NULL,
+  period_start      DATE         NOT NULL,
+  period_end        DATE         NOT NULL,
+  amount_ht         DECIMAL(12,3) NOT NULL DEFAULT 0,
+  vat_amount        DECIMAL(12,3) NOT NULL DEFAULT 0,
+  daily_tax_amount  DECIMAL(12,3) NOT NULL DEFAULT 0,
+  line_ttc          DECIMAL(12,3) NOT NULL DEFAULT 0,
+  label             TEXT,
+  status            TEXT         NOT NULL DEFAULT 'planifie'
+                    CHECK (status IN ('planifie','brouillon','confirme','annule')),
+  invoice_id        TEXT         REFERENCES invoices(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ  DEFAULT NOW(),
+  created_by        TEXT,
+  updated_at        TIMESTAMPTZ  DEFAULT NOW(),
+  updated_by        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_invoice_schedule_contract ON invoice_schedule(contract_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_schedule_invoice  ON invoice_schedule(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_schedule_status   ON invoice_schedule(status);
+CREATE INDEX IF NOT EXISTS idx_invoice_schedule_date     ON invoice_schedule(scheduled_date);
+
+-- Colonnes ajoutées sur invoices (migration 007)
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS invoice_number TEXT UNIQUE; -- format AAAA-NNNN, NULL pour brouillons
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS schedule_id TEXT;           -- référence non-FK vers invoice_schedule.id
+```
+
+- `invoice_schedule.invoice_id` est NULL tant que l'entrée est `planifie` ; il est renseigné dès qu'une facture brouillon est générée.
+- `invoices.invoice_number` est NULL pour tous les brouillons ; il est attribué à la confirmation (`POST /invoices/:id/confirm`) dans l'ordre séquentiel `AAAA-NNNN`.
+- `invoices.schedule_id` (sans contrainte FK pour éviter la circularité) permet de retrouver l'entrée d'échéancier depuis la facture.
+- `DELETE /invoices/:id` retourne 422 si `status ≠ 'brouillon'`.
+
 ### SETTINGS — colonnes ajoutées (second RIB) — ✅ Implémenté (Phase 1A, BR22)
 
 ```sql
@@ -888,6 +925,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   customer_name VARCHAR(255),
   quote_date DATE NOT NULL,
   validity_date DATE NOT NULL,
+  type TEXT NOT NULL DEFAULT 'court' CHECK (type IN ('court', 'long', 'autre')),  -- migration 008
   status VARCHAR(20) NOT NULL DEFAULT 'brouillon',
   total_amount_ht DECIMAL(15, 2) DEFAULT 0,
   total_vat_amount DECIMAL(15, 2) DEFAULT 0,
@@ -905,7 +943,10 @@ CREATE INDEX idx_quotes_customer ON quotes(customer_id);
 CREATE INDEX idx_quotes_status ON quotes(status);
 ```
 
+> **✅ Migration 008** : `ALTER TABLE quotes ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'court' CHECK (type IN ('court', 'long', 'autre'));` — à exécuter dans Supabase SQL Editor (`src/backend/migrations/008_quote_type.sql`).
+
 - Reprend la structure entête de `contracts` (BR20), avec en plus `validity_date` (date de validité du devis affichée sur le PDF) et `converted_contract_id`.
+- `type` (ajout migration 008, BR27+BR32) : `court`, `long`, `autre`. Propagé au contrat lors de la validation (`POST /quotes/:id/validate`) : si `type = 'long'`, le contrat créé hérite de `type = 'long'` et `payment_plan = 'mensualite'`, déclenchant la section "Échéancier" dans le détail contrat.
 - `validity_date` est **obligatoire** (`NOT NULL`, BR27) : aucune valeur par défaut en base — l'application calcule et propose `quote_date + 30 jours` à la création, modifiable par l'utilisateur avant enregistrement.
 - `status` : `brouillon`, `envoye`, `valide`, `refuse`, `expire`. Un devis `valide` est lecture seule (`converted_contract_id` renseigné). Transition `envoye → expire` lorsque `validity_date < date du jour` (calculée à l'affichage, persistée à la prochaine action, même mécanisme que `contract_lines.status` `active → termine`).
 - `total_amount_ht` / `total_vat_amount` / `total_amount_ttc` / `total_amount_tnd` = sommes agrégées des `quote_lines` (mêmes règles de calcul que `contract_lines`, BR18).
@@ -980,3 +1021,43 @@ LANGUAGE plpgsql AS $$ ... $$;
 
 - Le backend appelle ces fonctions via `POST /rpc/create_contract_with_lines`, `POST /rpc/create_invoice_with_lines`, `POST /rpc/validate_quote` (PostgREST) au lieu d'enchaîner plusieurs `INSERT`/`UPDATE` non transactionnels.
 - Le corps `$$ ... $$` (logique métier détaillée) sera écrit lors de la phase de développement ; cette spécification fixe la signature, le périmètre transactionnel et les règles métier (BR19, BR21, BR25, BR27) que chaque fonction doit respecter.
+
+---
+
+### NUMBER_SEQUENCES — Souches de numéros configurables (migration 009, BR33)
+
+```sql
+CREATE TABLE IF NOT EXISTS number_sequences (
+  id             TEXT PRIMARY KEY,          -- 'invoices' | 'contracts' | 'quotes' | 'reservations'
+  label          TEXT NOT NULL,
+  prefix         TEXT NOT NULL DEFAULT '',  -- ex: 'FAC', 'CTR', 'DEV'
+  separator      TEXT NOT NULL DEFAULT '-', -- '-' | '/' | '.' | '_' | ''
+  include_year   BOOLEAN NOT NULL DEFAULT TRUE,
+  digits         INTEGER NOT NULL DEFAULT 4,
+  last_number    INTEGER NOT NULL DEFAULT 0,
+  last_year      INTEGER,
+  reset_annually BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Fonctions RPC (migration 009)
+CREATE OR REPLACE FUNCTION next_sequence_number(p_sequence_id TEXT) RETURNS TEXT ...;
+CREATE OR REPLACE FUNCTION resync_sequence(p_sequence_id TEXT) RETURNS INTEGER ...;
+
+-- Colonnes ajoutées sur les entités métier (migration 009)
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS contract_number TEXT UNIQUE;
+ALTER TABLE quotes     ADD COLUMN IF NOT EXISTS quote_number   TEXT UNIQUE;
+-- invoices.invoice_number existe depuis migration 007
+```
+
+> **✅ Migration 009** : fichier `src/backend/migrations/009_number_sequences.sql` — à exécuter dans Supabase SQL Editor.
+
+**Format généré** : `{prefix}{sep}{année?}{sep}{N zéros}` — ex. `FAC-2026-0042`, `CTR-2026-0001`, `DEV-2026-005`.
+
+**Règles** :
+- `next_sequence_number` utilise `FOR UPDATE` pour garantir l'atomicité sous charge concurrente.
+- Un numéro réservé mais dont l'entité n'a pas été créée forme un **trou intentionnel** — ne jamais renuméroter.
+- `resync_sequence` recalcule `last_number` sur le max réel des enregistrements en base.
+- `contracts.contract_number` et `quotes.quote_number` sont attribués à la **création** ; `invoices.invoice_number` est attribué à la **confirmation** (BR32/BR33).
+

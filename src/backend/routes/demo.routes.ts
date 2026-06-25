@@ -8,14 +8,14 @@ router.use(authorizeRoles('admin'));
 router.post('/reset', async (req: AuthRequest, res: Response) => {
   try {
     const { cars = [], customers = [], contracts = [], contract_lines = [],
-            invoices = [], payments = [], maintenance = [], vignettes = [],
+            invoices = [], invoice_lines = [], invoice_schedule = [], payments = [], maintenance = [], vignettes = [],
             reservations = [], insurances = [], leasing = [],
             quotes = [], quote_lines = [] } = req.body;
 
     // Delete in reverse FK order
     const tables = [
       'inspection_details', 'inspections', 'vignettes', 'insurances',
-      'leasing_contracts', 'maintenance_costs', 'payments', 'invoices',
+      'leasing_contracts', 'maintenance_costs', 'payments', 'invoice_lines', 'invoice_schedule', 'invoices',
       'collections', 'quote_lines', 'quotes', 'contract_lines', 'contracts',
       'reservations', 'cars', 'customers',
     ];
@@ -45,6 +45,8 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
     await insertMany('contracts', contracts);
     await insertMany('contract_lines', contract_lines); // FK contract_lines.contract_id → contracts (CASCADE)
     await insertMany('invoices', invoices);
+    await insertMany('invoice_lines', invoice_lines);
+    await insertMany('invoice_schedule', invoice_schedule); // FK invoice_schedule.contract_id → contracts, .invoice_id → invoices
     await insertMany('payments', payments);
     await insertMany('maintenance_costs', maintenance);
     await insertMany('vignettes', vignettes);

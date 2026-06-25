@@ -168,6 +168,27 @@
 - [ ] **Période affichée** : en mode lecture, le modal entête affiche la "Période" calculée (min date début → max date fin des lignes), pas une date libre
 - [ ] **Modifier entête** : bouton "✏ Modifier entête" → champs devenus éditables (client, date signature, type, paiement, statut) → enregistrement → persisté
 
+### UC-CTR-8 : Générer l'échéancier de facturation (BR32)
+**En tant que gestionnaire**, je veux planifier la facturation mensuelle d'un contrat long terme sans créer de factures immédiatement.
+
+- [ ] **Section visible uniquement pour contrats long terme** : ouvrir le modal de détail d'un contrat `type=long` → section "Échéancier de facturation" apparaît en bas ; absent pour `type=court`
+- [ ] **Générer l'échéancier** : cliquer "Générer l'échéancier" sur un contrat de 12 mois → 12 entrées créées (`status=planifie`), une par mois, avec libellé "Loyer [Mois Année] — [plaques]"
+- [ ] **Blocage sans lignes actives** : contrat long terme sans aucune ligne active → message d'erreur "Ce contrat n'a aucune ligne active", aucune entrée créée
+- [ ] **Montants corrects** : les montants HT des entrées correspondent à la somme des tarifs des lignes actives du contrat
+- [ ] **Cohérence des dates** : les périodes des entrées couvrent exactement la plage start/end du contrat, sans trous ni chevauchements
+- [ ] **Régénérer** : après modification du contrat (tarif, dates), cliquer "↺ Régénérer" → confirmation demandée → entrées `planifie` supprimées et recréées ; entrées `brouillon`/`confirme` non touchées
+- [ ] **Persistance** : F5 → les entrées d'échéancier sont toujours présentes
+
+### UC-CTR-9 : Générer une facture depuis l'échéancier (BR32)
+**En tant que gestionnaire**, je veux transformer une entrée planifiée en facture brouillon au moment de la facturation.
+
+- [ ] **Bouton "Générer facture"** : visible uniquement sur les entrées `planifie` → clic → facture brouillon créée, modal facture s'ouvre
+- [ ] **Statut mis à jour** : l'entrée d'échéancier passe de `planifie` à `brouillon`, le bouton "Générer facture" est remplacé par "Voir brouillon →"
+- [ ] **Facture sans numéro** : la facture créée s'affiche `FAC-XXXXX (brouillon)` — pas encore de numéro séquentiel
+- [ ] **Lignes générées** : la facture brouillon contient les lignes issues des `contract_lines` actives (une par véhicule)
+- [ ] **Entrée déjà générée** : tenter de régénérer une entrée `brouillon` → message d'erreur "Cette entrée est au statut brouillon, pas planifie"
+- [ ] **Persistance** : F5 → facture brouillon toujours présente, entrée d'échéancier en statut `brouillon`
+
 ---
 
 ## 6. Module Devis (BR27)
@@ -175,6 +196,7 @@
 ### UC-QUO-1 : Créer un devis
 **En tant qu'agent commercial**, je veux préparer un devis pour un client avant de créer le contrat.
 
+- [ ] **Champ Type** : sélecteur "Court terme / Long terme / Autre" présent dans le formulaire de création ; valeur par défaut "Court terme" ; persisté en base dans `quotes.type`
 - [ ] **Onglet "Devis"** : accessible depuis la barre de navigation
 - [ ] **Formulaire nouveau devis** : Client (sélecteur), Date du devis (aujourd'hui par défaut), Date de validité (aujourd'hui + 30j par défaut), Notes
 - [ ] **Validité obligatoire** : vider le champ "Date de validité" et tenter de créer → erreur inline
@@ -202,10 +224,20 @@
 - [ ] **Confirmation explicite** : cliquer "✓ Valider → Contrat" → boîte de confirmation "opération irréversible"
 - [ ] **Annulation** : annuler la confirmation → aucune modification
 - [ ] **Validation réussie** : confirmer → `POST /quotes/:id/validate` → nouveau contrat créé avec mêmes client/lignes/montants → devis passe à `valide`, `converted_contract_id` renseigné
+- [ ] **Propagation du type** : devis `type = court` → contrat `type = court`, `payment_plan = 'paiement client debut'` ; devis `type = long` → contrat `type = long`, `payment_plan = 'mensualite'`
 - [ ] **Réservations créées (BR25)** : pour chaque ligne de contrat créée, une réservation est automatiquement créée/liée
 - [ ] **Navigation post-validation** : lien "Voir le contrat {id}" dans l'entête du devis → clic ouvre le détail du contrat créé
 - [ ] **Devis validé → lecture seule** : aucun bouton d'édition de lignes ni d'entête
 - [ ] **Validation avec conflit BR19** : valider un devis dont une ligne chevauche désormais un contrat actif → erreur rouge inline, rollback complet (aucun contrat créé en base), devis reste `envoye`/`brouillon`
+
+### UC-QUO-6 : Devis long terme → proposition d'échéancier (BR27+BR32)
+**En tant qu'agent commercial**, je veux que la validation d'un devis long terme propose directement la génération de l'échéancier.
+
+- [ ] **Déclenchement automatique** : valider un devis `type = long` → modal contrat s'ouvre → une boîte de confirmation "Générer l'échéancier de facturation maintenant ?" apparaît (~300ms après ouverture)
+- [ ] **Accepter** : cliquer "OK" → `POST /contracts/:id/generate-schedule` → entrées échéancier créées → section "Échéancier" du modal contrat affiche les lignes générées
+- [ ] **Refuser** : cliquer "Annuler" → aucun échéancier créé, section "Échéancier" reste vide (bouton "Générer l'échéancier" disponible manuellement)
+- [ ] **Devis court terme** : pas de boîte de confirmation après validation
+- [ ] **Persistance** : F5 → échéancier toujours présent dans le détail contrat
 
 ---
 
@@ -219,26 +251,68 @@
 - [ ] **Calcul automatique** (BR15bis) : HT → TVA calculée + taxe journalière (par ligne) + timbre (une fois pour la facture)
 - [ ] **Facture sans ligne → bloquée** : tenter d'enregistrer sans aucune ligne → message "Une facture doit contenir au moins une ligne"
 
-### UC-INV-2 : Auto-remplissage depuis un contrat (BR21)
-- [ ] **Sélection d'un contrat** : dans le formulaire facture, sélectionner un contrat ayant 2 lignes actives → 2 lignes de facture générées automatiquement (véhicule, période, montant HT repris de chaque `contract_line`)
-- [ ] **Lignes modifiables avant enregistrement** : modifier le montant HT d'une ligne générée → calcul TVA/taxe mis à jour
-- [ ] **Ligne résiliée au prorata (BR26)** : sélectionner un contrat dont une ligne a été résiliée → la ligne de facture reprend le montant HT **ajusté** (prorata), pas l'original
-- [ ] **Changement de contrat** : changer le contrat sélectionné → lignes du premier contrat remplacées par celles du second
+### UC-INV-2 : Créer une facture avec lignes relationnelles (BR21)
+**En tant que comptable**, je veux que les lignes d'une facture soient stockées en base de façon fiable.
 
-### UC-INV-3 : Sélection du RIB (BR22)
+- [ ] **Création avec lignes** : créer une facture avec 2 lignes → `POST /invoices` retourne 201, les lignes sont bien dans la table `invoice_lines` (vérifiable via `GET /invoice-lines?invoice_id=xxx`), plus dans le JSONB
+- [ ] **Blocage sans ligne (UI)** : tenter d'enregistrer le formulaire sans aucune ligne → le bouton est bloqué ou un message rouge "Une facture doit contenir au moins une ligne" s'affiche, aucun appel API émis
+- [ ] **Blocage sans ligne (backend)** : appel direct `POST /invoices` avec `lines: []` → réponse `400 { success: false, message: "Une facture doit contenir au moins une ligne." }`
+- [ ] **Persistance** : F5 → la facture et ses lignes sont toujours présentes, les totaux (HT/TVA/TTC) sont corrects
+
+### UC-INV-3 : Édition des lignes dans le modal (BR21)
+**En tant que comptable**, je veux modifier, ajouter ou supprimer des lignes d'une facture existante.
+
+- [ ] **Ouvrir le modal** : double-clic sur une facture → modal "Facture XXX" s'ouvre, lignes affichées avec colonnes Libellé/Contrat, Début période, Jours, HT, TVA, Taxe+Timbre, TTC, Actions (✏ ✕)
+- [ ] **Ajouter une ligne** : cliquer "+ Ajouter une ligne" → ligne inline bleue apparaît ; saisir Contrat + Jours + HT → TVA/Taxe/TTC calculés en temps réel → ✓ → ligne sauvegardée via `POST /invoice-lines`, totaux de la facture recalculés, ligne apparaît dans la grille
+- [ ] **Modifier une ligne** : cliquer ✏ sur une ligne → ligne passe en mode édition (fond ambré) avec tous les champs éditables ; modifier le montant HT → TTC recalculé ; ✓ → `PUT /invoice-lines/:id`, totaux mis à jour, grille rafraîchie
+- [ ] **Supprimer une ligne (non dernière)** : cliquer ✕ sur une ligne quand la facture en a 2+ → confirmation → `DELETE /invoice-lines/:id` → ligne retirée, totaux recalculés
+- [ ] **Supprimer la dernière ligne** : cliquer ✕ sur la seule ligne d'une facture → message d'erreur "Une facture doit avoir au moins une ligne.", ligne conservée
+- [ ] **Persistance** : fermer le modal, rouvrir → les modifications sont toujours présentes (rechargement API au close du modal)
+
+### UC-INV-4 : Migration automatique des factures existantes (BR21)
+**En tant que système**, les anciennes factures (lignes en JSONB) doivent être transparentes pour l'utilisateur.
+
+- [ ] **Facture ancienne lisible** : ouvrir une facture créée avant BR21 (lignes en JSONB, pas encore dans `invoice_lines`) → le modal affiche ses lignes correctement (repli JSONB)
+- [ ] **Migration lazy au premier open** : ouvrir une facture ancienne → les lignes sont automatiquement migrées dans `invoice_lines` ; fermer et rouvrir → les lignes s'affichent depuis la table relationnelle (boutons ✏/✕ actifs)
+- [ ] **Intégrité après migration** : les montants/périodes après migration sont identiques aux données JSONB d'origine
+- [ ] **PDF inchangé** : générer le PDF d'une facture migrée → contenu identique à avant la migration
+
+### UC-INV-5 : Sélection du RIB (BR22)
 - [ ] **RIB n°2 configuré** : si 2 RIB sont configurés en Paramètres, le sélecteur "RIB" apparaît dans le formulaire
 - [ ] **RIB figé sur la facture** : créer une facture avec RIB n°2, puis modifier les paramètres RIB → régénérer le PDF → le PDF affiche toujours le RIB n°2 initial (non le nouveau RIB)
 - [ ] **PDF sans RIB n°2** : avec seulement RIB n°1 configuré → pas de sélecteur, RIB n°1 utilisé implicitement dans le PDF
 
-### UC-INV-4 : Générer le PDF de la facture
-- [ ] **PDF correct** : toutes les lignes visibles, totaux HT/TVA/taxe/timbre/TTC cohérents
-- [ ] **Timbre fiscal une seule fois** : pour une facture multi-lignes, le timbre n'apparaît qu'une fois dans les totaux
-- [ ] **RIB affiché** : le PDF contient les coordonnées bancaires (RIB figé à la création)
+### UC-INV-6 : Auto-remplissage depuis un contrat (BR21)
+**En tant que comptable**, je veux que la sélection d'un contrat pré-remplisse les lignes de facture.
 
-### UC-INV-5 : Statuts de facture et recouvrement
-- [ ] **Statuts** : `en_attente` → `partiellement_payee` → `payee` (progression via les paiements)
-- [ ] **Grille Recouvrement** : affiche les factures avec montant dû / payé / restant
+- [ ] **Sélection d'un contrat** : dans le formulaire facture, sélectionner un contrat ayant 2 lignes actives → 2 lignes générées automatiquement (véhicule, période, montant HT repris de chaque `contract_line`)
+- [ ] **Lignes modifiables avant enregistrement** : modifier le montant HT d'une ligne générée → calcul TVA/taxe mis à jour
+- [ ] **Ligne résiliée au prorata (BR26)** : sélectionner un contrat dont une ligne a été résiliée → la ligne de facture reprend le montant HT **ajusté** (prorata), pas l'original
+- [ ] **Changement de contrat** : changer le contrat sélectionné → lignes du premier contrat remplacées par celles du second
+
+### UC-INV-7 : Générer le PDF de la facture
+**En tant que comptable**, je veux générer un PDF conforme depuis les lignes relationnelles (BR21).
+
+- [ ] **PDF correct** : toutes les lignes visibles (lues depuis `invoice_lines`, fallback JSONB si ancienne facture), totaux HT/TVA/taxe/timbre/TTC cohérents
+- [ ] **Timbre fiscal une seule fois** : pour une facture multi-lignes, le timbre n'apparaît qu'une fois dans les totaux
+- [ ] **RIB affiché** : le PDF contient les coordonnées bancaires (RIB figé à la création — UC-INV-5)
+
+### UC-INV-8 : Statuts de facture et recouvrement
+- [ ] **Statuts** : `brouillon` → `en_attente` → `partiellement_payee` → `payee` (progression)
+- [ ] **Grille Recouvrement** : affiche les factures avec montant dû / payé / restant (les brouillons n'y apparaissent pas)
 - [ ] **Navigation dashboard → factures** : KPI factures impayées du dashboard → navigue vers `#invoices` filtré sur statut impayé
+
+### UC-INV-9 : Confirmer une facture brouillon — numérotation séquentielle (BR27)
+**En tant que comptable**, je veux confirmer un brouillon pour lui attribuer un numéro officiel chronologique.
+
+- [ ] **Bouton "✓ Confirmer la facture"** : visible dans le modal uniquement pour les factures `brouillon`
+- [ ] **Numéro attribué à la confirmation** : après confirmation → statut passe à `en_attente`, numéro `AAAA-NNNN` attribué (ex. `2026-0001`), affiché à la place de l'ID dans la liste et dans le modal
+- [ ] **Séquentialité** : confirmer 3 brouillons en janvier → numéros `2026-0001`, `2026-0002`, `2026-0003` dans l'ordre de confirmation, pas dans l'ordre de création
+- [ ] **Chronologie respectée** : un brouillon créé en décembre mais confirmé en janvier → numéro de janvier (pas de décembre)
+- [ ] **Suppression impossible après confirmation** : tenter `DELETE /invoices/:id` sur une facture `en_attente` → `422 "Seules les factures en brouillon peuvent être supprimées"`
+- [ ] **Suppression possible avant confirmation** : `DELETE /invoices/:id` sur un brouillon → succès, entrée d'échéancier repasse à `planifie`
+- [ ] **Échéancier mis à jour** : après confirmation, l'entrée d'échéancier correspondante passe à `confirme`, le lien "Voir brouillon →" devient le numéro de facture cliquable
+- [ ] **Persistance** : F5 → numéro toujours présent, statut `en_attente`
 
 ---
 
@@ -362,6 +436,42 @@
 - [ ] **Clic sur barre graphique** : cliquer sur un mois du graphique → navigue vers les données détaillées de ce mois avec filtre appliqué
 - [ ] **Prévision de trésorerie** : tableau des 365 prochains jours avec revenus/dépenses prévisionnels
 
+### UC-DASH-4 : Taux d'occupation flotte — vue macro (§9.14)
+**En tant que directeur**, je veux voir en un coup d'œil si la flotte est bien utilisée sur les 6 prochains mois.
+
+- [ ] **Scénario nominal** : le graphique affiche 6 barres mensuelles avec un taux d'occupation (%) calculé à partir des réservations et lignes de contrat actives ; les barres sont colorées (vert / orange / rouge) selon les seuils 50 % / 80 %
+- [ ] **KPI mois courant** : le span `#homeOccupancyKpi` affiche `X% ce mois (N/M véhicules)` avec la couleur correspondante
+- [ ] **Tooltip** : survoler une barre → tooltip `N / M véhicules (X%)` affiché par Chart.js
+- [ ] **Navigation** : cliquer sur une barre → onglet Réservations affiché (règle widgets cliquables)
+- [ ] **Flotte vide** : aucun véhicule → graphique masqué / pas d'erreur JS
+- [ ] **Véhicules indisponibles exclus** : `status='indisponible'` non comptabilisés dans le total
+- [ ] **Persistance** : F5 → recalcul depuis API (pas de données figées)
+
+### UC-DASH-5 : Dashboard personnalisable — déplacement, redimensionnement, masquage (§9.15)
+**En tant qu'utilisateur**, je veux déplacer, redimensionner et masquer les cartes du dashboard, et retrouver ma configuration à chaque connexion.
+
+**Déplacement**
+- [ ] **Glisser une carte** : cliquer-glisser sur `⠿` → relâcher à une nouvelle position → toutes les cartes se réorganisent (KPIs et graphiques dans la même grille unifiée)
+- [ ] **Déplacer un KPI sous les graphiques** : KPI déposé après les graphiques → affiché en bas de la grille
+- [ ] **Persistance ordre** : F5 / déconnexion-reconnexion → même ordre restauré
+
+**Redimensionnement**
+- [ ] **Élargir** `▸` : cliquer `▸` sur une carte span-1 → passe à span-2 (2/3 de largeur) → cliquer à nouveau → span-3 (pleine largeur)
+- [ ] **Rétrécir** `◂` : cliquer `◂` sur une carte span-3 → passe à span-2 puis span-1 ; ne peut pas descendre en dessous de span-1
+- [ ] **Chart.js recalibré** : après redimensionnement, le graphique occupe tout l'espace de la carte (pas de débordement ni de canvas trop étroit)
+- [ ] **Persistance taille** : F5 → taille de chaque carte restaurée
+
+**Masquage / restauration**
+- [ ] **Masquer** `✕` : cliquer `✕` → carte disparaît de la grille ; une barre jaune `Masqués :` apparaît au-dessus de la grille avec un chip `👁 Nom de la carte`
+- [ ] **Restaurer** : cliquer le chip dans la barre jaune → carte réapparaît dans sa dernière position connue ; barre disparaît si plus aucune carte masquée
+- [ ] **Persistance masquage** : F5 → carte toujours masquée / barre jaune toujours visible
+
+**Isolation et cas limites**
+- [ ] **Multi-device** : réorganiser sur le navigateur A → même layout sur le navigateur B
+- [ ] **Isolation utilisateurs** : layout utilisateur A sans effet sur utilisateur B
+- [ ] **Premier accès** : table `user_preferences` vide → ordre/taille/masquage par défaut, aucune erreur JS
+- [ ] **Graphiques intacts** : déplacer une carte Chart.js → graphique toujours rendu (canvas préservé dans le DOM)
+
 ---
 
 ## 17. Paramètres
@@ -482,6 +592,117 @@
 | `users` | ✓ | ✓ | ✓ | — | — | ✓ | — | ✓ |
 
 > **Légende** : ✓ = à couvrir par les tests UC de ce document | — = non applicable ou couvert implicitement
+
+---
+
+## 10. Module Gestion des données — Import / Export (DMF)
+
+### UC-DATA-1 : Accéder au catalogue des entités
+**En tant qu'administrateur**, je veux voir la liste des entités importables/exportables avec leur nombre d'enregistrements en base.
+
+- [ ] **Onglet "Gestion des données"** : accessible depuis la barre de navigation
+- [ ] **Grille de cartes** : une carte par entité (Clients, Véhicules, Assurances, Leasings, Vignettes, Maintenance)
+- [ ] **Compteur** : chaque carte affiche le nombre d'enregistrements actuels en base
+- [ ] **Persistance** : F5 → onglet toujours présent
+
+### UC-DATA-2 : Exporter une entité en CSV
+**En tant qu'administrateur**, je veux exporter la liste complète d'une entité pour la consulter ou la modifier en masse dans Excel.
+
+- [ ] **Bouton "↓ Exporter CSV"** : présent sur chaque carte entité
+- [ ] **Téléchargement direct** : clic → fichier `<entité>_export_AAAA-MM-JJ.csv` téléchargé
+- [ ] **Format** : séparateur `;`, encodage UTF-8 avec BOM (ouvrable directement dans Excel sans déformation des caractères spéciaux)
+- [ ] **En-têtes** : identiques au template import (roundtrip : export → réimporter sans modification = 0 erreur, 0 création, N mises à jour)
+- [ ] **Export vide** : entité sans enregistrement → CSV avec seulement la ligne d'en-têtes, pas d'erreur
+
+### UC-DATA-3 : Télécharger le template d'import
+**En tant qu'administrateur**, je veux un fichier modèle pré-formaté pour remplir mes données.
+
+- [ ] **Bouton "↓ Télécharger le template CSV"** : présent dans le modal d'import (étape 1)
+- [ ] **Contenu** : commentaires `#` (champs obligatoires, format dates, valeurs enum acceptées), ligne d'en-têtes, 1 ligne d'exemple
+- [ ] **Format** : séparateur `;`, UTF-8 avec BOM
+
+### UC-DATA-4 : Importer un fichier CSV valide
+**En tant qu'administrateur**, je veux importer un fichier CSV pour créer ou mettre à jour des enregistrements en masse.
+
+- [ ] **Modal d'import** : s'ouvre via bouton "↑ Importer CSV" sur la carte entité
+- [ ] **Sélection fichier** : champ `<input type="file" accept=".csv">` fonctionnel
+- [ ] **Import réussi** : fichier valide → panneau de résultat affiché avec badges "N créés / N mis à jour"
+- [ ] **Déduplication** : réimporter le même fichier → 0 créés, N mis à jour (pas de doublons)
+- [ ] **Compteur mis à jour** : après import, la carte entité affiche le nouveau nombre d'enregistrements
+- [ ] **Persistance** : F5 → enregistrements importés toujours présents
+
+### UC-DATA-5 : Validation et rapport d'erreurs
+**En tant qu'administrateur**, je veux que les erreurs dans mon fichier soient détectées et détaillées avant ou pendant l'import.
+
+- [ ] **Champ obligatoire vide** : ligne avec champ requis vide → erreur `"[label] est obligatoire"` avec numéro de ligne
+- [ ] **Type invalide** : valeur non numérique dans un champ number → erreur `"valeur numérique attendue"`
+- [ ] **Date mal formatée** : `15/01/2024` au lieu de `2024-01-15` → erreur `"format AAAA-MM-JJ attendu"`
+- [ ] **Enum invalide** : valeur non reconnue → erreur listant les valeurs acceptées
+- [ ] **Tableau d'erreurs** : ligne, champ, message pour chaque erreur
+- [ ] **Rapport CSV** : bouton "↓ Télécharger rapport d'erreurs CSV" → fichier avec les mêmes colonnes
+- [ ] **Blocage par défaut** : si erreurs présentes et `skip_errors=false` → aucune ligne écrite en base
+
+### UC-DATA-6 : Mode simulation (dry run)
+**En tant qu'administrateur**, je veux valider mon fichier sans l'importer pour m'assurer qu'il est correct.
+
+- [ ] **Checkbox "Valider sans importer"** : présente dans le modal, décochée par défaut
+- [ ] **Dry run activé** : cliquer "Lancer l'import" avec la case cochée → validation complète mais aucune écriture en base
+- [ ] **Notice visible** : panneau de résultat affiche un avertissement jaune "Mode validation uniquement — aucune donnée n'a été écrite"
+- [ ] **Compteur inchangé** : nombre d'enregistrements sur la carte entité identique avant/après
+
+### UC-DATA-7 : Import partiel (skip_errors)
+**En tant qu'administrateur**, je veux importer les lignes valides d'un fichier même si certaines lignes contiennent des erreurs.
+
+- [ ] **Bouton "Importer les lignes valides quand même"** : visible dans le panneau d'erreurs
+- [ ] **Résultat** : lignes valides créées/mises à jour, lignes invalides ignorées et reportées
+- [ ] **Rapport** : badges distincts "N créés", "N ignorés", "N erreurs"
+
+### UC-DATA-8 : Résolution automatique des FK véhicule
+**En tant qu'administrateur**, je veux importer des assurances/leasings/vignettes/maintenance en utilisant l'immatriculation sans connaître l'ID interne du véhicule.
+
+- [ ] **Colonne `car_plate`** : dans le CSV, saisir l'immatriculation du véhicule (ex. `123TU4567`)
+- [ ] **Résolution automatique** : le backend résout `car_plate → car_id` avant INSERT
+- [ ] **Erreur si véhicule inconnu** : immatriculation inexistante en base → erreur `"Véhicule X introuvable en base"` sur la ligne concernée, sans bloquer les autres lignes valides (avec skip_errors)
+
+---
+
+## 11. Module Souches de numéros (BR33)
+
+### UC-SEQ-1 : Afficher et configurer une souche
+**En tant qu'administrateur**, je veux voir et modifier la configuration de chaque souche depuis l'onglet Paramètres.
+
+- [ ] **Section "Souches de numéros"** : visible dans l'onglet "Actions rapides" après exécution de la migration 009
+- [ ] **Cartes souches** : une carte par entité (Factures, Contrats, Devis, Réservations) avec préfixe, séparateur, digits, include_year, reset_annually, et **aperçu du prochain numéro**
+- [ ] **Bouton "✏ Configurer"** : ouvre modal d'édition → modifier les champs → "Enregistrer" → carte mise à jour, aperçu recalculé
+- [ ] **Validation** : digits < 1 ou > 10 → erreur inline ; préfixe > 20 caractères → erreur inline
+- [ ] **Persistance** : F5 → configuration toujours présente
+
+### UC-SEQ-2 : Génération automatique du numéro à la création
+**En tant qu'agent**, je veux que le numéro soit attribué automatiquement sans action manuelle.
+
+- [ ] **Nouveau contrat** : `POST /contracts` → `contract_number` assigné selon la souche `contracts`
+- [ ] **Nouveau devis** : `POST /quotes` → `quote_number` assigné selon la souche `quotes`
+- [ ] **Confirmation facture** : `POST /invoices/:id/confirm` → `invoice_number` assigné selon la souche `invoices`
+- [ ] **Format correct** : numéro généré respecte prefix/sep/année/digits configurés
+- [ ] **Séquentiel** : créer 3 contrats d'affilée → numéros consécutifs sans trou ni doublon
+- [ ] **Reset annuel** : si `reset_annually=true` et changement d'année → compteur repart à 1
+
+### UC-SEQ-3 : Resynchronisation du compteur
+**En tant qu'administrateur**, je veux pouvoir recaler le compteur sur la réalité de la base en cas de décalage.
+
+- [ ] **Bouton "↺ Resynchroniser"** : disponible sur chaque carte souche
+- [ ] **Confirmation** : boîte de dialogue avant exécution
+- [ ] **Résultat** : message "Souche resynchronisée. Dernier numéro en base : N" affiché, carte rafraîchie
+- [ ] **Effet** : après resync, le prochain numéro généré = max réel + 1 (pas de saut)
+
+### UC-SEQ-4 : Audit des trous de séquence
+**En tant qu'administrateur**, je veux détecter les trous dans la numérotation (factures, contrats, devis).
+
+- [ ] **Bouton "🔍 Audit trous"** : disponible pour Factures, Contrats, Devis
+- [ ] **Modal d'audit** : affiche total, min, max, last_number en base
+- [ ] **Pas de trou** : message "✅ Aucun trou détecté dans la séquence"
+- [ ] **Trous détectés** : liste des numéros manquants affichée (ex. "N°4 · N°7")
+- [ ] **Décalage compteur** : si `last_number > max réel` → avertissement jaune "utilisez Resynchroniser"
 
 ---
 
