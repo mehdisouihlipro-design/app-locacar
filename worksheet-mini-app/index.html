@@ -456,6 +456,7 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
       margin-bottom: 12px;
+      align-items: start;
     }
 
     .chart-card {
@@ -490,6 +491,7 @@
     }
     .cbt:hover { color: #3c4a6e; background: #edf0f8; }
     .cbt.cbt-hide:hover { color: #c53030; background: #fff5f5; }
+    .cbt:disabled { opacity: .25; cursor: not-allowed; background: none !important; color: #b0bcd0 !important; }
     .drag-handle {
       cursor: grab; color: #b0bcd0; font-size: 18px;
       line-height: 1; user-select: none; padding: 1px 2px;
@@ -5265,6 +5267,12 @@
       }
       currentUser = null;
       authTransport = "supabase";
+      // Réinitialiser le cache dashboard — chaque utilisateur a son propre layout
+      _dashboardLayout = null;
+      _dashLayoutLoaded = false;
+      _dashControlsInited = false;
+      if (_dashSortableInstance) { _dashSortableInstance.destroy(); _dashSortableInstance = null; }
+      _dashSortableInited = false;
       setAppVisibility(false);
       setAuthStatus("Deconnecté.");
     }
@@ -8792,6 +8800,7 @@
     let _dashLayoutLoaded = false;
     let _dashSortableInited = false;
     let _dashControlsInited = false;
+    let _dashSortableInstance = null;
 
     function _dashSpan(el) {
       const cls = [...el.classList].find(c => c.startsWith('dash-span-'));
@@ -8853,6 +8862,8 @@
           if (el) el.classList.add('dash-hidden');
         });
       }
+      // Mettre à jour l'état disabled des boutons ◂/▸ après application du layout
+      grid.querySelectorAll('[data-card-id]').forEach(card => _updateSpanButtons(card));
       renderHiddenBar();
     }
 
@@ -8883,7 +8894,7 @@
       if (typeof Sortable === 'undefined' || _dashSortableInited) return;
       const grid = byId('dashboardGrid');
       if (!grid) return;
-      Sortable.create(grid, {
+      _dashSortableInstance = Sortable.create(grid, {
         animation: 150,
         handle: '.drag-handle',
         filter: '.dash-hidden',
@@ -8894,16 +8905,26 @@
       _dashSortableInited = true;
     }
 
+    function _updateSpanButtons(card) {
+      const n = _dashSpan(card);
+      const shrink = card.querySelector('.cbt-shrink');
+      const expand = card.querySelector('.cbt-expand');
+      if (shrink) shrink.disabled = (n <= 1);
+      if (expand) expand.disabled = (n >= 3);
+    }
+
     function initCardControls() {
       if (_dashControlsInited) return;
       _dashControlsInited = true;
       const grid = byId('dashboardGrid');
       if (!grid) return;
       grid.querySelectorAll('[data-card-id]').forEach(card => {
+        _updateSpanButtons(card);
         // Expand
         card.querySelector('.cbt-expand')?.addEventListener('click', e => {
           e.stopPropagation();
           _setDashSpan(card, _dashSpan(card) + 1);
+          _updateSpanButtons(card);
           setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
           saveDashboardLayout();
         });
@@ -8911,6 +8932,7 @@
         card.querySelector('.cbt-shrink')?.addEventListener('click', e => {
           e.stopPropagation();
           _setDashSpan(card, _dashSpan(card) - 1);
+          _updateSpanButtons(card);
           setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
           saveDashboardLayout();
         });
