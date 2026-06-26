@@ -11278,18 +11278,22 @@
         byId("qlTtc").value = days ? amtTtc.toFixed(2) : "";
         byId("qlVat").value = days ? vat.toFixed(2)    : "";
       };
+      const clearQlError = () => { byId("qlError").style.display = "none"; };
       byId("qlRate").oninput = () => {
         const rHt = Number(byId("qlRate").value || 0);
         byId("qlRateTtc").value = (Math.round(rHt * (1 + vatRate()) * 100) / 100).toFixed(2);
-        recalcMontants();
+        recalcMontants(); clearQlError();
       };
       byId("qlRateTtc").oninput = () => {
         const rTtc = Number(byId("qlRateTtc").value || 0);
         byId("qlRate").value = (Math.round(rTtc / (1 + vatRate()) * 100) / 100).toFixed(2);
-        recalcMontants();
+        recalcMontants(); clearQlError();
       };
-      byId("qlStart").oninput = recalcMontants;
-      byId("qlEnd").oninput   = recalcMontants;
+      byId("qlStart").oninput = () => { recalcMontants(); clearQlError(); };
+      byId("qlEnd").oninput   = () => { recalcMontants(); clearQlError(); };
+      byId("qlCar").onchange  = clearQlError;
+      if (isShortTermQ && byId("qlPickup")) byId("qlPickup").oninput = clearQlError;
+      if (isShortTermQ && byId("qlReturn")) byId("qlReturn").oninput = clearQlError;
       byId("qlSaveBtn").onclick   = () => submitInlineQuoteLine(quoteId, tr);
       byId("qlCancelBtn").onclick = () => { tr.remove(); byId("qdAddLineBtn").textContent = "+ Ajouter une ligne"; renderQuoteDetailLines(quoteId); };
       byId("qlCar").focus();
@@ -11342,16 +11346,18 @@
         byId("qleqVat").value = days ? (Math.round((aTtc-aHt)*100)/100).toFixed(2) : "";
         byId("qleqDur").textContent = days ? `${days}j` : "—";
       };
+      const clearQleqError = () => { byId("qleqError").style.display = "none"; };
       byId("qleqRate").oninput = () => {
         byId("qleqRateTtc").value = (Math.round(Number(byId("qleqRate").value||0)*(1+vatRate())*100)/100).toFixed(2);
-        recalc();
+        recalc(); clearQleqError();
       };
       byId("qleqRateTtc").oninput = () => {
         byId("qleqRate").value = (Math.round(Number(byId("qleqRateTtc").value||0)/(1+vatRate())*100)/100).toFixed(2);
-        recalc();
+        recalc(); clearQleqError();
       };
-      byId("qleqStart").oninput = recalc;
-      byId("qleqEnd").oninput   = recalc;
+      byId("qleqStart").oninput = () => { recalc(); clearQleqError(); };
+      byId("qleqEnd").oninput   = () => { recalc(); clearQleqError(); };
+      byId("qleqCar").onchange  = clearQleqError;
       recalc(); // init durée
       byId("qleqSaveBtn").onclick   = () => saveEditQuoteLine(quoteId, lineId, editTr);
       byId("qleqCancelBtn").onclick = () => { renderQuoteDetailLines(quoteId); };
@@ -11370,25 +11376,7 @@
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
       if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
       if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
-      // Contrôle disponibilité (exclure la ligne en cours d'édition)
-      const contractConflict = (state.contractLines || []).find(l =>
-        l.carId === carId && l.status === "active" &&
-        startStr <= l.periodEnd && endStr >= l.periodStart
-      );
-      if (contractConflict) {
-        const carObj = state.cars.find(c => c.id === carId);
-        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà engagé du ${contractConflict.periodStart} au ${contractConflict.periodEnd}.`;
-        errDiv.style.display = ""; return;
-      }
-      const rsvConflict = (state.reservations || []).find(r =>
-        r.carId === carId && !["annulee", "terminee"].includes(r.status) &&
-        startStr <= r.endDate && endStr >= r.startDate
-      );
-      if (rsvConflict) {
-        const carObj = state.cars.find(c => c.id === carId);
-        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà réservé du ${rsvConflict.startDate} au ${rsvConflict.endDate}.`;
-        errDiv.style.display = ""; return;
-      }
+      // Le contrôle de chevauchement est délégué au backend (BR19 + buffer + heures)
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(startStr, endStr);
       const saveBtn = byId("qleqSaveBtn");
@@ -11433,25 +11421,7 @@
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
       if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
       if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
-      // Contrôle disponibilité : contrats actifs
-      const contractConflict = (state.contractLines || []).find(l =>
-        l.carId === carId && l.status === "active" &&
-        startStr <= l.periodEnd && endStr >= l.periodStart
-      );
-      if (contractConflict) {
-        const carObj = state.cars.find(c => c.id === carId);
-        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà engagé du ${contractConflict.periodStart} au ${contractConflict.periodEnd} (contrat actif).`;
-        errDiv.style.display = ""; return;
-      }
-      const rsvConflict = (state.reservations || []).find(r =>
-        r.carId === carId && !["annulee", "terminee"].includes(r.status) &&
-        startStr <= r.endDate && endStr >= r.startDate
-      );
-      if (rsvConflict) {
-        const carObj = state.cars.find(c => c.id === carId);
-        errDiv.textContent = `⚠ ${carObj?.plate || carId} est déjà réservé du ${rsvConflict.startDate} au ${rsvConflict.endDate}.`;
-        errDiv.style.display = ""; return;
-      }
+      // Le contrôle de chevauchement est délégué au backend (BR19 + buffer + heures)
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(startStr, endStr);
       const saveBtn = byId("qlSaveBtn");
@@ -14375,10 +14345,12 @@
           if (rate > 0) { tr.querySelector("#cleHt").value = (rate * days).toFixed(2); recomputeHt(); }
         } else { tr.querySelector("#cleDur").textContent = "—"; }
       };
-      tr.querySelector("#cleHt").oninput    = recomputeHt;
-      tr.querySelector("#cleTtc").oninput   = recomputeTtc;
-      tr.querySelector("#cleStart").oninput = updateDur;
-      tr.querySelector("#cleEnd").oninput   = updateDur;
+      const clearCleError = () => { tr.querySelector("#cleError").style.display = "none"; };
+      tr.querySelector("#cleHt").oninput    = () => { recomputeHt(); clearCleError(); };
+      tr.querySelector("#cleTtc").oninput   = () => { recomputeTtc(); clearCleError(); };
+      tr.querySelector("#cleStart").oninput = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#cleEnd").oninput   = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#cleCar").onchange  = clearCleError;
       tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
       tr.querySelector("#cleCancelBtn").onclick = () => renderContractDetailLines(contractId);
       tr.querySelector("#cleCar").focus();
@@ -14595,8 +14567,12 @@
         });
       }
 
-      byId("ilStart").oninput = updateDuration;
-      byId("ilEnd").oninput = updateDuration;
+      const clearIlError = () => { byId("ilError").style.display = "none"; tr.style.outline = ""; };
+      byId("ilStart").oninput = () => { updateDuration(); clearIlError(); };
+      byId("ilEnd").oninput = () => { updateDuration(); clearIlError(); };
+      byId("ilCar").onchange = clearIlError;
+      if (isShortTerm && byId("ilPickup")) byId("ilPickup").oninput = clearIlError;
+      if (isShortTerm && byId("ilReturn")) byId("ilReturn").oninput = clearIlError;
       byId("ilRate").oninput = () => {
         const s = byId("ilStart").value, e = byId("ilEnd").value;
         const rate = Number(byId("ilRate").value || 0);
@@ -14605,12 +14581,14 @@
           byId("ilAmtHt").value = (rate * days).toFixed(2);
           recomputeHt();
         }
+        clearIlError();
       };
-      byId("ilAmtHt").oninput = recomputeHt;
+      byId("ilAmtHt").oninput = () => { recomputeHt(); clearIlError(); };
       byId("ilAmtTtc").oninput = () => {
         const r = computeContractLineHt(Number(byId("ilAmtTtc").value || 0));
         byId("ilAmtHt").value = r.amountHt.toFixed(2);
         byId("ilVat").value = r.vatAmount.toFixed(2);
+        clearIlError();
       };
 
       byId("ilCancelBtn").onclick = () => {
