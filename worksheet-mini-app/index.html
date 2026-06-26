@@ -5577,8 +5577,8 @@
       if (reservations) state.reservations = reservations.map(r => ({
         id: r.id, customerId: r.customer_id, carId: r.car_id,
         customerName: r.customer_name || "", carPlate: r.car_plate || "",
-        startDate: r.start_date || "", startTime: r.start_time || "09:00",
-        endDate: r.end_date || "", endTime: r.end_time || "18:00",
+        startDate: r.start_date || "", startTime: (r.start_time || "09:00").slice(0, 5),
+        endDate: r.end_date || "", endTime: (r.end_time || "18:00").slice(0, 5),
         status: r.status || "en_attente",
         createdAt: r.created_at || "", createdBy: r.created_by || null,
         updatedAt: r.updated_at || "", updatedBy: r.updated_by || null,
@@ -10173,7 +10173,8 @@
     }
 
     function toReservationDateTime(dateIso, timeIso, isStart) {
-      const safeTime = timeIso && /^\d{2}:\d{2}$/.test(timeIso) ? timeIso : (isStart ? "00:00" : "23:59");
+      const t = String(timeIso || "").slice(0, 5); // normalize "HH:MM:SS" → "HH:MM" (PostgreSQL TIME format)
+      const safeTime = /^\d{2}:\d{2}$/.test(t) ? t : (isStart ? "00:00" : "23:59");
       const dt = new Date(`${dateIso}T${safeTime}:00`);
       return Number.isFinite(dt.getTime()) ? dt : null;
     }
@@ -11536,7 +11537,7 @@
         id: r.id, carId: r.car_id, carPlate: r.car_plate || "",
         customerId: r.customer_id, customerName: r.customer_name || "",
         startDate: r.start_date, endDate: r.end_date,
-        startTime: r.start_time || "09:00", endTime: r.end_time || "18:00",
+        startTime: (r.start_time || "09:00").slice(0, 5), endTime: (r.end_time || "18:00").slice(0, 5),
         status: r.status || "confirmee", notes: r.notes || "",
         contractLineId: r.contract_line_id || null,
       }));
