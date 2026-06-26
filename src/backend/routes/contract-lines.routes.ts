@@ -23,11 +23,13 @@ function periodsConflict(
   bufferHours: number = 0
 ): boolean {
   if (e1 < s2 || e2 < s1) return false;
-  // Existing ends on new's start day → no conflict if existing released before new pickup
-  if (e2 === s1 && return2 && pickup1) { if (addHoursToTime(return2, bufferHours) <= pickup1) return false; }
-  // New ends on existing's start day → no conflict if new released before existing pickup
-  if (e1 === s2 && return1 && pickup2) { if (addHoursToTime(return1, bufferHours) <= pickup2) return false; }
-  return true;
+  // Proper date overlap (not just a boundary touch): always conflict
+  const properOverlap = e1 > s2 && e2 > s1;
+  if (properOverlap) return true;
+  // Boundary touch only: allow by default (turnover day), resolve with times if available
+  if (e2 === s1 && return2 && pickup1) return addHoursToTime(return2, bufferHours) > pickup1;
+  if (e1 === s2 && return1 && pickup2) return addHoursToTime(return1, bufferHours) > pickup2;
+  return false; // boundary touch, no time info → allow
 }
 
 // BR19 niveau 2 : vérifie chevauchement sur les lignes actives et les réservations.

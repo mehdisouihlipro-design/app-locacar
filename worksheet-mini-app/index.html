@@ -12135,7 +12135,11 @@
       const totalVat = lines.reduce((s, l) => s + (l.vatAmount || 0), 0);
       const totalTax = lines.reduce((s, l) => s + (l.dailyTaxAmount || 0), 0);
       const stamp = Number(invoice.stampDutyAmount || 0);
-      const totalTtc = totalHt + totalVat + totalTax + stamp;
+      const computedTtc = totalHt + totalVat + totalTax + stamp;
+      // Pour les vieilles factures sans décomposition TVA dans les lignes,
+      // utiliser le montant TTC stocké sur l'entête plutôt que le total calculé.
+      const storedTtc = Number(invoice.amountTnd || 0);
+      const totalTtc = (totalVat === 0 && totalTax === 0 && storedTtc > computedTtc) ? storedTtc : computedTtc;
       if (tfoot) tfoot.innerHTML = `
         <tr>
           <td colspan="3" style="padding:6px 8px;text-align:right;font-size:12px;color:var(--muted);">Timbre : ${formatTnd(stamp)}</td>
@@ -12433,19 +12437,31 @@
             ? state.contracts.find(c => String(c.id) === String(invoice.contractId)) : null;
           const car = contract && contract.carId
             ? state.cars.find(c => String(c.id) === String(contract.carId)) : null;
+          const invHt    = Number(invoice.amountHt        || 0);
+          const invVat   = Number(invoice.vatAmount        || 0);
+          const invTax   = Number(invoice.dailyTaxAmount   || 0);
+          const invStamp = Number(invoice.stampDutyAmount  || 0);
+          const invTtc   = Number(invoice.amountTnd        || 0);
+          // Si les champs TVA/taxe sont à 0 mais que le TTC stocké est supérieur au HT,
+          // préserver le TTC d'origine (ancienne facture sans décomposition).
+          // lineTtc = montant de la ligne hors timbre fiscal (le timbre est au niveau facture).
+          const computedLineTtc = invHt + invVat + invTax;
+          const preservedLineTtc = (invVat === 0 && invTax === 0 && invTtc > invHt)
+            ? Math.max(invTtc - invStamp, invHt)
+            : computedLineTtc;
           srcLines = [{
             contractId:    invoice.contractId || null,
             carPlate:      car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
             designation:   car ? (car.model || "") : "",
-            amountOriginal: Number(invoice.amountHt || 0),
+            amountOriginal: invHt,
             currency:      "TND",
-            amountHt:      Number(invoice.amountHt || 0),
-            vatAmount:     Number(invoice.vatAmount || 0),
-            dailyTaxAmount: Number(invoice.dailyTaxAmount || 0),
+            amountHt:      invHt,
+            vatAmount:     invVat,
+            dailyTaxAmount: invTax,
             days:          Number(invoice.rentalDays || 0),
             periodStart:   invoice.periodStart || "",
             periodEnd:     invoice.periodEnd || "",
-            lineTtc:       Number(invoice.amountHt || 0) + Number(invoice.vatAmount || 0) + Number(invoice.dailyTaxAmount || 0),
+            lineTtc:       preservedLineTtc,
           }];
         }
         if (srcLines) {
