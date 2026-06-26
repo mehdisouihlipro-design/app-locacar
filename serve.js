@@ -330,6 +330,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /api/reset-sequences — remet tous les compteurs de souche à 0
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/reset-sequences') {
+    (async () => {
+      const supabaseUrl = getEnv('SUPABASE_URL');
+      const serviceKey  = getEnv('SUPABASE_SERVICE_ROLE_KEY') || getEnv('SUPABASE_SERVICE_KEY') || getEnv('SUPABASE_ANON_KEY');
+      if (!supabaseUrl || !serviceKey) { sendJson(res, 500, { error: 'SUPABASE_URL ou clé non configurés' }); return; }
+      const base = supabaseUrl.trim().replace(/\/$/, '').replace(/\/rest\/v1\/?$/i, '');
+      const headers = { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+      // Remettre tous les compteurs à 0 (filtre sur last_number >= 0 = toutes les lignes)
+      const patchRes = await supabaseFetch(`${base}/rest/v1/number_sequences?last_number=gte.0`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ last_number: 0, last_year: null }),
+      });
+      if (!patchRes.ok) { sendJson(res, 500, { error: `Supabase PATCH échoué: ${patchRes.status}` }); return; }
+      sendJson(res, 200, { ok: true });
+    })().catch(e => sendJson(res, 500, { error: e.message }));
+    return;
+  }
+
   if (req.method === 'POST' && parsedUrl.pathname === '/api/analyze-damages') {
     readJsonBody(req)
       .then(async (body) => {

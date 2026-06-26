@@ -8206,8 +8206,8 @@
       console.log("Sync API:", summary);
     }
 
-    document.getElementById("resetBtn").addEventListener("click", () => {
-      const ok = confirm("Supprimer toutes les donnees de la mini app ?");
+    document.getElementById("resetBtn").addEventListener("click", async () => {
+      const ok = confirm("Supprimer toutes les donnees de la mini app ?\n\nLes souches de numéros seront aussi remises à zéro.");
       if (!ok) return;
       state.cars = [];
       state.customers = [];
@@ -8227,6 +8227,8 @@
       state.leasingInstallments = [];
       state.vignettes = [];
       state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRibLabel: "RIB", companyRib: "", companyRib2Label: "RIB 2", companyRib2: "", companyTaxId: "", companyName: "", logoUrl: "" };
+      // Remettre toutes les souches à zéro
+      fetch("/api/reset-sequences", { method: "POST" }).catch(() => {});
       saveAndRender();
     });
 
