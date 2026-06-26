@@ -6,28 +6,36 @@ import { stampCreate, stampUpdate } from '../utils/audit';
 
 const router = Router();
 
-// Retourne true si les deux périodes (avec heures optionnelles) se chevauchent.
-// Cas particulier : si les périodes se touchent sur UN seul jour (fin A = début B),
-// il n'y a conflit QUE SI return_time A > pickup_time B (ou si l'une est absente → conservateur).
+// Ajoute des heures décimales à une heure "HH:MM" et retourne "HH:MM" (plafonné à 23:59).
+function addHoursToTime(time: string, hours: number): string {
+  if (!hours || !time) return time;
+  const [h, m] = time.split(':').map(Number);
+  const totalMinutes = Math.min(h * 60 + m + Math.round(hours * 60), 23 * 60 + 59);
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+
+// Retourne true si les deux périodes (avec heures et buffer optionnels) se chevauchent.
+// Cas limite : si fin A = début B (même jour), conflit ssi heure retour A + buffer > heure pickup B.
+// Si l'une des heures est absente → conservateur (conflit).
 function periodsConflict(
   s1: string, e1: string, pickup1: string | null, return1: string | null,
-  s2: string, e2: string, pickup2: string | null, return2: string | null
+  s2: string, e2: string, pickup2: string | null, return2: string | null,
+  bufferHours: number = 0
 ): boolean {
   if (e1 < s2 || e2 < s1) return false;
   if (e1 === s2) {
-    // Fin 1 = début 2 : conflit ssi voiture restituée après la prise en charge suivante
-    if (return1 && pickup2) return return1 > pickup2;
+    if (return1 && pickup2) return addHoursToTime(return1, bufferHours) > pickup2;
     return true;
   }
   if (e2 === s1) {
-    if (return2 && pickup1) return return2 > pickup1;
+    if (return2 && pickup1) return addHoursToTime(return2, bufferHours) > pickup1;
     return true;
   }
   return true;
 }
 
 // BR19 niveau 2 : vérifie chevauchement sur les lignes actives et les réservations.
-// Prend en compte les heures pour les touchées intra-journalières (court terme).
+// Applique le buffer de paramétrage pour les cas intra-journaliers (court terme).
 async function findVehicleOverlap(
   carId: string,
   periodStart: string,
@@ -36,12 +44,19 @@ async function findVehicleOverlap(
   returnTime: string | null = null,
   excludeLineId?: string
 ): Promise<{ message: string; conflict: Record<string, unknown> } | null> {
+  // Lire le buffer depuis les paramètres
+  let bufferHours = 0;
+  try {
+    const settingsRes = await global.db.get('/settings?id=eq.1&select=reservation_buffer_hours');
+    bufferHours = Number((settingsRes.data || [])[0]?.reservation_buffer_hours ?? 0);
+  } catch (_) { /* buffer = 0 si inaccessible */ }
+
   const linesResult = await global.db.get(
     `/contract_lines?car_id=eq.${carId}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end,pickup_time,return_time`
   );
   const overlappingLine = (linesResult.data || []).find((line: any) => {
     if (excludeLineId && line.id === excludeLineId) return false;
-    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, line.period_start, line.period_end, line.pickup_time, line.return_time);
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, line.period_start, line.period_end, line.pickup_time, line.return_time, bufferHours);
   });
 
   if (overlappingLine) {
@@ -64,7 +79,7 @@ async function findVehicleOverlap(
   const overlappingReservation = (reservationsResult.data || []).find((rsv: any) => {
     if (rsv.status === 'annulee' || rsv.status === 'terminee') return false;
     if (excludeLineId && rsv.contract_line_id === excludeLineId) return false;
-    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, rsv.start_date, rsv.end_date, rsv.start_time, rsv.end_time);
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, rsv.start_date, rsv.end_date, rsv.start_time, rsv.end_time, bufferHours);
   });
 
   if (overlappingReservation) {

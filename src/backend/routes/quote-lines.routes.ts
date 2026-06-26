@@ -25,13 +25,21 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
+function addHoursToTime(time: string, hours: number): string {
+  if (!hours || !time) return time;
+  const [h, m] = time.split(':').map(Number);
+  const totalMinutes = Math.min(h * 60 + m + Math.round(hours * 60), 23 * 60 + 59);
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+
 function periodsConflict(
   s1: string, e1: string, p1: string | null, r1: string | null,
-  s2: string, e2: string, p2: string | null, r2: string | null
+  s2: string, e2: string, p2: string | null, r2: string | null,
+  bufferHours: number = 0
 ): boolean {
   if (e1 < s2 || e2 < s1) return false;
-  if (e1 === s2) { if (r1 && p2) return r1 > p2; return true; }
-  if (e2 === s1) { if (r2 && p1) return r2 > p1; return true; }
+  if (e1 === s2) { if (r1 && p2) return addHoursToTime(r1, bufferHours) > p2; return true; }
+  if (e2 === s1) { if (r2 && p1) return addHoursToTime(r2, bufferHours) > p1; return true; }
   return true;
 }
 
@@ -43,12 +51,18 @@ async function findQuoteOverlap(
   returnTime: string | null = null,
   excludeLineId?: string
 ): Promise<{ message: string } | null> {
+  let bufferHours = 0;
+  try {
+    const settingsRes = await global.db.get('/settings?id=eq.1&select=reservation_buffer_hours');
+    bufferHours = Number((settingsRes.data || [])[0]?.reservation_buffer_hours ?? 0);
+  } catch (_) { /* buffer = 0 si inaccessible */ }
+
   const qlRes = await global.db.get(
     `/quote_lines?car_id=eq.${carId}&select=id,quote_id,car_plate,period_start,period_end,pickup_time,return_time`
   );
   const conflictQl = (qlRes.data || []).find((l: any) => {
     if (excludeLineId && l.id === excludeLineId) return false;
-    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, l.period_start, l.period_end, l.pickup_time, l.return_time);
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, l.period_start, l.period_end, l.pickup_time, l.return_time, bufferHours);
   });
   if (conflictQl) {
     return { message: `⚠ Le véhicule ${conflictQl.car_plate} est déjà présent dans le devis ${conflictQl.quote_id} du ${conflictQl.period_start} au ${conflictQl.period_end}. Choisissez une autre période ou un autre véhicule.` };
@@ -58,7 +72,7 @@ async function findQuoteOverlap(
     `/contract_lines?car_id=eq.${carId}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end,pickup_time,return_time`
   );
   const conflictCl = (clRes.data || []).find((l: any) => {
-    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, l.period_start, l.period_end, l.pickup_time, l.return_time);
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, l.period_start, l.period_end, l.pickup_time, l.return_time, bufferHours);
   });
   if (conflictCl) {
     return { message: `⚠ Le véhicule ${conflictCl.car_plate} est déjà engagé sur le contrat ${conflictCl.contract_id} du ${conflictCl.period_start} au ${conflictCl.period_end}.` };
