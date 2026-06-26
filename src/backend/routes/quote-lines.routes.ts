@@ -25,12 +25,48 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
+async function findQuoteOverlap(
+  carId: string,
+  periodStart: string,
+  periodEnd: string,
+  excludeLineId?: string
+): Promise<{ message: string } | null> {
+  // Vérifier les autres lignes de devis pour le même véhicule
+  const qlRes = await global.db.get(
+    `/quote_lines?car_id=eq.${carId}&select=id,quote_id,car_plate,period_start,period_end`
+  );
+  const conflictQl = (qlRes.data || []).find((l: any) => {
+    if (excludeLineId && l.id === excludeLineId) return false;
+    return periodStart <= l.period_end && periodEnd >= l.period_start;
+  });
+  if (conflictQl) {
+    return { message: `⚠ Le véhicule ${conflictQl.car_plate} est déjà présent dans le devis ${conflictQl.quote_id} du ${conflictQl.period_start} au ${conflictQl.period_end}. Choisissez une autre période ou un autre véhicule.` };
+  }
+
+  // Vérifier les lignes de contrat actives pour le même véhicule
+  const clRes = await global.db.get(
+    `/contract_lines?car_id=eq.${carId}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end`
+  );
+  const conflictCl = (clRes.data || []).find((l: any) => {
+    return periodStart <= l.period_end && periodEnd >= l.period_start;
+  });
+  if (conflictCl) {
+    return { message: `⚠ Le véhicule ${conflictCl.car_plate} est déjà engagé sur le contrat ${conflictCl.contract_id} du ${conflictCl.period_start} au ${conflictCl.period_end}.` };
+  }
+
+  return null;
+}
+
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
+    const { car_id, period_start, period_end } = req.body;
+    if (car_id && period_start && period_end) {
+      const overlap = await findQuoteOverlap(car_id, period_start, period_end);
+      if (overlap) return res.status(409).json({ success: false, code: 'vehicle_overlap', message: overlap.message });
+    }
     const id = req.body.id || `QL-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const body = { ...req.body, id };
     await global.db.post('/quote_lines', stampCreate(body, req), { headers: { Prefer: 'return=minimal' } });
-    // Recalculer les totaux du devis
     if (body.quote_id) await recalcQuoteTotals(body.quote_id);
     res.status(201).json({ success: true, data: { id, ...body } });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
@@ -40,6 +76,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const check = await global.db.get(`/quote_lines?id=eq.${req.params.id}&select=id,quote_id`);
     if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Ligne introuvable.' });
+    const { car_id, period_start, period_end } = req.body;
+    if (car_id && period_start && period_end) {
+      const overlap = await findQuoteOverlap(car_id, period_start, period_end, req.params.id);
+      if (overlap) return res.status(409).json({ success: false, code: 'vehicle_overlap', message: overlap.message });
+    }
     const result = await global.db.patch(`/quote_lines?id=eq.${req.params.id}`, stampUpdate(req.body, req), { headers: { Prefer: 'return=representation' } });
     const updated = Array.isArray(result.data) ? result.data[0] : result.data;
     const quoteId = updated?.quote_id || check.data[0].quote_id;

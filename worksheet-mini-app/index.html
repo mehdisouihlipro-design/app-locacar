@@ -1781,8 +1781,8 @@
           <tr>
             <th>ID</th>
             <th>Client</th>
-            <th>Date</th>
-            <th>Validité</th>
+            <th>Début</th>
+            <th>Fin</th>
             <th>Lignes</th>
             <th>Total TTC</th>
             <th>Statut</th>
@@ -11035,8 +11035,8 @@
     const QUOTES_COLUMNS = [
       { key: "id" },
       { key: "customerName" },
-      { key: "quoteDate", sortType: "date" },
-      { key: "validityDate", sortType: "date" },
+      { key: "periodStart", sortType: "date", accessor: (q) => getQuotePeriod(q.id).start || "" },
+      { key: "periodEnd",   sortType: "date", accessor: (q) => getQuotePeriod(q.id).end   || "" },
       { key: "lignes", sortType: "number", accessor: (q) => (state.quoteLines || []).filter(l => l.quoteId === q.id).length },
       { key: "totalAmountTtc", sortType: "number" },
       { key: "status", filterType: "select", options: ["brouillon","envoye","valide","refuse","expire"], accessor: (q) => getQuoteDisplayStatus(q) },
@@ -11060,14 +11060,16 @@
         const lineCount = (state.quoteLines || []).filter(l => l.quoteId === q.id).length;
         const displayStatus = getQuoteDisplayStatus(q);
         const statusCss = displayStatus === "valide" ? "dispo" : displayStatus === "refuse" || displayStatus === "expire" ? "loue" : displayStatus === "envoye" ? "maintenance" : "pending";
+        const period = getQuotePeriod(q.id);
+        const dateStyle = "white-space:nowrap;font-size:13px;";
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         tr.addEventListener("dblclick", () => openQuoteDetail(q.id));
         tr.innerHTML = `
           <td><a href="#" data-open-quote="${safe(q.id)}">${safe(q.id)}</a></td>
           <td>${safe(q.customerName || "-")}</td>
-          <td>${q.quoteDate || "-"}</td>
-          <td style="${displayStatus === "expire" ? "color:#c53030;" : ""}">${q.validityDate || "-"}</td>
+          <td style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
+          <td style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
           <td><a href="#" data-open-quote-detail="${safe(q.id)}" class="badge-lignes">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
           <td>${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td><span class="badge-status ${statusCss}">${displayStatus}</span></td>
@@ -11094,10 +11096,11 @@
       const cancelBtn = byId("qdCancelEditBtn");
 
       if (!editMode) {
+        const qp = getQuotePeriod(quoteId);
         byId("qdHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(q.customerName || "-")}</strong></div>
-          <div><span class="label-small">Date devis</span><br>${q.quoteDate || "-"}</div>
-          <div><span class="label-small">Validité</span><br>${q.validityDate || "-"}</div>
+          <div><span class="label-small">Début</span><br>${qp.start || "-"}</div>
+          <div><span class="label-small">Fin</span><br>${qp.end || "-"}</div>
           <div><span class="label-small">Statut</span><br>${displayStatus}</div>
           <div><span class="label-small">Notes</span><br>${safe(q.notes || "—")}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
@@ -11111,10 +11114,11 @@
         const custOpts = state.customers.map(c =>
           `<option value="${safe(c.id)}"${c.id === q.customerId ? " selected" : ""}>${safe(c.name)}</option>`
         ).join("");
+        const qpEdit = getQuotePeriod(quoteId);
         byId("qdHeader").innerHTML = `
           <div><label class="label-small">Client</label><select id="qdEClient" style="width:100%;">${custOpts}</select></div>
-          <div><label class="label-small">Date devis</label><input id="qdEDate" type="date" value="${q.quoteDate||""}" style="width:100%;" /></div>
-          <div><label class="label-small">Date validité</label><input id="qdEValidity" type="date" value="${q.validityDate||""}" style="width:100%;" /></div>
+          <div><span class="label-small">Début</span><br>${qpEdit.start || "—"}</div>
+          <div><span class="label-small">Fin</span><br>${qpEdit.end || "—"}</div>
           <div><label class="label-small">Statut</label>
             <select id="qdEStatus" style="width:100%;">
               <option value="brouillon"${q.status==="brouillon"?" selected":""}>brouillon</option>
@@ -11135,13 +11139,11 @@
           const customer = state.customers.find(c => c.id === customerId);
           await apiPut(`/quotes/${quoteId}`, {
             customer_id: customerId, customer_name: customer ? customer.name : q.customerName,
-            quote_date: byId("qdEDate").value, validity_date: byId("qdEValidity").value,
             status: byId("qdEStatus").value, notes: byId("qdENotes").value,
           });
           const idx = state.quotes.findIndex(x => x.id === quoteId);
           if (idx >= 0) Object.assign(state.quotes[idx], {
             customerId, customerName: customer ? customer.name : q.customerName,
-            quoteDate: byId("qdEDate").value, validityDate: byId("qdEValidity").value,
             status: byId("qdEStatus").value, notes: byId("qdENotes").value,
           });
           renderQuoteDetailHeader(quoteId, false);
@@ -11735,6 +11737,15 @@
 
     if (byId("quotesFilterStatus")) byId("quotesFilterStatus").addEventListener("change", renderQuotes);
     if (byId("quotesSearch")) byId("quotesSearch").addEventListener("input", renderQuotes);
+
+    function getQuotePeriod(quoteId) {
+      const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId && l.periodStart && l.periodEnd);
+      if (!lines.length) return { start: null, end: null };
+      return {
+        start: lines.reduce((m, l) => (!m || l.periodStart < m ? l.periodStart : m), ""),
+        end:   lines.reduce((m, l) => (!m || l.periodEnd   > m ? l.periodEnd   : m), ""),
+      };
+    }
 
     function getContractPeriod(contractId) {
       const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule" && l.periodStart && l.periodEnd);
@@ -14590,19 +14601,107 @@
 
     // ── Ouvrir le modal de détail ────────────────────────────────────────────────
 
-    function createInvoiceFromContract(contractId) {
-      byId("contractDetailModal").style.display = "none";
-      openTab("invoices");
-      requestAnimationFrame(() => {
-        const form = byId("invoiceLegacyForm");
-        if (form) form.style.display = "block";
-        const sel = byId("invoiceContract");
-        if (sel) {
-          sel.value = contractId;
-          sel.dispatchEvent(new Event("change"));
-          sel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
+    async function createInvoiceFromContract(contractId) {
+      const contract = state.contracts.find(c => c.id === contractId);
+      if (!contract) { alert("Contrat introuvable."); return; }
+
+      const contractLines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status === "active");
+      if (contractLines.length === 0) {
+        alert("Ce contrat n'a aucune ligne active à facturer.");
+        return;
+      }
+
+      const customer = state.customers.find(c => c.id === contract.customerId);
+      const rib = state.settings.companyRib || "";
+      const ribLabel = state.settings.companyRibLabel || "RIB";
+      const dueDate = addDaysToIsoDate(today, 7);
+      const stampDutyAmount = Number(state.settings.stampDutyTnd || 0);
+
+      const lines = contractLines.map(cl => {
+        const lineBreakdown = computeLineBreakdown(cl.amountHt || 0, cl.days || 0);
+        return {
+          contractId,
+          contractLineId: cl.id,
+          carPlate: cl.carPlate || "",
+          designation: (state.cars.find(c => c.id === cl.carId) || {}).model || "",
+          amountOriginal: cl.amountHt || 0,
+          currency: "TND",
+          amountHt: lineBreakdown.amountHt,
+          vatAmount: lineBreakdown.vatAmount,
+          dailyTaxAmount: lineBreakdown.dailyTaxAmount,
+          days: cl.days || 0,
+          periodStart: cl.periodStart || "",
+          periodEnd: cl.periodEnd || "",
+          lineTtc: lineBreakdown.lineTtc,
+        };
       });
+
+      const totalAmountHt  = lines.reduce((s, l) => s + l.amountHt, 0);
+      const totalVat       = lines.reduce((s, l) => s + l.vatAmount, 0);
+      const totalDailyTax  = lines.reduce((s, l) => s + l.dailyTaxAmount, 0);
+      const totalTnd       = totalAmountHt + totalVat + totalDailyTax + stampDutyAmount;
+      const totalDays      = lines.reduce((s, l) => s + l.days, 0);
+      const periodStart    = lines.reduce((m, l) => (!m || (l.periodStart && l.periodStart < m) ? l.periodStart : m), "");
+      const periodEnd      = lines.reduce((m, l) => (!m || (l.periodEnd   && l.periodEnd   > m) ? l.periodEnd   : m), "");
+
+      byId("contractDetailModal").style.display = "none";
+
+      let invId = uid("FAC");
+      const savedInv = await apiPost("/invoices", {
+        id: invId,
+        contract_id: contractId,
+        customer_name: customer ? customer.name : (contract.customerName || ""),
+        amount_original: totalAmountHt,
+        currency: "TND",
+        amount_tnd: totalTnd,
+        amount_ht: totalAmountHt,
+        vat_amount: totalVat,
+        daily_tax_amount: totalDailyTax,
+        stamp_duty_amount: stampDutyAmount,
+        rental_days: totalDays,
+        period_start: periodStart,
+        period_end: periodEnd,
+        lines,
+        paid_amount_tnd: 0,
+        due_amount_tnd: totalTnd,
+        label: `Facture – ${contractId}`,
+        due_date: dueDate,
+        status: "en_attente",
+        reminder_count: 0,
+        rib,
+        rib_label: ribLabel,
+      });
+      if (savedInv && savedInv.id) invId = savedInv.id;
+
+      // Charger les invoice_lines créées par le backend
+      const createdLines = await apiGet(`/invoice-lines?invoice_id=${encodeURIComponent(invId)}`);
+      if (createdLines) {
+        (state.invoiceLines = state.invoiceLines || []).push(...createdLines.map(l => ({
+          id: l.id, invoiceId: l.invoice_id,
+          contractLineId: l.contract_line_id || null, contractId: l.contract_id || null,
+          carPlate: l.car_plate || "", designation: l.designation || "",
+          amountOriginal: l.amount_original || 0, currency: l.currency || "TND",
+          amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
+          dailyTaxAmount: l.daily_tax_amount || 0, days: l.days || 0,
+          periodStart: l.period_start || "", periodEnd: l.period_end || "",
+          lineTtc: l.line_ttc || 0,
+        })));
+      }
+
+      state.invoices.push({
+        id: invId, contractId, customerName: customer ? customer.name : (contract.customerName || ""),
+        amountOriginal: totalAmountHt, currency: "TND",
+        amountTnd: totalTnd, amountHt: totalAmountHt, vatAmount: totalVat,
+        dailyTaxAmount: totalDailyTax, stampDutyAmount,
+        rentalDays: totalDays, periodStart, periodEnd,
+        lines: [], paidAmountTnd: 0, dueAmountTnd: totalTnd,
+        label: `Facture – ${contractId}`, dueDate, status: "en_attente",
+        reminderCount: 0, rib, ribLabel,
+      });
+
+      openTab("invoices");
+      renderInvoices();
+      window.openInvoiceEditModal(invId);
     }
 
     function openContractDetail(contractId) {
