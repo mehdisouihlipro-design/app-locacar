@@ -6,21 +6,42 @@ import { stampCreate, stampUpdate } from '../utils/audit';
 
 const router = Router();
 
-// BR19 niveau 2 : verifie qu'une ligne (vehicule + periode, statut actif)
-// ne chevauche pas une autre ligne de contrat active ou une reservation
-// active sur le meme vehicule. Retourne le conflit trouve, ou null.
+// Retourne true si les deux périodes (avec heures optionnelles) se chevauchent.
+// Cas particulier : si les périodes se touchent sur UN seul jour (fin A = début B),
+// il n'y a conflit QUE SI return_time A > pickup_time B (ou si l'une est absente → conservateur).
+function periodsConflict(
+  s1: string, e1: string, pickup1: string | null, return1: string | null,
+  s2: string, e2: string, pickup2: string | null, return2: string | null
+): boolean {
+  if (e1 < s2 || e2 < s1) return false;
+  if (e1 === s2) {
+    // Fin 1 = début 2 : conflit ssi voiture restituée après la prise en charge suivante
+    if (return1 && pickup2) return return1 > pickup2;
+    return true;
+  }
+  if (e2 === s1) {
+    if (return2 && pickup1) return return2 > pickup1;
+    return true;
+  }
+  return true;
+}
+
+// BR19 niveau 2 : vérifie chevauchement sur les lignes actives et les réservations.
+// Prend en compte les heures pour les touchées intra-journalières (court terme).
 async function findVehicleOverlap(
   carId: string,
   periodStart: string,
   periodEnd: string,
+  pickupTime: string | null = null,
+  returnTime: string | null = null,
   excludeLineId?: string
 ): Promise<{ message: string; conflict: Record<string, unknown> } | null> {
   const linesResult = await global.db.get(
-    `/contract_lines?car_id=eq.${carId}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end`
+    `/contract_lines?car_id=eq.${carId}&status=eq.active&select=id,contract_id,car_plate,period_start,period_end,pickup_time,return_time`
   );
   const overlappingLine = (linesResult.data || []).find((line: any) => {
     if (excludeLineId && line.id === excludeLineId) return false;
-    return periodStart <= line.period_end && periodEnd >= line.period_start;
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, line.period_start, line.period_end, line.pickup_time, line.return_time);
   });
 
   if (overlappingLine) {
@@ -31,32 +52,27 @@ async function findVehicleOverlap(
     return {
       message: `⚠ Le véhicule ${overlappingLine.car_plate} est déjà engagé du ${overlappingLine.period_start} au ${overlappingLine.period_end} sur le contrat ${overlappingLine.contract_id} (ligne ${lineNumber || 1}). Choisissez une autre période ou un autre véhicule.`,
       conflict: {
-        carId,
-        contractId: overlappingLine.contract_id,
-        lineId: overlappingLine.id,
-        periodStart: overlappingLine.period_start,
-        periodEnd: overlappingLine.period_end,
+        carId, contractId: overlappingLine.contract_id, lineId: overlappingLine.id,
+        periodStart: overlappingLine.period_start, periodEnd: overlappingLine.period_end,
       },
     };
   }
 
   const reservationsResult = await global.db.get(
-    `/reservations?car_id=eq.${carId}&select=id,car_plate,start_date,end_date,status,contract_line_id`
+    `/reservations?car_id=eq.${carId}&select=id,car_plate,start_date,end_date,status,contract_line_id,start_time,end_time`
   );
   const overlappingReservation = (reservationsResult.data || []).find((rsv: any) => {
     if (rsv.status === 'annulee' || rsv.status === 'terminee') return false;
     if (excludeLineId && rsv.contract_line_id === excludeLineId) return false;
-    return periodStart <= rsv.end_date && periodEnd >= rsv.start_date;
+    return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, rsv.start_date, rsv.end_date, rsv.start_time, rsv.end_time);
   });
 
   if (overlappingReservation) {
     return {
       message: `⚠ Le véhicule ${overlappingReservation.car_plate} est déjà engagé du ${overlappingReservation.start_date} au ${overlappingReservation.end_date} par la réservation ${overlappingReservation.id}. Choisissez une autre période ou un autre véhicule.`,
       conflict: {
-        carId,
-        reservationId: overlappingReservation.id,
-        periodStart: overlappingReservation.start_date,
-        periodEnd: overlappingReservation.end_date,
+        carId, reservationId: overlappingReservation.id,
+        periodStart: overlappingReservation.start_date, periodEnd: overlappingReservation.end_date,
       },
     };
   }
@@ -77,6 +93,8 @@ async function applyBR25(
   periodStart: string,
   periodEnd: string,
   contractId: string,
+  pickupTime: string | null,
+  returnTime: string | null,
   req: AuthRequest
 ): Promise<Record<string, unknown> | null> {
   try {
@@ -126,8 +144,8 @@ async function applyBR25(
         customer_name: customerName,
         start_date: periodStart,
         end_date: periodEnd,
-        start_time: '09:00',
-        end_time: '18:00',
+        start_time: pickupTime || '09:00',
+        end_time: returnTime || '18:00',
         status: 'confirmee',
         contract_line_id: lineId,
       }, req), { headers: { Prefer: 'return=minimal' } });
@@ -168,8 +186,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const status = req.body.status || 'active';
+    const pickupTime: string | null = req.body.pickup_time || null;
+    const returnTime: string | null = req.body.return_time || null;
     if (status === 'active') {
-      const overlap = await findVehicleOverlap(req.body.car_id, req.body.period_start, req.body.period_end);
+      const overlap = await findVehicleOverlap(req.body.car_id, req.body.period_start, req.body.period_end, pickupTime, returnTime);
       if (overlap) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: overlap.message, conflict: overlap.conflict });
     }
 
@@ -189,6 +209,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         String(line.period_start),
         String(line.period_end),
         String(line.contract_id),
+        pickupTime,
+        returnTime,
         req
       );
       if (reservation) line.reservation_id = reservation.id;
@@ -211,9 +233,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     const periodStart = req.body.period_start ?? current.period_start;
     const periodEnd = req.body.period_end ?? current.period_end;
     const status = req.body.status ?? current.status;
+    const pickupTime: string | null = req.body.pickup_time !== undefined ? (req.body.pickup_time || null) : (current.pickup_time || null);
+    const returnTime: string | null = req.body.return_time !== undefined ? (req.body.return_time || null) : (current.return_time || null);
 
     if (status === 'active') {
-      const overlap = await findVehicleOverlap(carId, periodStart, periodEnd, req.params.id);
+      const overlap = await findVehicleOverlap(carId, periodStart, periodEnd, pickupTime, returnTime, req.params.id);
       if (overlap) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: overlap.message, conflict: overlap.conflict });
     }
 

@@ -5448,6 +5448,7 @@
       if (contractLinesRaw) state.contractLines = contractLinesRaw.map(l => ({
         id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
         periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        pickupTime: l.pickup_time || null, returnTime: l.return_time || null,
         days: l.days || 0, months: l.months || 0,
         rate: l.rate || 0, rateCurrency: l.rate_currency || "TND",
         amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
@@ -5470,6 +5471,7 @@
       if (quoteLinesRaw) state.quoteLines = quoteLinesRaw.map(l => ({
         id: l.id, quoteId: l.quote_id, carId: l.car_id, carPlate: l.car_plate || "",
         periodStart: l.period_start || "", periodEnd: l.period_end || "",
+        pickupTime: l.pickup_time || null, returnTime: l.return_time || null,
         days: l.days || 0, months: l.months || 0,
         rate: l.rate || 0, rateCurrency: l.rate_currency || "TND",
         amountHt: l.amount_ht || 0, vatAmount: l.vat_amount || 0,
@@ -11183,7 +11185,7 @@
           : `<button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
-          <td style="white-space:nowrap;">${l.periodStart || "-"} → ${l.periodEnd || "-"}</td>
+          <td style="white-space:nowrap;">${l.periodStart || "-"}${l.pickupTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.pickupTime.slice(0,5)}</span>` : ""} → ${l.periodEnd || "-"}${l.returnTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.returnTime.slice(0,5)}</span>` : ""}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${rateTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
@@ -11218,6 +11220,9 @@
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}">${safe(c.plate)}${(c.brand||c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
+      const quote = (state.quotes || []).find(q => q.id === quoteId);
+      const isShortTermQ = !quote || quote.type === "court";
+
       const tr = document.createElement("tr");
       tr.className = "ql-inline-new";
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
@@ -11225,8 +11230,10 @@
         <td style="padding:4px;"><select id="qlCar" style="width:100%;min-width:110px;font-size:12px;"><option value="">— véhicule —</option>${carOptions}</select></td>
         <td style="padding:4px;white-space:nowrap;">
           <input id="qlStart" type="date" style="width:108px;font-size:12px;" />
+          ${isShortTermQ ? `<input id="qlPickup" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de sortie" />` : ""}
           <span style="margin:0 2px;">→</span>
           <input id="qlEnd" type="date" style="width:108px;font-size:12px;" />
+          ${isShortTermQ ? `<input id="qlReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="qlDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
         <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="HT/j" style="width:72px;font-size:12px;text-align:right;" /></td>
@@ -11437,11 +11444,18 @@
       const { days, months } = calcLineDuration(startStr, endStr);
       const saveBtn = byId("qlSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
+      const qlPickupEl = byId("qlPickup");
+      const qlReturnEl = byId("qlReturn");
+      const qlPickupTime = qlPickupEl ? (qlPickupEl.value || null) : null;
+      const qlReturnTime = qlReturnEl ? (qlReturnEl.value || null) : null;
+
       const result = await apiPostWithError("/quote-lines", {
         quote_id: quoteId, car_id: carId, car_plate: car ? car.plate : "",
         period_start: startStr, period_end: endStr, days, months,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+        ...(qlPickupTime ? { pickup_time: qlPickupTime } : {}),
+        ...(qlReturnTime ? { return_time: qlReturnTime } : {}),
       });
       if (!result.ok) {
         saveBtn.disabled = false; saveBtn.textContent = "✓";
@@ -11450,7 +11464,9 @@
       const lineData = result.data;
       state.quoteLines.push({
         id: lineData?.id || uid("QL"), quoteId, carId, carPlate: car ? car.plate : "",
-        periodStart: startStr, periodEnd: endStr, days, months, rate, rateTtc, rateCurrency: "TND",
+        periodStart: startStr, periodEnd: endStr,
+        pickupTime: qlPickupTime, returnTime: qlReturnTime,
+        days, months, rate, rateTtc, rateCurrency: "TND",
         amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
       });
       // Mettre à jour les totaux du devis dans state
@@ -14127,9 +14143,11 @@
         const rsvBadge = l.reservationId
           ? `<a href="#" class="badge-lignes" style="font-size:10px;padding:1px 6px;" data-goto-tab="reservations" data-goto-query="${safe(l.reservationId)}">&#x1F4C5; ${safe(l.reservationId)}</a>`
           : '<span style="color:var(--muted);font-size:11px;">—</span>';
+        const pickupStr = l.pickupTime ? `<span style="font-size:10px;color:#4d6a97;"> ${l.pickupTime.slice(0,5)}</span>` : "";
+        const returnStr = l.returnTime ? `<span style="font-size:10px;color:#4d6a97;"> ${l.returnTime.slice(0,5)}</span>` : "";
         const periodLabel = l.actualEndDate
-          ? `${l.periodStart || "-"} → ${l.periodEnd || "-"}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
-          : `${l.periodStart || "-"} → ${l.periodEnd || "-"}`;
+          ? `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
+          : `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}`;
         const canEdit      = displayStatus === "active" || displayStatus === "brouillon";
         const canTerminate = displayStatus === "active";
         tr.innerHTML = `
@@ -14354,6 +14372,9 @@
         `<option value="${safe(car.id)}">${safe(car.plate)}${(car.brand || car.model) ? ` — ${safe(((car.brand || "") + " " + (car.model || "")).trim())}` : ""}</option>`
       ).join("");
 
+      const contract = state.contracts.find(c => c.id === contractId);
+      const isShortTerm = !contract || contract.type === "court";
+
       const tr = document.createElement("tr");
       tr.className = "inline-new-line";
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
@@ -14366,8 +14387,10 @@
         </td>
         <td style="padding:6px 4px;white-space:nowrap;">
           <input id="ilStart" type="date" style="width:108px;font-size:12px;" />
+          ${isShortTerm ? `<input id="ilPickup" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de sortie" />` : ""}
           <span style="margin:0 2px;color:var(--muted);">→</span>
           <input id="ilEnd" type="date" style="width:108px;font-size:12px;" />
+          ${isShortTerm ? `<input id="ilReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="ilDur" style="text-align:right;padding:6px 4px;font-size:12px;color:var(--muted);">—</td>
         <td style="padding:6px 4px;text-align:right;">
@@ -14480,12 +14503,17 @@
 
       const parentContract = state.contracts.find(c => c.id === contractId);
       const lineStatus = (parentContract && parentContract.status === "brouillon") ? "brouillon" : "active";
+      const pickupTime = byId("ilPickup") ? (byId("ilPickup").value || null) : null;
+      const returnTime = byId("ilReturn") ? (byId("ilReturn").value || null) : null;
+
       const result = await apiPostWithError("/contract-lines", {
         contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "",
         period_start: startStr, period_end: endStr, days, months,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
         status: lineStatus,
+        ...(pickupTime ? { pickup_time: pickupTime } : {}),
+        ...(returnTime ? { return_time: returnTime } : {}),
       });
 
       if (!result.ok) {
@@ -14504,6 +14532,7 @@
         id: lineData?.id || uid("CL"),
         contractId, carId, carPlate: car ? car.plate : "",
         periodStart: startStr, periodEnd: endStr,
+        pickupTime: pickupTime || null, returnTime: returnTime || null,
         days, months, rate, rateCurrency: "TND",
         amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
         status: lineStatus,
