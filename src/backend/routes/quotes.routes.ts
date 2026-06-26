@@ -100,7 +100,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const id = req.body.id || uid('QUO');
     let quoteNumber = req.body.quote_number || null;
     if (!quoteNumber) {
-      try { quoteNumber = await nextSequenceNumber('quotes'); } catch { /* non bloquant si souche absente */ }
+      try { quoteNumber = await nextSequenceNumber('quotes'); } catch (seqErr) { console.error('[quotes] nextSequenceNumber failed:', seqErr); }
     }
     const body = {
       ...req.body, id,

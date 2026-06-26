@@ -27,7 +27,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     // Générer un numéro de contrat séquentiel si pas déjà fourni
     let contractNumber = req.body.contract_number || null;
     if (!contractNumber) {
-      try { contractNumber = await nextSequenceNumber('contracts'); } catch { /* non bloquant si la souche n'est pas encore créée */ }
+      try { contractNumber = await nextSequenceNumber('contracts'); } catch (seqErr) { console.error('[contracts] nextSequenceNumber failed:', seqErr); }
     }
     await global.db.post('/contracts', stampCreate({ ...req.body, id, contract_number: contractNumber, status: req.body.status || 'active' }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: { id, contract_number: contractNumber, ...req.body } });

@@ -38,8 +38,10 @@ function periodsConflict(
   bufferHours: number = 0
 ): boolean {
   if (e1 < s2 || e2 < s1) return false;
-  if (e1 === s2) { if (r1 && p2) return addHoursToTime(r1, bufferHours) > p2; return true; }
-  if (e2 === s1) { if (r2 && p1) return addHoursToTime(r2, bufferHours) > p1; return true; }
+  // Existing ends on new's start day → no conflict if existing released before new pickup
+  if (e2 === s1 && r2 && p1) { if (addHoursToTime(r2, bufferHours) <= p1) return false; }
+  // New ends on existing's start day → no conflict if new released before existing pickup
+  if (e1 === s2 && r1 && p2) { if (addHoursToTime(r1, bufferHours) <= p2) return false; }
   return true;
 }
 

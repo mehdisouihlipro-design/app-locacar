@@ -11211,7 +11211,7 @@
           byId("quoteDetailModal").style.display = "none";
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         }));
-        tr.querySelector(".ql-delete-btn").addEventListener("click", () => deleteQuoteLine(quoteId, l.id));
+        tr.querySelector(".ql-delete-btn")?.addEventListener("click", () => deleteQuoteLine(quoteId, l.id));
         if (isEditable) tr.querySelector(".ql-edit-btn")?.addEventListener("click", () => editInlineQuoteLine(quoteId, l.id, tr));
         tbody.appendChild(tr);
       });
