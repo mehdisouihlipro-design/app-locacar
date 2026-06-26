@@ -5372,6 +5372,27 @@
       }
     }
 
+    // Lit la souche depuis Supabase et retourne le prochain numéro formaté.
+    // Appelé côté frontend pour ne pas dépendre de la compilation TypeScript du backend.
+    async function fetchNextSequenceNumber(sequenceId) {
+      try {
+        const cfg = JSON.parse(localStorage.getItem('locacar-supabase-cfg') || '{}');
+        if (!cfg.url || !cfg.anonKey) return null;
+        const base = cfg.url.trim().replace(/\/$/, '').replace(/\/rest\/v1\/?$/i, '');
+        const res = await fetch(`${base}/rest/v1/rpc/next_sequence_number`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` },
+          body: JSON.stringify({ p_sequence_id: sequenceId }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return typeof data === 'string' && data ? data : null;
+      } catch (e) {
+        console.warn('[fetchNextSequenceNumber]', sequenceId, e);
+        return null;
+      }
+    }
+
     async function loadDataFromAPI() {
       const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, invoiceLinesRaw, invoiceScheduleRaw, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
@@ -5429,7 +5450,7 @@
       }));
 
       if (contracts) state.contracts = contracts.map(c => ({
-        id: c.id, customerId: c.customer_id, carId: c.car_id,
+        id: c.id, contractNumber: c.contract_number || null, customerId: c.customer_id, carId: c.car_id,
         customerName: c.customer_name || "", carPlate: c.car_plate || "",
         contractDate: c.contract_date, type: c.type || "court",
         days: c.days || 0, months: c.months || 0,
@@ -5459,7 +5480,7 @@
       }));
 
       if (quotesRaw) state.quotes = quotesRaw.map(q => ({
-        id: q.id, customerId: q.customer_id, customerName: q.customer_name || "",
+        id: q.id, quoteNumber: q.quote_number || null, customerId: q.customer_id, customerName: q.customer_name || "",
         quoteDate: q.quote_date || "", validityDate: q.validity_date || "",
         status: q.status || "brouillon", notes: q.notes || "",
         type: q.type || "court",
@@ -5754,8 +5775,10 @@
       const isBrouillon = byId("contractIsBrouillon") && byId("contractIsBrouillon").checked;
       const initialStatus = isBrouillon ? "brouillon" : "active";
 
+      const contractNumber = await fetchNextSequenceNumber('contracts');
       const savedContract = await apiPost("/contracts", {
         id: contractId,
+        contract_number: contractNumber,
         customer_id: customerId,
         customer_name: customer.name,
         contract_date: contractDate,
@@ -11069,7 +11092,7 @@
         tr.className = "clickable-row";
         tr.addEventListener("dblclick", () => openQuoteDetail(q.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-quote="${safe(q.id)}">${safe(q.id)}</a></td>
+          <td><a href="#" data-open-quote="${safe(q.id)}">${safe(q.quoteNumber || q.id)}</a></td>
           <td>${safe(q.customerName || "-")}</td>
           <td style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
           <td style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
@@ -11819,8 +11842,9 @@
         if (!quoteDate || !validityDate) { alert("Dates requises."); return; }
         const customer = state.customers.find(c => c.id === customerId);
         const quoteId = uid("QUO");
+        const quoteNumber = await fetchNextSequenceNumber('quotes');
         const saved = await apiPost("/quotes", {
-          id: quoteId, customer_id: customerId,
+          id: quoteId, quote_number: quoteNumber, customer_id: customerId,
           customer_name: customer ? customer.name : "",
           quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
           type: quoteType,
@@ -11908,14 +11932,15 @@
         });
         tr.addEventListener("dblclick", () => openContractDetail(contract.id));
         const lignesCount = (state.contractLines || []).filter(l => l.contractId === contract.id && l.status !== "annule").length;
+        const originQuote = contract.quoteId ? state.quotes.find(q => q.id === contract.quoteId) : null;
         const quoteCell = contract.quoteId
-          ? `<a href="#" data-open-quote-from-contract="${safe(contract.quoteId)}" style="font-family:monospace;font-size:12px;">${safe(contract.quoteId)}</a>`
+          ? `<a href="#" data-open-quote-from-contract="${safe(contract.quoteId)}" style="font-family:monospace;font-size:12px;">${safe(originQuote?.quoteNumber || contract.quoteId)}</a>`
           : `<span style="color:var(--muted);">—</span>`;
         const period = getContractPeriod(contract.id);
         const dateStyle = "white-space:nowrap;font-size:13px;";
         tr.innerHTML = `
           <td>
-            <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.id)}</a>
+            <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.contractNumber || contract.id)}</a>
             <div class="small"><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(contract.id)}" title="Voir les factures de ce contrat">Factures →</a></div>
           </td>
           <td>${safe(contract.type)}</td>
@@ -12516,24 +12541,28 @@
         ieConfirmBtn.textContent = "✓ Confirmer la facture";
         ieConfirmBtn.onclick = async () => {
           if (!confirm("Confirmer cette facture ? Un numéro séquentiel lui sera attribué et elle ne pourra plus être supprimée.")) return;
-          const res = await apiPostWithError(`/invoices/${invoice.id}/confirm`, {});
+          // Générer le numéro côté frontend (appel direct Supabase RPC)
+          const invoiceNumber = await fetchNextSequenceNumber('invoices');
+          if (!invoiceNumber) { alert("Impossible de générer le numéro de facture. Vérifiez la configuration des souches."); return; }
+          const res = await apiPutWithError(`/invoices/${invoice.id}`, { status: "en_attente", invoice_number: invoiceNumber });
           if (!res.ok) { alert(res.errorMsg || "Erreur lors de la confirmation."); return; }
-          const confirmed = res.data;
           const idx = state.invoices.findIndex(i => String(i.id) === String(invoice.id));
           if (idx >= 0) {
             state.invoices[idx].status = "en_attente";
-            state.invoices[idx].invoiceNumber = confirmed.invoice_number || res.invoiceNumber;
+            state.invoices[idx].invoiceNumber = invoiceNumber;
           }
           // Mettre à jour l'entrée d'échéancier dans le state local
           if (invoice.scheduleId) {
             const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
-            if (sIdx >= 0) state.invoiceSchedule[sIdx].status = "confirme";
+            if (sIdx >= 0) {
+              state.invoiceSchedule[sIdx].status = "confirme";
+              await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "confirme" });
+            }
           }
           ieConfirmBtn.style.display = "none";
-          byId("ieNumber").textContent = confirmed.invoice_number || res.invoiceNumber || invoice.id;
+          byId("ieNumber").textContent = invoiceNumber;
           renderInvoiceDetailHeader(invoice.id, false);
           renderInvoices();
-          // Rafraîchir l'échéancier si le modal contrat est ouvert
           if (invoice.contractId) renderContractSchedule(invoice.contractId);
         };
       } else {
