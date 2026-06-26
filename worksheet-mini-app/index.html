@@ -11096,6 +11096,7 @@
       const displayStatus = getQuoteDisplayStatus(q);
       const editBtn   = byId("qdEditHeaderBtn");
       const cancelBtn = byId("qdCancelEditBtn");
+      const isLocked  = !!q.convertedContractId;
 
       if (!editMode) {
         const qp = getQuotePeriod(quoteId);
@@ -11109,9 +11110,19 @@
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           ${q.convertedContractId ? `<div><span class="label-small">Contrat</span><br><a href="#" data-open-contract="${safe(q.convertedContractId)}">${safe(q.convertedContractId)}</a></div>` : ""}
         `;
-        editBtn.textContent = "✏ Modifier entête";
-        editBtn.onclick = () => renderQuoteDetailHeader(quoteId, true);
+        if (isLocked) {
+          editBtn.textContent = "🔒 Devis verrouillé";
+          editBtn.disabled = true;
+          editBtn.onclick = null;
+        } else {
+          editBtn.textContent = "✏ Modifier entête";
+          editBtn.disabled = false;
+          editBtn.onclick = () => renderQuoteDetailHeader(quoteId, true);
+        }
         cancelBtn.style.display = "none";
+      } else if (isLocked) {
+        renderQuoteDetailHeader(quoteId, false);
+        return;
       } else {
         const custOpts = state.customers.map(c =>
           `<option value="${safe(c.id)}"${c.id === q.customerId ? " selected" : ""}>${safe(c.name)}</option>`
@@ -11154,8 +11165,8 @@
       }
 
       // Afficher/masquer les boutons d'action selon le statut
-      const isEditable = !["valide","refuse"].includes(q.status);
-      byId("qdSendBtn").style.display    = q.status === "brouillon" ? "" : "none";
+      const isEditable = !isLocked && !["valide","refuse"].includes(q.status);
+      byId("qdSendBtn").style.display    = (!isLocked && q.status === "brouillon") ? "" : "none";
       byId("qdRefuseBtn").style.display  = isEditable ? "" : "none";
       byId("qdValidateBtn").style.display = isEditable ? "" : "none";
       byId("qdPdfBtn").style.display     = "";
@@ -11170,7 +11181,8 @@
       const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
       byId("qdEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
       const q = state.quotes.find(x => x.id === quoteId);
-      const isEditable = q && !["valide", "refuse"].includes(q.status);
+      const isQuoteLocked = q && !!q.convertedContractId;
+      const isEditable = !isQuoteLocked && q && !["valide", "refuse"].includes(q.status);
       let sumHt = 0, sumTtc = 0;
       lines.forEach(l => {
         sumHt  += l.amountHt  || 0;
@@ -11179,7 +11191,7 @@
         const tr = document.createElement("tr");
         const vatRate = Number(state.settings.vatRate || 19) / 100;
         const rateTtc = l.rateTtc != null ? l.rateTtc : Math.round(l.rate * (1 + vatRate) * 100) / 100;
-        const actionBtns = isEditable
+        const actionBtns = isQuoteLocked ? "" : isEditable
           ? `<button class="ql-edit-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">✏️</button>
              <button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`
           : `<button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`;
@@ -11593,66 +11605,166 @@
     function generateQuotePdf(quoteId) {
       const q = (state.quotes || []).find(x => x.id === quoteId);
       if (!q) { alert("Devis introuvable."); return; }
+
       const lines = (state.quoteLines || []).filter(l => l.quoteId === quoteId);
       const customer = state.customers.find(c => c.id === q.customerId);
       let branding = {};
       try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
       const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
+      const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
       const settings = state.settings || {};
+
+      const clientName = safe(q.customerName || (customer && customer.name) || "-");
+      const clientInfo = customer ? [customer.address, customer.phone].filter(Boolean).join(" · ") : "";
+
       const sumHt  = lines.reduce((s, l) => s + (l.amountHt  || 0), 0);
       const sumVat = lines.reduce((s, l) => s + (l.vatAmount  || 0), 0);
       const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+
+      const qp = getQuotePeriod(quoteId);
+      const quoteDate = qp.start || q.quoteDate || new Date().toISOString().slice(0, 10);
+
       const lineRowsHtml = lines.map(l => {
         const car = state.cars.find(c => c.plate === l.carPlate);
+        const designation = safe(car ? (((car.brand || "") + " " + (car.model || "")).trim() || "Véhicule") : "Véhicule");
         return `<tr>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate||"-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;">${safe(car ? (car.brand||""+" "+car.model||"").trim() : "-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.periodStart||"-"}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.periodEnd||"-"}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days||"-"}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
-        </tr>`;
+        <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
+      </tr>`;
       }).join("");
+
       const win = window.open("", "_blank");
-      if (!win) { alert("Autorisez les popups pour ce site."); return; }
-      win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Devis ${safe(q.id)}</title>
-      <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a202c;}
-      table{border-collapse:collapse;width:100%;}th{background:#1a56db;color:#fff;padding:8px;text-align:left;}
-      .header{display:flex;justify-content:space-between;margin-bottom:20px;}
-      .validity{background:#fef3c7;border:2px solid #f59e0b;padding:10px;border-radius:6px;text-align:center;font-size:14px;font-weight:bold;margin-bottom:16px;}
-      </style></head><body>
-      <div class="header">
-        <div><h2 style="margin:0;">${safe(companyName)}</h2>
-          ${settings.companyAddress ? `<div>${safe(settings.companyAddress)}</div>` : ""}
-          ${settings.companyRib ? `<div>RIB : ${safe(settings.companyRib)}</div>` : ""}
-        </div>
-        <div style="text-align:right;">
-          <h2 style="margin:0;color:#1a56db;">DEVIS</h2>
-          <div>N° ${safe(q.id)}</div>
-          <div>Date : ${q.quoteDate||"-"}</div>
-        </div>
-      </div>
-      <div class="validity">⚠ Devis valable jusqu'au : ${q.validityDate||"-"}</div>
-      <div style="margin-bottom:16px;"><strong>Client :</strong> ${safe(q.customerName||"-")}
-        ${customer && customer.phone ? ` — ${safe(customer.phone)}` : ""}
-        ${customer && customer.address ? `<br>${safe(customer.address)}` : ""}
-      </div>
-      ${q.notes ? `<div style="margin-bottom:12px;padding:8px;background:#f1f5f9;border-radius:4px;"><em>${safe(q.notes)}</em></div>` : ""}
-      <table style="margin-bottom:16px;">
-        <thead><tr><th>Immatriculation</th><th>Modèle</th><th>Début</th><th>Fin</th><th>Jours</th><th>Montant HT</th><th>TVA</th><th>TTC</th></tr></thead>
-        <tbody>${lineRowsHtml}</tbody>
-        <tfoot>
-          <tr><td colspan="5" style="padding:6px;font-weight:bold;">Total</td>
-            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumHt)}</td>
-            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumVat)}</td>
-            <td style="padding:6px;text-align:right;font-weight:bold;">${formatTnd(sumTtc)}</td>
+      if (!win) { alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur."); return; }
+
+      win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Devis ${safe(q.id)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #0d244a; margin: 0; padding: 24px 30px; line-height: 1.4; }
+    h1, h2, h3, p { margin: 0; padding: 0; }
+    table { border-collapse: collapse; }
+    .print-btn { display:block; margin-bottom:16px; text-align:right; }
+    .print-btn button { background:#0d244a; color:#fff; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; }
+    .print-btn button:hover { background:#1540c8; }
+    @media print {
+      @page { margin: 12mm; size: A4 portrait; }
+      body { padding: 0; }
+      .print-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-btn">
+    <button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+  </div>
+
+  <!-- En-tête -->
+  <table width="100%" style="margin-bottom:14px;border-bottom:2px solid #0d244a;padding-bottom:10px;">
+    <tr>
+      <td style="vertical-align:middle;">
+        <table>
+          <tr>
+            <td style="padding-right:12px;vertical-align:middle;">
+              <img src="${safe(logoUrl)}" style="max-width:70px;max-height:70px;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <h1 style="font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
+              <p style="font-size:9px;color:#4d6a97;margin-top:2px;">LOCATION DE VOITURES</p>
+              ${settings.companyAddress ? `<p style="font-size:9px;color:#4d6a97;">${safe(settings.companyAddress)}</p>` : ""}
+              ${(settings.companyPhone || settings.companyRib) ? `<p style="font-size:9px;color:#4d6a97;">${settings.companyPhone ? "Tel: " + safe(settings.companyPhone) : ""}${settings.companyRib ? " &middot; " + safe(settings.companyRibLabel || "RIB") + ": " + safe(settings.companyRib) : ""}</p>` : ""}
+              ${settings.companyTaxId ? `<p style="font-size:9px;color:#4d6a97;">Matricule fiscal: ${safe(settings.companyTaxId)}</p>` : ""}
+            </td>
           </tr>
-        </tfoot>
-      </table>
-      <div style="margin-top:24px;font-size:11px;color:#718096;text-align:center;">Ce devis est valable jusqu'au ${q.validityDate||"-"}. Passé cette date, il sera considéré comme expiré.</div>
-      <script>window.onload=()=>{window.print();}<\/script></body></html>`);
+        </table>
+      </td>
+      <td style="vertical-align:top;text-align:right;">
+        <h2 style="font-size:14px;color:#1540c8;">DEVIS</h2>
+        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(q.id)}</strong></p>
+        <p style="font-size:10px;">Date&nbsp;: <strong>${safe(quoteDate)}</strong></p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Client -->
+  <div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px 10px;background:#f5f7ff;">
+    <p style="font-size:10px;color:#1540c8;font-weight:bold;margin-bottom:4px;">Client</p>
+    <p style="font-size:10px;"><strong>${clientName}</strong></p>
+    ${clientInfo ? `<p style="font-size:9px;color:#4d6a97;">${safe(clientInfo)}</p>` : ""}
+  </div>
+
+  ${q.notes ? `<div style="margin-bottom:14px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;font-size:10px;font-style:italic;">${safe(q.notes)}</div>` : ""}
+
+  <!-- Lignes de devis -->
+  <table width="100%" style="font-size:9px;margin-bottom:14px;">
+    <thead>
+      <tr style="background:#0d244a;color:#fff;">
+        <th style="padding:6px;border:1px solid #0d244a;">Désignation</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
+        <th style="padding:6px;border:1px solid #0d244a;">DU</th>
+        <th style="padding:6px;border:1px solid #0d244a;">AU</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Nb.j</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Prix HT</th>
+        <th style="padding:6px;border:1px solid #0d244a;">TVA</th>
+        <th style="padding:6px;border:1px solid #0d244a;">Prix TTC</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lineRowsHtml}
+    </tbody>
+  </table>
+
+  <!-- Totaux -->
+  <table width="100%" style="font-size:10px;margin-bottom:10px;">
+    <tr>
+      <td></td>
+      <td width="280">
+        <table width="100%">
+          <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumHt)}</td></tr>
+          <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 19)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumVat)}</td></tr>
+          <tr style="font-weight:bold;border-top:2px solid #0d244a;">
+            <td style="padding:6px 8px;">Total T.T.C</td>
+            <td style="padding:6px 8px;text-align:right;">${formatTnd(sumTtc)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Montant en lettres -->
+  <div style="border-top:1px dashed #c8daf9;padding-top:8px;margin-bottom:24px;font-size:10px;font-style:italic;">
+    Arrêtée le présent devis à la somme de&nbsp;: <strong>${amountToFrenchWords(sumTtc)}</strong>.
+  </div>
+
+  <!-- Signatures -->
+  <table width="100%" style="font-size:10px;margin-top:30px;">
+    <tr>
+      <td width="50%" style="padding:8px;vertical-align:top;">
+        <p style="font-weight:bold;margin-bottom:30px;">Signature du prestataire&nbsp;:</p>
+        <div style="border-bottom:1px solid #0d244a;width:80%;"></div>
+      </td>
+      <td width="50%" style="padding:8px;vertical-align:top;">
+        <p style="font-weight:bold;margin-bottom:30px;">Signature du client&nbsp;:</p>
+        <div style="border-bottom:1px solid #0d244a;width:80%;"></div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Pied de page -->
+  <div style="border-top:1px solid #c8daf9;padding-top:6px;margin-top:16px;font-size:8px;color:#4d6a97;text-align:center;">
+    ${safe(companyName)}${settings.companyAddress ? " &middot; " + safe(settings.companyAddress) : ""}${settings.companyPhone ? " &middot; Tel: " + safe(settings.companyPhone) : ""}${settings.companyTaxId ? " &middot; Matricule fiscal: " + safe(settings.companyTaxId) : ""}
+  </div>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`);
       win.document.close();
     }
 
@@ -11661,7 +11773,9 @@
     function openQuoteDetail(quoteId) {
       const q = (state.quotes || []).find(x => x.id === quoteId);
       if (!q) return;
+      const isQuoteDetailLocked = !!q.convertedContractId;
       byId("qdQuoteId").textContent = quoteId;
+      byId("qdAddLineBtn").style.display = isQuoteDetailLocked ? "none" : "";
       byId("qdAddLineBtn").textContent = "+ Ajouter une ligne";
       byId("qdAddLineBtn").onclick = () => appendInlineQuoteLineRow(quoteId);
       byId("qdValidateError").style.display = "none";
@@ -11761,6 +11875,10 @@
         start: lines.reduce((m, l) => (!m || l.periodStart < m ? l.periodStart : m), ""),
         end:   lines.reduce((m, l) => (!m || l.periodEnd   > m ? l.periodEnd   : m), ""),
       };
+    }
+
+    function isContractFactured(contractId) {
+      return (state.invoices || []).some(inv => inv.contractId === contractId);
     }
 
     function getContractPeriod(contractId) {
@@ -14013,6 +14131,8 @@
       const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
       const editBtn = byId("cdlEditHeaderBtn");
       const cancelBtn = byId("cdlCancelEditBtn");
+      const isContractLocked = isContractFactured(contractId);
+      const linkedInvoice = (state.invoices || []).find(inv => inv.contractId === contractId);
 
       if (!editMode) {
         const periodStart = lines.length ? lines.reduce((min, l) => l.periodStart < min ? l.periodStart : min, lines[0].periodStart) : null;
@@ -14023,6 +14143,9 @@
         const quoteLink = contract.quoteId
           ? `<a class="xref" data-open-quote="${safe(contract.quoteId)}" href="#" style="font-family:monospace;">${safe(contract.quoteId)}</a>`
           : "—";
+        const invoiceLink = linkedInvoice
+          ? `<a href="#" data-open-invoice="${safe(linkedInvoice.id)}" style="font-family:monospace;">${safe(linkedInvoice.id)}</a>`
+          : "";
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
@@ -14032,6 +14155,7 @@
           <div><span class="label-small">Devis d'origine</span><br>${quoteLink}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+          ${linkedInvoice ? `<div><span class="label-small">Facture</span><br>${invoiceLink}</div>` : ""}
         `;
         byId("cdlHeader").querySelectorAll("[data-open-quote]").forEach(a => {
           a.addEventListener("click", e => {
@@ -14041,14 +14165,32 @@
             if (qId && typeof openQuoteDetail === "function") openQuoteDetail(qId);
           });
         });
-        editBtn.textContent = "✏ Modifier entête";
-        editBtn.onclick = () => renderContractDetailHeader(contractId, true);
+        byId("cdlHeader").querySelectorAll("[data-open-invoice]").forEach(a => {
+          a.addEventListener("click", e => {
+            e.preventDefault();
+            byId("contractDetailModal").style.display = "none";
+            const invId = a.getAttribute("data-open-invoice");
+            if (invId && typeof window.openInvoiceEditModal === "function") window.openInvoiceEditModal(invId);
+          });
+        });
+        if (isContractLocked) {
+          editBtn.textContent = "🔒 Contrat verrouillé";
+          editBtn.disabled = true;
+          editBtn.onclick = null;
+        } else {
+          editBtn.textContent = "✏ Modifier entête";
+          editBtn.disabled = false;
+          editBtn.onclick = () => renderContractDetailHeader(contractId, true);
+        }
         cancelBtn.style.display = "none";
-        // Bouton confirmer : visible uniquement pour les contrats brouillon
+        // Bouton confirmer : visible uniquement pour les contrats brouillon non verrouillés
         const confirmBtn = byId("cdlConfirmBtn");
-        confirmBtn.style.display = isBrouillon ? "" : "none";
+        confirmBtn.style.display = (!isContractLocked && isBrouillon) ? "" : "none";
         confirmBtn.onclick = () => confirmContract(contractId);
         byId("cdlConfirmError").style.display = "none";
+      } else if (isContractLocked) {
+        renderContractDetailHeader(contractId, false);
+        return;
       } else {
         const custOpts = state.customers.map(c =>
           `<option value="${safe(c.id)}"${c.id === contract.customerId ? " selected" : ""}>${safe(c.name)}</option>`
@@ -14148,8 +14290,10 @@
         const periodLabel = l.actualEndDate
           ? `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
           : `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}`;
-        const canEdit      = displayStatus === "active" || displayStatus === "brouillon";
-        const canTerminate = displayStatus === "active";
+        const contractForLock = state.contracts.find(c => c.id === contractId);
+        const isContractLockedForLine = contractForLock ? isContractFactured(contractId) : false;
+        const canEdit      = !isContractLockedForLine && (displayStatus === "active" || displayStatus === "brouillon");
+        const canTerminate = !isContractLockedForLine && displayStatus === "active";
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
           <td style="white-space:nowrap;">${periodLabel}</td>
@@ -14163,7 +14307,7 @@
           <td class="cl-actions-cell" style="text-align:center;white-space:nowrap;">
             ${canEdit      ? `<button class="cl-edit-btn secondary" style="padding:2px 6px;font-size:12px;" title="Modifier">✎</button>` : ""}
             ${canTerminate ? `<button class="cl-terminate-btn secondary" style="padding:2px 6px;font-size:12px;color:#c53030;" title="Résilier">⏹</button>` : ""}
-            <button class="cl-delete-btn secondary" style="padding:2px 6px;font-size:12px;" title="Supprimer">🗑</button>
+            ${!isContractLockedForLine ? `<button class="cl-delete-btn secondary" style="padding:2px 6px;font-size:12px;" title="Supprimer">🗑</button>` : ""}
           </td>
         `;
         tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", (e) => {
@@ -14173,7 +14317,7 @@
         }));
         if (canEdit)      tr.querySelector(".cl-edit-btn")     .addEventListener("click", () => editContractLine(contractId, l.id, tr));
         if (canTerminate) tr.querySelector(".cl-terminate-btn").addEventListener("click", () => terminateContractLine(contractId, l.id, tr));
-        tr.querySelector(".cl-delete-btn").addEventListener("click", () => deleteContractLine(contractId, l.id));
+        if (!isContractLockedForLine) tr.querySelector(".cl-delete-btn")?.addEventListener("click", () => deleteContractLine(contractId, l.id));
         tbody.appendChild(tr);
       });
       if (inlineRow) tbody.appendChild(inlineRow);
@@ -14736,9 +14880,12 @@
     function openContractDetail(contractId) {
       const contract = state.contracts.find(c => c.id === contractId);
       if (!contract) return;
+      const isLockedContract = isContractFactured(contractId);
       byId("cdlContractId").textContent = contractId;
+      byId("cdlAddLineToggleBtn").style.display = isLockedContract ? "none" : "";
       byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
       byId("cdlAddLineToggleBtn").onclick = () => appendInlineLineRow(contractId);
+      byId("cdlCreateInvoiceBtn").style.display = isLockedContract ? "none" : "";
       byId("cdlCreateInvoiceBtn").onclick = () => createInvoiceFromContract(contractId);
       byId("cdlPdfBtn").onclick = () => generateContractPdf(contractId);
       renderContractDetailHeader(contractId, false);

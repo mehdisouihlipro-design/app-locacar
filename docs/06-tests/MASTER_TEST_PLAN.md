@@ -491,9 +491,39 @@
 ### UC-CTR-9 : Créer une facture depuis un contrat (§9.16)
 **En tant qu'agent**, je veux créer rapidement une facture liée à un contrat sans naviguer manuellement.
 
-- [ ] **Scénario nominal** : ouvrir le modal de détail d'un contrat → cliquer "📄 Créer une facture" → modal se ferme → onglet Factures actif → formulaire de création ouvert → champ Contrat pré-rempli avec l'ID du contrat → lignes auto-remplies via `populateInvoiceLinesFromContract`
-- [ ] **Lignes auto-remplies** : le formulaire est pré-rempli avec les lignes du contrat sélectionné (même comportement qu'un changement manuel dans `#invoiceContract`)
-- [ ] **Annulation** : fermer le formulaire facture sans soumettre → retour à l'onglet Factures sans aucun enregistrement créé
+- [ ] **Scénario nominal** : ouvrir le modal de détail d'un contrat → cliquer "📄 Créer une facture" → facture créée automatiquement avec les lignes du contrat → modal facture ouvert directement
+- [ ] **Contrat verrouillé après facturation** : fermer le modal facture → rouvrir le modal contrat → bouton "📄 Créer une facture" n'est plus visible → bouton "✏ Modifier entête" affiche "🔒 Contrat verrouillé" (désactivé) → aucun bouton d'édition/suppression sur les lignes
+- [ ] **Lien vers la facture** : l'entête du contrat verrouillé affiche "Facture : FAC-XXXXX" cliquable → ouvre le modal de la facture liée
+- [ ] **Annulation** : si aucune facture n'est créée, le contrat reste modifiable
+
+### UC-CTR-10 : Verrouillage après facturation
+**En tant que système**, un contrat facturé ne doit plus être modifiable.
+
+- [ ] **Entête** : bouton "✏ Modifier entête" devient "🔒 Contrat verrouillé" et est désactivé
+- [ ] **Lignes** : pas de bouton Modifier, Résilier ou Supprimer sur les lignes
+- [ ] **Ajout de ligne** : bouton "+ Ajouter une ligne" masqué
+- [ ] **Persistance** : F5 → état verrouillé conservé (basé sur l'existence de la facture en DB)
+
+### UC-QUO-7 : Verrouillage après transformation en contrat
+**En tant que système**, un devis transformé en contrat ne doit plus être modifiable.
+
+- [ ] **Entête** : bouton "✏ Modifier entête" devient "🔒 Devis verrouillé" et est désactivé → boutons Envoyer/Refuser/Valider masqués
+- [ ] **Lignes** : aucun bouton d'édition ou de suppression sur les lignes
+- [ ] **Ajout de ligne** : bouton "+ Ajouter une ligne" masqué
+- [ ] **Lien contrat** : l'entête affiche "Contrat : CTR-XXXXX" cliquable → ouvre le modal du contrat correspondant
+- [ ] **PDF** : le bouton "🖨 PDF" reste visible et fonctionnel
+
+### UC-QUO-8 : PDF devis (style identique à la facture)
+**En tant qu'agent**, je veux imprimer un devis avec le même design que la facture.
+
+- [ ] **En-tête** : logo + nom société + adresse + téléphone + RIB + matricule fiscal (identique à `generateInvoicePdf`)
+- [ ] **Titre** : "DEVIS" avec le numéro N° QUO-XXXXX et la date
+- [ ] **Bloc client** : même style que la facture (fond #f5f7ff, bordure bleue)
+- [ ] **Tableau des lignes** : colonnes Désignation, Immatriculation, DU, AU, Nb.j, Prix HT, TVA, Prix TTC
+- [ ] **Totaux** : HT + TVA + TTC (sans taxe journalière ni timbre, propres aux factures)
+- [ ] **Montant en lettres** : "Arrêtée le présent devis à la somme de …"
+- [ ] **Blocs signature** : Prestataire + Client (mêmes que le contrat)
+- [ ] **Pied de page** : nom société + adresse + téléphone + matricule fiscal
 
 ---
 
