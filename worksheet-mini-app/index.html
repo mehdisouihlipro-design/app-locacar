@@ -5786,7 +5786,7 @@
       if (savedContract && savedContract.id) contractId = savedContract.id;
 
       state.contracts.push({
-        id: contractId,
+        id: contractId, contractNumber,
         type,
         customerId,
         customerName: customer.name,
@@ -11842,7 +11842,7 @@
           type: quoteType,
         });
         state.quotes.push({
-          id: quoteId, customerId, customerName: customer ? customer.name : "",
+          id: quoteId, quoteNumber, customerId, customerName: customer ? customer.name : "",
           quoteDate, validityDate, status: "brouillon", notes, type: quoteType,
           totalAmountHt: 0, totalVatAmount: 0, totalAmountTtc: 0, convertedContractId: null,
         });
