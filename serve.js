@@ -286,6 +286,50 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Souche de numéros ────────────────────────────────────────────────────────
+  // GET /api/next-sequence/:id — lit number_sequences, incrémente, retourne le numéro formaté
+  if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/next-sequence/')) {
+    const sequenceId = parsedUrl.pathname.split('/api/next-sequence/')[1];
+    if (!sequenceId) { sendJson(res, 400, { error: 'sequenceId manquant' }); return; }
+
+    (async () => {
+      const supabaseUrl = getEnv('SUPABASE_URL');
+      const serviceKey  = getEnv('SUPABASE_SERVICE_ROLE_KEY') || getEnv('SUPABASE_SERVICE_KEY') || getEnv('SUPABASE_ANON_KEY');
+      if (!supabaseUrl || !serviceKey) { sendJson(res, 500, { error: 'SUPABASE_URL ou clé non configurés' }); return; }
+
+      const base = supabaseUrl.trim().replace(/\/$/, '').replace(/\/rest\/v1\/?$/i, '');
+      const headers = { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+
+      // 1. Lire la souche
+      const getRes = await supabaseFetch(`${base}/rest/v1/number_sequences?id=eq.${encodeURIComponent(sequenceId)}&select=*`, { headers });
+      if (!getRes.ok || !Array.isArray(getRes.body) || !getRes.body[0]) {
+        sendJson(res, 404, { error: `Souche "${sequenceId}" introuvable` });
+        return;
+      }
+      const seq = getRes.body[0];
+
+      // 2. Calculer le prochain numéro
+      const year = new Date().getFullYear();
+      const newNumber = (seq.reset_annually && (!seq.last_year || Number(seq.last_year) < year))
+        ? 1 : (Number(seq.last_number) || 0) + 1;
+
+      // 3. Incrémenter dans la base
+      await supabaseFetch(`${base}/rest/v1/number_sequences?id=eq.${encodeURIComponent(sequenceId)}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ last_number: newNumber, last_year: year }),
+      });
+
+      // 4. Formater le numéro
+      let n = seq.prefix ? seq.prefix + seq.separator : '';
+      if (seq.include_year) n += String(year) + seq.separator;
+      n += String(newNumber).padStart(Number(seq.digits) || 4, '0');
+
+      sendJson(res, 200, { number: n });
+    })().catch(e => sendJson(res, 500, { error: e.message }));
+    return;
+  }
+
   if (req.method === 'POST' && parsedUrl.pathname === '/api/analyze-damages') {
     readJsonBody(req)
       .then(async (body) => {

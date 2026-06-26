@@ -5372,38 +5372,13 @@
       }
     }
 
-    // Lit number_sequences directement via REST Supabase, incrémente et retourne le numéro formaté.
+    // Appelle /api/next-sequence/:id sur serve.js (même origine) — pas de dépendance au backend Express.
     async function fetchNextSequenceNumber(sequenceId) {
       try {
-        const cfg = JSON.parse(localStorage.getItem('locacar-supabase-cfg') || '{}');
-        if (!cfg.url || !cfg.anonKey) return null;
-        const base = cfg.url.trim().replace(/\/$/, '').replace(/\/rest\/v1\/?$/i, '');
-        const h = { 'Content-Type': 'application/json', apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` };
-
-        // 1. Lire la souche
-        const getRes = await fetch(`${base}/rest/v1/number_sequences?id=eq.${encodeURIComponent(sequenceId)}&select=*`, { headers: h });
-        if (!getRes.ok) { console.warn('[souche] lecture échouée', sequenceId, getRes.status); return null; }
-        const seq = (await getRes.json())[0];
-        if (!seq) { console.warn('[souche] souche introuvable:', sequenceId); return null; }
-
-        // 2. Calculer le prochain numéro
-        const year = new Date().getFullYear();
-        const newNumber = (seq.reset_annually && (!seq.last_year || Number(seq.last_year) < year))
-          ? 1
-          : (Number(seq.last_number) || 0) + 1;
-
-        // 3. Mettre à jour le compteur
-        await fetch(`${base}/rest/v1/number_sequences?id=eq.${encodeURIComponent(sequenceId)}`, {
-          method: 'PATCH',
-          headers: { ...h, Prefer: 'return=minimal' },
-          body: JSON.stringify({ last_number: newNumber, last_year: year }),
-        });
-
-        // 4. Formater : {prefix}{sep}{année?}{sep}{0000N}
-        let n = seq.prefix ? seq.prefix + seq.separator : '';
-        if (seq.include_year) n += String(year) + seq.separator;
-        n += String(newNumber).padStart(Number(seq.digits) || 4, '0');
-        return n;
+        const res = await fetch(`/api/next-sequence/${encodeURIComponent(sequenceId)}`);
+        if (!res.ok) { console.warn('[souche] HTTP', res.status, sequenceId); return null; }
+        const data = await res.json();
+        return data.number || null;
       } catch (e) {
         console.warn('[fetchNextSequenceNumber]', sequenceId, e);
         return null;
