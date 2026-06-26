@@ -472,6 +472,29 @@
 - [ ] **Premier accès** : table `user_preferences` vide → ordre/taille/masquage par défaut, aucune erreur JS
 - [ ] **Graphiques intacts** : déplacer une carte Chart.js → graphique toujours rendu (canvas préservé dans le DOM)
 
+### UC-DASH-6 : Réinitialisation du layout dashboard (§9.15)
+**En tant qu'utilisateur**, je veux remettre le dashboard dans sa disposition d'origine en un clic.
+
+- [ ] **Scénario nominal** : après avoir déplacé, redimensionné ou masqué des cartes → cliquer "↺ Réinitialiser" → confirmation → toutes les cartes reviennent à l'ordre et aux spans par défaut, aucune carte masquée, barre jaune disparaît
+- [ ] **Persistance** : F5 après réinitialisation → layout par défaut toujours appliqué (POST /preferences/dashboard-layout mis à jour)
+- [ ] **Sans personnalisation** : cliquer "↺ Réinitialiser" sans avoir modifié le layout → aucune erreur, layout inchangé
+- [ ] **Annulation** : cliquer "↺ Réinitialiser" puis annuler la confirmation → layout non modifié
+
+### UC-CTR-8 : PDF du contrat (§9.16)
+**En tant qu'agent**, je veux générer un PDF imprimable du contrat à remettre au client.
+
+- [ ] **Scénario nominal** : ouvrir le modal de détail d'un contrat avec au moins une ligne → cliquer "🖨 PDF" → une fenêtre d'impression s'ouvre avec le contrat formaté (en-tête agence, infos client, tableau des lignes, totaux, blocs de signatures)
+- [ ] **Contenu complet** : le PDF affiche l'ID contrat, le type, la date, le nom client, les lignes (immatriculation, modèle, période, jours, tarif, montant HT, TVA, TTC), les totaux HT/TVA/TTC, le montant en lettres, les blocs de signature
+- [ ] **Contrat sans lignes** : ouvrir un contrat à 0 lignes → PDF s'ouvre avec message "Aucune ligne" dans le tableau
+- [ ] **Popup bloquée** : si le navigateur bloque la popup → message d'avertissement affiché à l'utilisateur
+
+### UC-CTR-9 : Créer une facture depuis un contrat (§9.16)
+**En tant qu'agent**, je veux créer rapidement une facture liée à un contrat sans naviguer manuellement.
+
+- [ ] **Scénario nominal** : ouvrir le modal de détail d'un contrat → cliquer "📄 Créer une facture" → modal se ferme → onglet Factures actif → formulaire de création ouvert → champ Contrat pré-rempli avec l'ID du contrat → lignes auto-remplies via `populateInvoiceLinesFromContract`
+- [ ] **Lignes auto-remplies** : le formulaire est pré-rempli avec les lignes du contrat sélectionné (même comportement qu'un changement manuel dans `#invoiceContract`)
+- [ ] **Annulation** : fermer le formulaire facture sans soumettre → retour à l'onglet Factures sans aucun enregistrement créé
+
 ---
 
 ## 17. Paramètres

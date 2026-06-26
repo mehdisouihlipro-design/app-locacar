@@ -1454,10 +1454,24 @@ Inspiré du Data Management Framework (DMF) de Dynamics 365 F&O. Accessible via 
 
 **Table DB :** `user_preferences(user_id TEXT, key TEXT, value JSONB, updated_at TIMESTAMPTZ)` — PK `(user_id, key)`.
 
+**Bouton "↺ Réinitialiser"** : dans l'en-tête du dashboard, remet l'ordre par défaut, tous les spans à leur valeur `data-default-span`, dé-masque toutes les cartes, et enregistre via `saveDashboardLayout()`.
+
 **Fichiers :**
 - `src/backend/migrations/010_user_preferences.sql`
 - `src/backend/routes/preferences.routes.ts` (GET + PUT `/:key`)
-- `worksheet-mini-app/index.html` — fonctions `initDashboardSortable()`, `initCardControls()`, `saveDashboardLayout()`, `applyDashboardLayout()`, `loadDashboardLayout()`, `renderHiddenBar()`
+- `worksheet-mini-app/index.html` — fonctions `initDashboardSortable()`, `initCardControls()`, `saveDashboardLayout()`, `applyDashboardLayout()`, `loadDashboardLayout()`, `renderHiddenBar()`, `resetDashboardLayout()`, constante `DASH_DEFAULT_ORDER`
+
+### 9.16 ✅ Implémenté (2026-06) — PDF contrat + bouton "Créer une facture" depuis le contrat
+
+**PDF contrat** : bouton "🖨 PDF" dans le modal de détail du contrat (`#contractDetailModal`) — ouvre une fenêtre d'impression avec gabarit complet : en-tête agence (logo, nom, adresse, matricule fiscal), informations client, tableau des lignes de contrat (immatriculation, modèle, période, jours, tarif/j HT, montant HT, TVA, TTC), totaux (HT / TVA / TTC), montant en lettres, blocs de signatures (loueur / locataire), pied de page.
+- Fonction : `generateContractPdf(contractId)` — même pattern que `generateInvoicePdf` (window.open + self-contained HTML + window.print).
+- Les lignes sont lues depuis `state.contractLines` filtré sur `contractId`.
+
+**Créer une facture depuis un contrat** : bouton "📄 Créer une facture" dans les actions du modal de détail.
+- Ferme le modal contrat, navigue vers l'onglet Factures, ouvre le formulaire de création, pré-sélectionne le contrat dans `#invoiceContract` et déclenche le `change` event pour auto-remplir les lignes.
+- Fonction : `createInvoiceFromContract(contractId)`.
+
+**Fichier :** `worksheet-mini-app/index.html`
 
 ---
 

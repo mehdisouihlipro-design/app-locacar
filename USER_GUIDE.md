@@ -117,6 +117,10 @@ Survolez n'importe quelle carte KPI ou graphique : une barre d'outils apparaît 
 
 **Tout est sauvegardé sur votre compte** (position, taille, visibilité) et restauré à chaque connexion, quel que soit le navigateur ou l'appareil.
 
+#### Réinitialiser la disposition
+
+Cliquer le bouton **"↺ Réinitialiser"** (en haut à droite du dashboard) → confirmer → toutes les cartes reviennent à leur ordre, taille et visibilité par défaut. La réinitialisation est enregistrée sur votre compte.
+
 ### Message Trésorerie
 - 🟢 **Vert:** "Projection stable à 1 an" + solde minimum
 - 🔴 **Rouge:** "ALERTE: tresorerie prévisionnelle négative à partir de {date}"
@@ -304,6 +308,27 @@ Pour les contrats de **type long terme**, le modal de détail affiche une sectio
 
 **Régénérer l'échéancier :**
 Si le contrat est modifié (nouvelles lignes, tarif changé), cliquer **"↺ Régénérer"** → les entrées `Planifié` sont supprimées et recréées. Les entrées déjà en `Brouillon` ou `Confirmé` **ne sont jamais touchées**.
+
+#### Télécharger le PDF du contrat
+
+Dans le modal de détail d'un contrat, cliquer **"🖨 PDF"** → une fenêtre d'impression s'ouvre avec :
+- En-tête de l'agence (logo, nom, adresse, matricule fiscal)
+- Informations du client
+- Tableau des lignes (immatriculation, modèle, période, jours, tarif/j HT, montant HT, TVA, TTC)
+- Totaux (HT / TVA / TTC) et montant en lettres
+- Blocs de signature (loueur / locataire)
+
+Cliquer **"🖨 Imprimer / Enregistrer en PDF"** dans la fenêtre ouverte pour imprimer ou enregistrer en PDF via votre navigateur.
+
+> **Si la fenêtre ne s'ouvre pas** : votre navigateur bloque les popups pour ce site. Autorisez-les dans les paramètres du navigateur (icône dans la barre d'adresse).
+
+#### Créer une facture depuis un contrat
+
+Dans le modal de détail d'un contrat, cliquer **"📄 Créer une facture"** :
+1. Le modal se ferme automatiquement
+2. L'onglet **Factures** s'ouvre
+3. Le formulaire de création de facture s'affiche avec le contrat **pré-sélectionné** et les **lignes auto-remplies**
+4. Vérifier les lignes, ajuster si nécessaire, puis cliquer **"Créer facture"**
 
 ---
 
