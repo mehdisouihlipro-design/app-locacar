@@ -2715,9 +2715,16 @@
       </div>
 
       <p class="muted">Tu peux precharger des donnees de demo ou tout vider.</p>
-      <div class="actions" style="margin-bottom:32px;">
+      <div class="actions" style="margin-bottom:16px;">
         <button class="secondary" id="seedBtn">Charger donnees demo</button>
         <button class="warn" id="resetBtn">Vider toutes les donnees</button>
+      </div>
+
+      <p class="muted">Sauvegarde et restauration de la base de données (export / import JSON complet).</p>
+      <div class="actions" style="margin-bottom:32px;">
+        <button class="secondary" id="backupBtn">📥 Télécharger sauvegarde</button>
+        <button class="secondary" id="restoreBtn">📤 Restaurer depuis fichier</button>
+        <input type="file" id="restoreFileInput" accept=".json" style="display:none">
       </div>
 
       <!-- ── Souches de numéros ──────────────────────────────────────────────── -->
@@ -8207,8 +8214,22 @@
     }
 
     document.getElementById("resetBtn").addEventListener("click", async () => {
-      const ok = confirm("Supprimer toutes les donnees de la mini app ?\n\nLes souches de numéros seront aussi remises à zéro.");
+      const ok = confirm("Supprimer TOUTES les données de la base de données ?\n\nVéhicules, clients, contrats, factures, paiements, paramètres et souches de numéros seront effacés définitivement.\nCette action est irréversible.");
       if (!ok) return;
+      const btn = document.getElementById("resetBtn");
+      btn.textContent = "Suppression en cours…";
+      btn.disabled = true;
+      try {
+        if (API_URL && localStorage.getItem("locacar-jwt")) {
+          const res = await fetch(`${API_URL}/demo/clear`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("locacar-jwt")}` },
+          });
+          if (!res.ok) console.error("Vider données — erreur backend:", await res.text());
+        }
+      } catch (err) {
+        console.error("Vider données — erreur réseau:", err);
+      }
       state.cars = [];
       state.customers = [];
       state.contracts = [];
@@ -8227,9 +8248,79 @@
       state.leasingInstallments = [];
       state.vignettes = [];
       state.settings = { baseCurrency: "TND", eurToTnd: 3.4, openingCashTnd: 0, reservationBufferHours: 2, timelineZoomMode: "month", vatRate: 19, dailyTaxTnd: 2, stampDutyTnd: 1, companyAddress: "", companyPhone: "", companyRibLabel: "RIB", companyRib: "", companyRib2Label: "RIB 2", companyRib2: "", companyTaxId: "", companyName: "", logoUrl: "" };
-      // Remettre toutes les souches à zéro
-      fetch("/api/reset-sequences", { method: "POST" }).catch(() => {});
+      btn.textContent = "Vider toutes les donnees";
+      btn.disabled = false;
       saveAndRender();
+    });
+
+    // ── Backup : téléchargement JSON complet ────────────────────────────────────
+    document.getElementById("backupBtn").addEventListener("click", async () => {
+      if (!API_URL || !localStorage.getItem("locacar-jwt")) {
+        alert("Vous devez être connecté pour sauvegarder la base de données.");
+        return;
+      }
+      const btn = document.getElementById("backupBtn");
+      btn.textContent = "Téléchargement…";
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/backup/full`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("locacar-jwt")}` },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const blob = await res.blob();
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : `locarcar_backup_${new Date().toISOString().slice(0,10)}.json`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      } catch (err) {
+        alert("Erreur lors de la sauvegarde : " + err.message);
+        console.error(err);
+      } finally {
+        btn.textContent = "📥 Télécharger sauvegarde";
+        btn.disabled = false;
+      }
+    });
+
+    // ── Restore : import JSON complet ───────────────────────────────────────────
+    document.getElementById("restoreBtn").addEventListener("click", () => {
+      document.getElementById("restoreFileInput").click();
+    });
+    document.getElementById("restoreFileInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const ok = confirm(`Restaurer la base depuis "${file.name}" ?\n\nTOUTES les données actuelles seront remplacées par celles du fichier. Cette action est irréversible.`);
+      if (!ok) { e.target.value = ""; return; }
+      if (!API_URL || !localStorage.getItem("locacar-jwt")) {
+        alert("Vous devez être connecté pour restaurer la base de données.");
+        e.target.value = ""; return;
+      }
+      const btn = document.getElementById("restoreBtn");
+      btn.textContent = "Restauration…";
+      btn.disabled = true;
+      try {
+        const text = await file.text();
+        const payload = JSON.parse(text);
+        const res = await fetch(`${API_URL}/backup/restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("locacar-jwt")}` },
+          body: text,
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || data.error || "Erreur inconnue");
+        alert(`Restauration terminée : ${data.summary?.ok || 0} enregistrement(s) importé(s). Rechargement de la page…`);
+        window.location.reload();
+      } catch (err) {
+        alert("Erreur lors de la restauration : " + (err instanceof SyntaxError ? "Fichier JSON invalide." : err.message));
+        console.error(err);
+      } finally {
+        btn.textContent = "📤 Restaurer depuis fichier";
+        btn.disabled = false;
+        e.target.value = "";
+      }
     });
 
     // Ecran de parametrage isole (modale) : valide, met a jour state.settings,

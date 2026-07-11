@@ -5,6 +5,7 @@ import 'dotenv/config';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
 import axios from 'axios';
 import authRoutes from './routes/auth.routes';
 import usersRoutes from './routes/users.routes';
@@ -30,6 +31,9 @@ import leasingRoutes from './routes/leasing.routes';
 import vignettesRoutes from './routes/vignettes.routes';
 import settingsRoutes from './routes/settings.routes';
 import demoRoutes from './routes/demo.routes';
+import publicRoutes from './routes/public.routes';
+import siteAdminRoutes from './routes/site-admin.routes';
+import backupRoutes from './routes/backup.routes';
 
 // Supabase REST API Client
 // Uses service role key when available (bypasses RLS for backend writes)
@@ -112,6 +116,12 @@ app.get('/', (req: Request, res: Response) => {
 // Authentication routes
 app.use('/api/v1/auth', authRoutes);
 
+// Routes publiques (sans authentification JWT) — portail client site-web
+app.use('/api/v1/public', publicRoutes);
+
+// Portail client statique — accessible sur http://localhost:3001/portail
+app.use('/portail', express.static(path.join(__dirname, '../../site-web')));
+
 // Protect API routes with JWT authentication
 app.use('/api/v1', authenticateToken);
 
@@ -138,6 +148,8 @@ app.use('/api/v1/demo', demoRoutes);
 app.use('/api/v1/data-management', dataManagementRoutes);
 app.use('/api/v1/number-sequences', numberSequencesRoutes);
 app.use('/api/v1/preferences', preferencesRoutes);
+app.use('/api/v1/site-admin', siteAdminRoutes);
+app.use('/api/v1/backup', backupRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

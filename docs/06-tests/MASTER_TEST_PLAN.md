@@ -105,6 +105,7 @@
 ### UC-RSV-2 : Contrôle de chevauchement
 - [ ] **Conflit → message clair** : créer une réservation pour le véhicule X sur 10-20/06 alors qu'une réservation active existe pour X sur 15-25/06 → message d'erreur rouge inline précisant véhicule/période/conflit, enregistrement bloqué
 - [ ] **Périodes adjacentes → aucun conflit** : une réservation finissant le 20/06 et une nouvelle commençant le 21/06 → pas de conflit
+- [ ] **Même jour, horaires différents → aucun conflit** : réservation A finissant le 20/06 à 10:00, réservation B commençant le 20/06 à 14:00 → pas de conflit (fix HH:MM:SS : les colonnes PostgreSQL TIME retournent "HH:MM:SS", la fonction `toReservationDateTime` normalise via `.slice(0, 5)` avant comparaison pour éviter les faux conflits)
 - [ ] **Voiture `maintenance` ou `hors-service`** : tenter de créer une réservation sur un véhicule en maintenance → message d'avertissement (ou blocage selon règle métier)
 
 ### UC-RSV-3 : Gestion du cycle de vie
@@ -733,12 +734,15 @@
 ### UC-SEQ-2 : Génération automatique du numéro à la création
 **En tant qu'agent**, je veux que le numéro soit attribué automatiquement sans action manuelle.
 
-- [ ] **Nouveau contrat** : `POST /contracts` → `contract_number` assigné selon la souche `contracts`
-- [ ] **Nouveau devis** : `POST /quotes` → `quote_number` assigné selon la souche `quotes`
-- [ ] **Confirmation facture** : `POST /invoices/:id/confirm` → `invoice_number` assigné selon la souche `invoices`
-- [ ] **Format correct** : numéro généré respecte prefix/sep/année/digits configurés
+> **Implémentation actuelle** : le frontend appelle `GET /api/next-sequence/:id` sur `serve.js` (même origine, port 3000). `serve.js` lit la table `number_sequences` via l'API REST Supabase avec la `service_role_key`, calcule le prochain numéro, incrémente le compteur, puis retourne le numéro formaté. Ce n'est **pas** l'endpoint backend Express (`src/backend/`). La souche `invoices` est attribuée lors de la confirmation (bouton "Confirmer") via le même mécanisme + `PUT /invoices/:id` — l'endpoint `POST /invoices/:id/confirm` n'est **plus utilisé** pour l'attribution du numéro.
+
+- [ ] **Nouveau contrat** : créer un contrat → `contract_number` affiché dans la liste et dans le modal (format souche `contracts`)
+- [ ] **Nouveau devis** : créer un devis → `quote_number` affiché dans la liste et dans le modal (format souche `quotes`)
+- [ ] **Confirmation facture** : cliquer "Confirmer" sur une facture brouillon → `invoice_number` affiché (format souche `invoices`), statut passe à `en_attente`
+- [ ] **Format correct** : numéro généré respecte prefix/sep/année/digits configurés (ex. `CTR-2026-0001`)
 - [ ] **Séquentiel** : créer 3 contrats d'affilée → numéros consécutifs sans trou ni doublon
 - [ ] **Reset annuel** : si `reset_annually=true` et changement d'année → compteur repart à 1
+- [ ] **Affichage en liste** : la colonne Contrats/Devis affiche le numéro de souche (pas l'ID interne `CTR-xxxxx`)
 
 ### UC-SEQ-3 : Resynchronisation du compteur
 **En tant qu'administrateur**, je veux pouvoir recaler le compteur sur la réalité de la base en cas de décalage.
@@ -757,7 +761,44 @@
 - [ ] **Trous détectés** : liste des numéros manquants affichée (ex. "N°4 · N°7")
 - [ ] **Décalage compteur** : si `last_number > max réel` → avertissement jaune "utilisez Resynchroniser"
 
+### UC-SEQ-5 : Remise à zéro des souches lors du reset des données
+**En tant qu'administrateur**, je veux que les compteurs de souches soient remis à zéro quand je réinitialise toutes les données, pour que les numéros repartent de 0001 sur une base propre.
+
+> **Implémentation (mise à jour 2026-07-11)** : le bouton "Vider toutes les données" appelle directement `POST /api/v1/demo/clear` sur le backend Express (plus via serve.js). Cet endpoint supprime toutes les tables métier, supprime la ligne `settings` id=1, et exécute un `PATCH /number_sequences?id=not.is.null` avec `{ last_number: 0, last_year: null }`. Les données du portail client (`site_unavailability`) sont supprimées par cascade FK avec les véhicules.
+
+- [ ] **Réinitialisation couplée** : cliquer "Vider toutes les données" → confirmation explicite → bouton passe en "Suppression en cours…" → toutes les données supprimées EN BASE (pas seulement localement)
+- [ ] **Souches remises à zéro** : après le reset, l'aperçu dans les cartes de souches indique `0001` (last_number = 0)
+- [ ] **Paramètres remis aux défauts** : après le reset + F5, la modale Paramètres affiche les valeurs par défaut (TVA 19 %, taux 3.4, RIBs vides)
+- [ ] **Prochain numéro = 0001** : après reset, créer un contrat → numéro `CTR-XXXX-0001` (ou format configuré) — pas de résidu de l'ancienne séquence
+- [ ] **Persistance** : F5 après reset → tous les écrans sont vides (aucune donnée rechargée depuis Supabase)
+- [ ] **Erreur réseau** : si le backend est injoignable, le reset local (état JS + localStorage) s'exécute quand même et un message d'erreur console est affiché
+
 ---
 
-*Document généré le 2026-06-24 — à mettre à jour à chaque nouvelle phase.*  
+## 12. Module Sauvegarde & Restauration
+
+### UC-BAK-1 : Télécharger une sauvegarde complète
+**En tant qu'administrateur**, je veux exporter toutes les données en un fichier JSON pour pouvoir les restaurer plus tard ou dans un autre environnement.
+
+- [ ] **Bouton "📥 Télécharger sauvegarde"** : visible dans l'onglet "Actions rapides"
+- [ ] **Téléchargement** : cliquer → fichier `locarcar_backup_AAAA-MM-JJ.json` téléchargé automatiquement
+- [ ] **Contenu** : le fichier contient les champs `version`, `created_at`, `data` (toutes les tables métier) et `config` (souches + paramètres)
+- [ ] **Données complètes** : un environnement avec 50 véhicules, 100 contrats → le fichier contient bien 50 véhicules et 100 contrats
+- [ ] **Erreur réseau** : bouton "Téléchargement…" reste désactivé le temps du téléchargement, repasse à l'état initial en cas d'erreur avec message d'alerte
+
+### UC-BAK-2 : Restaurer une sauvegarde
+**En tant qu'administrateur**, je veux importer un fichier de sauvegarde JSON pour restaurer toutes les données (même scénario de migration ou de sinistre).
+
+- [ ] **Bouton "📤 Restaurer depuis fichier"** : visible dans l'onglet "Actions rapides" → ouvre le sélecteur de fichier (`.json` uniquement)
+- [ ] **Confirmation** : boîte de dialogue avertissant que toutes les données actuelles seront remplacées
+- [ ] **Restauration** : sélectionner un fichier de sauvegarde valide → bouton "Restauration…" désactivé → rechargement automatique de la page après succès
+- [ ] **Données restaurées** : après rechargement, tous les écrans affichent les données du fichier (véhicules, clients, contrats, etc.)
+- [ ] **Souches restaurées** : après restauration, les souches reprennent à partir du dernier numéro du fichier (pas de recomencement à 0001)
+- [ ] **Paramètres restaurés** : les paramètres d'agence du fichier sont restaurés (nom, RIBs, TVA…)
+- [ ] **Fichier invalide** : sélectionner un fichier non-JSON ou un JSON sans champ `version` → message d'erreur, pas de modification en base
+- [ ] **Migration d'environnement** : exporter depuis Railway → importer sur localhost (ou inversement) → données identiques dans les deux environnements
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-11 (POST /demo/clear, backup/restore, UC-SEQ-5 et UC-BAK-1/2).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

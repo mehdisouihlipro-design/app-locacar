@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration — LocaCar Site Web</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <script>
+    window.SITE_API_URL = 'http://localhost:3001';
+    // En production : window.SITE_API_URL = 'https://votre-projet.up.railway.app';
+  </script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       ÉCRAN DE CONNEXION
+  ════════════════════════════════════════════════════════ -->
+  <div class="login-page" id="loginPage">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-logo-icon">🚗</div>
+        <h1 class="login-title">Loca<span class="accent">Car</span> Admin</h1>
+        <p>Administration du portail client</p>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Adresse email</label>
+          <input type="email" id="loginEmail" placeholder="email@exemple.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Mot de passe</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-primary" id="loginBtn">Se connecter</button>
+        <div class="login-error hidden" id="loginError"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       TABLEAU DE BORD ADMIN
+  ════════════════════════════════════════════════════════ -->
+  <div class="admin-layout hidden" id="adminLayout">
+
+    <header class="admin-header">
+      <div class="admin-header-left">
+        <div class="admin-header-logo">Loca<span class="accent">Car</span></div>
+        <span class="admin-badge">Admin Site Web</span>
+      </div>
+      <div class="admin-header-right">
+        <span class="admin-user" id="adminUserName"></span>
+        <button type="button" class="btn-logout" id="logoutBtn">Déconnexion</button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+
+      <div class="info-banner">
+        ℹ️ <span>Cochez <strong>Visible</strong> pour qu'une voiture apparaisse sur le site.
+        Les voitures visibles sont disponibles sur <strong>toutes les dates par défaut</strong>.
+        Ajoutez des <strong>périodes d'indisponibilité</strong> pour bloquer certaines dates.</span>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Gestion des véhicules</div>
+        <div class="section-count" id="carsCount"></div>
+      </div>
+
+      <div class="cars-table-wrap">
+        <table class="cars-table">
+          <thead>
+            <tr>
+              <th>Photo</th>
+              <th>Véhicule</th>
+              <th>Visible sur le site</th>
+              <th>URL de la photo</th>
+              <th>Prix / jour (TND)</th>
+              <th>Indisponibilités</th>
+            </tr>
+          </thead>
+          <tbody id="carsTableBody">
+            <tr class="loading-row"><td colspan="6">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       MODALE INDISPONIBILITÉS
+  ════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="unavailModal" role="dialog" aria-modal="true" aria-labelledby="modalCarTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="modalCarTitle">Indisponibilités</div>
+          <div class="modal-subtitle">
+            Bloquez les dates où ce véhicule n'est pas disponible à la location.
+            En dehors de ces plages, il apparaît dans tous les résultats de recherche.
+          </div>
+        </div>
+        <button type="button" class="btn-close" id="closeModal" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <div id="unavailList" class="avail-list"></div>
+
+        <div class="add-avail-form">
+          <h4>Ajouter une période d'indisponibilité</h4>
+          <div class="avail-form-row">
+            <div class="avail-field">
+              <label for="unavailFrom" class="avail-label">Du</label>
+              <input type="date" id="unavailFrom" class="avail-date-input" aria-label="Date de début d'indisponibilité">
+            </div>
+            <div class="avail-field">
+              <label for="unavailTo" class="avail-label">Au</label>
+              <input type="date" id="unavailTo" class="avail-date-input" aria-label="Date de fin d'indisponibilité">
+            </div>
+          </div>
+          <input type="text" class="avail-notes-input" id="unavailNotes"
+            placeholder="Note optionnelle (ex. Révision technique, Réservation privée…)"
+            aria-label="Note optionnelle">
+          <button type="button" class="btn btn-accent btn-full" id="addUnavailBtn">
+            Ajouter cette période
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

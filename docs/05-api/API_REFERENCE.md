@@ -698,7 +698,7 @@ X-RateLimit-Reset: 1620000000
 | GET/PUT/DELETE | `/invoice-schedule/:id` | ✅ Implémenté (BR32). `PUT` met à jour une entrée. `DELETE` retourne 422 si `status ≠ 'planifie'`. |
 | POST | `/invoice-schedule/:id/generate` | ✅ Implémenté (BR32). Génère une facture brouillon depuis une entrée `planifie` : crée `invoices` (status=`brouillon`, sans `invoice_number`) + `invoice_lines` d'après les `contract_lines` actives, met à jour l'entrée (`status=brouillon`, `invoice_id`). Retourne 422 si l'entrée n'est pas `planifie`. |
 | POST | `/contracts/:id/generate-schedule` | ✅ Implémenté (BR32). Génère l'échéancier mensuel du contrat (`type=long` requis, sinon 422). Body optionnel : `{ override: true }` pour supprimer les entrées `planifie` existantes et régénérer. Retourne 422 si le contrat n'a aucune ligne active. Retourne 409 si un échéancier existe déjà (sans `override`). |
-| POST | `/invoices/:id/confirm` | ✅ Implémenté (BR32). Confirme un brouillon : attribue le prochain numéro séquentiel `AAAA-NNNN` (`invoice_number`), passe le statut à `en_attente`, met à jour l'entrée d'échéancier liée (`status=confirme`). Retourne 422 si le statut n'est pas `brouillon`. |
+| POST | `/invoices/:id/confirm` | ~~Contourné depuis 2026-06-27~~ — l'attribution du numéro de facture est désormais réalisée côté frontend via `GET /api/next-sequence/invoices` (serve.js) + `PUT /invoices/:id` avec `{ invoice_number, status: "en_attente" }`. Cet endpoint backend reste en place mais n'est plus appelé par l'interface. |
 | GET/POST | `/quotes` | Lister / créer un devis (entête `quotes`, BR27) |
 | GET/PUT/DELETE | `/quotes/:id` | Lire / modifier / supprimer un devis (modification/suppression impossibles si `status = 'valide'`) |
 | GET | `/quotes/:id/lines` | Lister les lignes d'un devis |
@@ -730,6 +730,57 @@ X-RateLimit-Reset: 1620000000
 
 ---
 
+## 14. Endpoints serve.js (utilitaires, même origine)
+
+> Ces endpoints sont servis par `serve.js` (port 3000, même origine que le frontend), **pas** par le backend Express (`src/backend/`, port 3001). Ils ont un accès direct à `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` via les variables d'environnement Railway, ce qui les rend fiables en production sans dépendre de la compilation TypeScript du backend.
+
+### 14.1 Générer le prochain numéro de souche
+
+```http
+GET /api/next-sequence/:sequenceId
+```
+
+**Paramètres** :
+- `:sequenceId` — identifiant de la souche dans `number_sequences.id` (ex. `contracts`, `quotes`, `invoices`, `reservations`)
+
+**Comportement** :
+1. Lit la ligne correspondante dans `number_sequences`
+2. Calcule le prochain numéro (reset annuel si `reset_annually=true` et nouvelle année)
+3. Incrémente `last_number` (et met à jour `last_year`) via PATCH Supabase avec filtre `?id=eq.:sequenceId`
+4. Retourne le numéro formaté selon `prefix`, `separator`, `include_year`, `digits`
+
+**Réponse 200** :
+```json
+{ "number": "CTR-2026-0001" }
+```
+
+**Réponse 404/500** : `{ "error": "<message>" }`
+
+**Appelé par** : `fetchNextSequenceNumber(sequenceId)` dans `worksheet-mini-app/index.html` à la création d'un contrat, d'un devis, ou à la confirmation d'une facture.
+
+---
+
+### 14.2 Remettre toutes les souches à zéro
+
+```http
+POST /api/reset-sequences
+```
+
+**Corps** : aucun
+
+**Comportement** : PATCH sur `number_sequences?last_number=gte.0` (filtre obligatoire — PostgREST bloque tout PATCH sans filtre) avec `{ last_number: 0, last_year: null }`. Remet tous les compteurs à zéro.
+
+**Réponse 200** :
+```json
+{ "ok": true }
+```
+
+**Réponse 500** : `{ "error": "<message>" }`
+
+**Appelé par** : le bouton "Vider toutes les données" (`resetBtn`) dans `worksheet-mini-app/index.html`, en parallèle du vidage des tables.
+
+---
+
 **Document Version**: 1.0.0  
-**Last Updated**: May 2026  
-**Next Review**: June 2026
+**Last Updated**: 2026-06-27  
+**Next Review**: Q3 2026

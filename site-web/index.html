@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="LocaCar — Location de voitures. Consultez nos véhicules disponibles selon vos dates.">
+  <title>LocaCar — Location de Voitures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+
+  <!--
+    Configuration — modifier l'URL selon l'environnement :
+    - Local   : http://localhost:3001
+    - Railway : https://votre-projet.up.railway.app
+  -->
+  <script>
+    window.SITE_API_URL = 'http://localhost:3001';
+  </script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       HEADER
+  ════════════════════════════════════════════════════════ -->
+  <header class="header">
+    <div class="header-inner">
+      <a href="#" class="logo">
+        <div class="logo-icon">🚗</div>
+        <div class="logo-text">Loca<span>Car</span></div>
+      </a>
+      <nav class="nav" aria-label="Navigation principale">
+        <a href="#catalog" class="nav-link">Nos véhicules</a>
+        <a href="#contact" class="nav-link">Contact</a>
+        <a href="#contact" class="nav-link nav-cta">Nous contacter</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════
+       HERO
+  ════════════════════════════════════════════════════════ -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-inner">
+      <div class="hero-label">📍 Votre partenaire location de voitures</div>
+      <h1 id="hero-title">Trouvez votre<br><span>voiture idéale</span></h1>
+      <p class="hero-subtitle">
+        Sélectionnez vos dates et découvrez instantanément les véhicules disponibles dans notre flotte.
+      </p>
+
+      <div class="search-box" role="search">
+        <div class="search-field">
+          <label for="searchFrom">Date de départ</label>
+          <input type="date" id="searchFrom" aria-label="Date de départ">
+        </div>
+        <div class="search-divider" aria-hidden="true"></div>
+        <div class="search-field">
+          <label for="searchTo">Date de retour</label>
+          <input type="date" id="searchTo" aria-label="Date de retour">
+        </div>
+        <button class="search-btn" id="searchBtn" aria-label="Rechercher les véhicules disponibles">
+          🔍 Rechercher
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════
+       BARRE DE CONFIANCE
+  ════════════════════════════════════════════════════════ -->
+  <div class="stats-bar" aria-label="Nos engagements">
+    <div class="stats-bar-inner">
+      <div class="stat-item">✅ <strong>Flotte entretenue</strong> — Véhicules récents</div>
+      <div class="stat-item">🔑 <strong>Prise en main rapide</strong></div>
+      <div class="stat-item">📞 <strong>Support dédié</strong></div>
+      <div class="stat-item">🌍 <strong>Disponibilité en temps réel</strong></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       CATALOGUE
+  ════════════════════════════════════════════════════════ -->
+  <main class="main" id="catalog">
+
+    <!-- Filtres -->
+    <div class="filter-section" role="group" aria-label="Filtres">
+      <span class="filter-label">Filtrer :</span>
+      <div class="filter-chip-bar" id="fuelFilterBar" role="group" aria-label="Type de carburant">
+        <!-- Généré par app.js -->
+      </div>
+      <select class="location-select" id="locationFilter" aria-label="Agence">
+        <option value="all">Toutes les agences</option>
+      </select>
+    </div>
+
+    <!-- En-tête résultats -->
+    <div class="results-header">
+      <p class="results-count" id="resultsCount" aria-live="polite"></p>
+    </div>
+
+    <!-- Erreur API -->
+    <div class="error-state hidden" id="errorState" role="alert"></div>
+
+    <!-- Chargement -->
+    <div class="loading-state" id="loadingState" aria-live="polite">
+      <div class="spinner" role="status" aria-label="Chargement..."></div>
+      <p>Chargement des véhicules…</p>
+    </div>
+
+    <!-- Aucun résultat -->
+    <div class="empty-state hidden" id="emptyState">
+      <div class="empty-icon" aria-hidden="true">🔍</div>
+      <h3>Aucun véhicule disponible</h3>
+      <p>Essayez d'autres dates ou une autre agence.<br>Vous pouvez aussi nous contacter directement.</p>
+    </div>
+
+    <!-- Grille voitures -->
+    <div class="cars-grid hidden" id="carsGrid" aria-label="Véhicules disponibles"></div>
+
+  </main>
+
+  <!-- ════════════════════════════════════════════════════════
+       SECTION CONTACT
+  ════════════════════════════════════════════════════════ -->
+  <section class="contact-section" id="contact" aria-labelledby="contact-title">
+    <div class="contact-inner">
+      <div>
+        <div class="contact-label">Contactez-nous</div>
+        <h2 id="contact-title">Prêt à prendre<br>la route ?</h2>
+        <p>
+          Notre équipe est disponible pour répondre à toutes vos questions,
+          vous accompagner dans votre choix et vous proposer le véhicule
+          le plus adapté à vos besoins.
+        </p>
+        <div class="contact-items">
+          <div class="contact-item">
+            <div class="contact-item-icon" aria-hidden="true">📞</div>
+            <div>
+              <div class="contact-item-label">Téléphone</div>
+              <div class="contact-item-value">+216 xx xxx xxx</div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon" aria-hidden="true">📧</div>
+            <div>
+              <div class="contact-item-label">Email</div>
+              <div class="contact-item-value">contact@locarcar.tn</div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon" aria-hidden="true">📍</div>
+            <div>
+              <div class="contact-item-label">Adresse</div>
+              <div class="contact-item-value">Tunis, Tunisie</div>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-item-icon" aria-hidden="true">🕐</div>
+            <div>
+              <div class="contact-item-label">Horaires</div>
+              <div class="contact-item-value">Lun – Sam · 8h00 – 18h00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="coming-soon-banner">
+          <div class="cs-icon" aria-hidden="true">🚀</div>
+          <h3>Réservation en ligne — Bientôt</h3>
+          <p>
+            La réservation directement depuis ce site sera disponible prochainement.
+            En attendant, contactez-nous par téléphone ou par email —
+            nous confirmons votre véhicule sous 24h.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════════════ -->
+  <footer class="footer">
+    <p>© 2025 LocaCar · Tous droits réservés</p>
+  </footer>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

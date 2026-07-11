@@ -62,4 +62,35 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /demo/clear — vide TOUTES les données sans réinsertion
+// Efface toutes les tables métier + settings + remet les souches à zéro
+router.post('/clear', async (req: AuthRequest, res: Response) => {
+  try {
+    const tables = [
+      'inspection_details', 'inspections', 'site_unavailability',
+      'vignettes', 'insurances', 'leasing_contracts', 'maintenance_costs',
+      'payments', 'invoice_lines', 'invoice_schedule', 'invoices',
+      'collections', 'quote_lines', 'quotes', 'contract_lines', 'contracts',
+      'reservations', 'cars', 'customers',
+    ];
+    for (const t of tables) {
+      await global.db.delete(`/${t}?id=gte.`).catch(() => {});
+    }
+
+    // Settings : suppression de la ligne id=1 (le GET /settings retourne les défauts si vide)
+    await global.db.delete('/settings?id=eq.1').catch(() => {});
+
+    // Souches : remise à zéro des compteurs (les lignes de config restent)
+    await global.db.patch(
+      '/number_sequences?id=not.is.null',
+      { last_number: 0, last_year: null },
+      { headers: { Prefer: 'return=minimal' } }
+    ).catch(() => {});
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
 export default router;

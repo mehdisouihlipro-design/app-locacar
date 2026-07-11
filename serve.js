@@ -542,3 +542,22 @@ server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}/`);
   console.log(`Press Ctrl+C to stop`);
 });
+
+// Ping Supabase toutes les 3 jours pour éviter la mise en pause automatique (plan gratuit)
+const KEEPALIVE_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000;
+async function pingSupabase() {
+  try {
+    const supabaseUrl = getEnv('SUPABASE_URL');
+    const serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY') || getEnv('SUPABASE_SERVICE_KEY') || getEnv('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !serviceKey) return;
+    const base = supabaseUrl.trim().replace(/\/$/, '').replace(/\/rest\/v1\/?$/i, '');
+    const res = await fetch(`${base}/rest/v1/settings?select=id&limit=1`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
+    console.log(`[keepalive] Supabase pinged — status ${res.status}`);
+  } catch (e) {
+    console.warn('[keepalive] ping failed:', e.message);
+  }
+}
+pingSupabase(); // ping au démarrage
+setInterval(pingSupabase, KEEPALIVE_INTERVAL_MS);
