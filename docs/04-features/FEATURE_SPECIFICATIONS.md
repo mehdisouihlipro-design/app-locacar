@@ -1473,8 +1473,48 @@ Inspiré du Data Management Framework (DMF) de Dynamics 365 F&O. Accessible via 
 
 **Fichier :** `worksheet-mini-app/index.html`
 
+### 9.17 ✅ Implémenté (2026-07) — Formulaire création véhicule complet + libellés français
+
+**Problème résolu** : le formulaire de création de véhicule n'exposait que 4 champs (immatriculation, modèle, agence, statut), et l'éditeur générique affichait les noms de propriétés camelCase au lieu de libellés lisibles.
+
+**Formulaire de création étendu** : `#carLegacyForm` comprend désormais tous les champs de la table `cars` :
+| Champ HTML | Propriété JS | Colonne DB |
+|---|---|---|
+| `carPlate` | `plate` | `plate` |
+| `carModel` | `model` | `model` |
+| `carBrand` | `brand` | `brand` |
+| `carColor` | `color` | `color` |
+| `carVin` | `vin` | `vin` |
+| `carRegistrationNumber` | `registrationNumber` | `registration_number` |
+| `carRegistrationDate` | `registrationDate` | `registration_date` |
+| `carFuelType` (select) | `fuelType` | `fuel_type` |
+| `carOdometerKm` | `odometerKm` | `odometer_km` |
+| `carStatus` (select) | `status` | `status` |
+| `carAgency` | `agency` | `location` |
+| `carOwnerName` | `ownerName` | `owner_name` |
+| `carPurchasePrice` | `purchasePrice` | `purchase_price` |
+| `carPurchaseDate` | `purchaseDate` | `purchase_date` |
+| `carOpeningCash` | `openingCashTnd` | `opening_cash_tnd` |
+| `carNotes` | `notes` | `notes` |
+
+Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le formulaire sans création.
+
+**Libellés en français dans l'éditeur générique** : `fieldLabelMap` (constante globale JS, juste avant `getEditorFieldConfig`) mappe chaque clé camelCase → libellé français pour tous les modules : véhicules, clients, contrats, factures, paiements, maintenance, réservations, assurances, leasing, vignettes, devis. Dans `openRecordEditor`, `label.textContent = config.label || key` utilise ce libellé.
+
+**Sélecteur carburant** : dans le formulaire et l'éditeur, `fuelType` est un `<select>` avec options Diesel / Essence / Hybride / Électrique / GPL (via `enumMap2` dans `getEditorFieldConfig`).
+
+**`loadDataFromAPI`** : tous les nouveaux champs (`color`, `vin`, `registrationNumber`, `registrationDate`, `fuelType`, `odometerKm`, `ownerName`, `purchasePrice`, `purchaseDate`, `notes`, `photoUrl`, `siteVisible`, `sitePriceDay`) sont désormais mappés du snake_case DB vers le camelCase JS.
+
+**`mapCarToApi`** : tous les champs sont inclus dans le `PUT /cars/:id` lors d'une édition via l'éditeur générique.
+
+**Backend** : `POST /cars` accepte désormais tous les champs (`registration_number`, `registration_date`, `fuel_type`, `purchase_price`, `purchase_date`, `owner_name`, `opening_cash_tnd`, `photo_url`, `site_visible`, `site_price_day`).
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — `#carLegacyForm`, `addCarBtn` handler, `newCarBtn` handler, `loadDataFromAPI` (cars mapping), `mapCarToApi`, `fieldLabelMap`, `getEditorFieldConfig` (inputTypeMap + enumMap2 + label dans retours), `openRecordEditor` (label display)
+- `src/backend/routes/cars.routes.ts` — `POST /` accepte tous les champs
+
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: June 2026  
+**Last Updated**: July 2026  
 **Next Review**: September 2026

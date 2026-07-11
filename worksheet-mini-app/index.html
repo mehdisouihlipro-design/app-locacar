@@ -1488,31 +1488,6 @@
         <button id="newCarBtn">Nouveau</button>
       </div>
 
-      <div id="carLegacyForm" style="display:none;">
-      <div class="row">
-        <div>
-          <label>Immatriculation</label>
-          <input id="carPlate" placeholder="123-ABC-45" />
-        </div>
-        <div>
-          <label>Modele</label>
-          <input id="carModel" placeholder="Dacia Logan" />
-        </div>
-        <div>
-          <label>Agence</label>
-          <input id="carAgency" placeholder="Agence Centre" />
-        </div>
-        <div>
-          <label>Statut</label>
-          <select id="carStatus">
-            <option value="dispo">dispo</option>
-            <option value="loue">loue</option>
-            <option value="maintenance">maintenance</option>
-          </select>
-        </div>
-      </div>
-      <button id="addCarBtn">Ajouter vehicule</button>
-      </div>
 
       <div class="row">
         <div>
@@ -5432,11 +5407,26 @@
       }
 
       if (cars) state.cars = cars.map(c => ({
-        id: c.id, plate: c.plate, model: c.model, brand: c.brand || "",
+        id: c.id,
+        plate: c.plate,
+        model: c.model,
+        brand: c.brand || "",
+        color: c.color || "",
+        vin: c.vin || "",
+        registrationNumber: c.registration_number || "",
+        registrationDate: c.registration_date || "",
+        fuelType: c.fuel_type || "",
+        odometerKm: Number(c.odometer_km || 0),
         agency: c.location || c.agency || "",
-        // Normalize: "disponible" → "dispo" to match internal app values
         status: c.status === "disponible" ? "dispo" : (c.status || "dispo"),
+        ownerName: c.owner_name || "",
+        purchasePrice: c.purchase_price ? Number(c.purchase_price) : null,
+        purchaseDate: c.purchase_date || "",
         openingCashTnd: Number(c.opening_cash_tnd || 0),
+        notes: c.notes || "",
+        photoUrl: c.photo_url || "",
+        siteVisible: Boolean(c.site_visible),
+        sitePriceDay: c.site_price_day ? Number(c.site_price_day) : null,
         gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
@@ -5672,24 +5662,6 @@
       setAuthStatus("Configure Supabase puis connecte-toi.");
     }
 
-    document.getElementById("addCarBtn").addEventListener("click", async () => {
-      const plate = byId("carPlate").value.trim();
-      const model = byId("carModel").value.trim();
-      const agency = byId("carAgency").value.trim();
-      const status = byId("carStatus").value;
-
-      if (!plate || !model || !agency) { alert("Completer les champs vehicule."); return; }
-
-      let id = uid("CAR");
-      const saved = await apiPost("/cars", { plate, model, agency, status });
-      if (saved && saved.id) id = saved.id;
-
-      state.cars.push({ id, plate, model, agency, status, gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-" });
-      byId("carPlate").value = "";
-      byId("carModel").value = "";
-      byId("carAgency").value = "";
-      saveAndRender();
-    });
 
     document.getElementById("saveGpsBtn").addEventListener("click", () => {
       const carId = byId("gpsCar").value;
@@ -7041,17 +7013,18 @@
     // Show/hide form handlers for new buttons (temporary: using inline forms)
     if (byId("newCarBtn")) {
       byId("newCarBtn").addEventListener("click", () => {
-        const form = byId("carLegacyForm");
-        if (form) {
-          form.style.display = form.style.display === "none" ? "block" : "none";
-          if (form.style.display === "block") {
-            byId("carPlate").value = "";
-            byId("carModel").value = "";
-            byId("carAgency").value = "";
-            byId("carStatus").value = "dispo";
-            byId("carPlate").focus();
-          }
-        }
+        openRecordEditorForCreate("cars", {
+          id: uid("CAR"),
+          plate: "", model: "", brand: "", color: "", vin: "",
+          registrationNumber: "", registrationDate: "",
+          fuelType: "", odometerKm: 0,
+          status: "dispo", agency: "", ownerName: "",
+          purchasePrice: 0, purchaseDate: "",
+          openingCashTnd: 0, notes: "",
+          photoUrl: "", siteVisible: false, sitePriceDay: 0,
+          gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
+          createdAt: "", createdBy: null, updatedAt: "", updatedBy: null,
+        });
       });
     }
 
@@ -8481,7 +8454,27 @@
     }
 
     function mapCarToApi(c) {
-      return { plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible"), opening_cash_tnd: Number(c.openingCashTnd || 0) };
+      return {
+        plate: c.plate,
+        model: c.model,
+        brand: c.brand || null,
+        color: c.color || null,
+        vin: c.vin || null,
+        registration_number: c.registrationNumber || null,
+        registration_date: c.registrationDate || null,
+        fuel_type: c.fuelType || null,
+        odometer_km: Number(c.odometerKm || 0),
+        location: c.agency || c.location || null,
+        status: c.status === "dispo" ? "disponible" : (c.status || "disponible"),
+        owner_name: c.ownerName || null,
+        purchase_price: c.purchasePrice ? Number(c.purchasePrice) : null,
+        purchase_date: c.purchaseDate || null,
+        opening_cash_tnd: Number(c.openingCashTnd || 0),
+        notes: c.notes || null,
+        photo_url: c.photoUrl || null,
+        site_visible: Boolean(c.siteVisible),
+        site_price_day: c.sitePriceDay ? Number(c.sitePriceDay) : null,
+      };
     }
 
     function mapCustomerToApi(c) {
@@ -14020,6 +14013,87 @@
       return { totalTnd, paidTnd, dueTnd };
     }
 
+    const fieldLabelMap = {
+      // Commun
+      "id": "Identifiant", "createdAt": "Créé le", "updatedAt": "Modifié le",
+      "createdBy": "Créé par", "updatedBy": "Modifié par",
+      // Véhicules
+      "cars.plate": "Immatriculation", "cars.model": "Modèle", "cars.brand": "Marque",
+      "cars.color": "Couleur", "cars.vin": "Numéro VIN",
+      "cars.registrationNumber": "N° carte grise", "cars.registrationDate": "Date d'immatriculation",
+      "cars.fuelType": "Type de carburant", "cars.odometerKm": "Kilométrage (km)",
+      "cars.status": "Statut", "cars.agency": "Agence / Lieu",
+      "cars.ownerName": "Nom du propriétaire",
+      "cars.purchasePrice": "Prix d'achat (TND)", "cars.purchaseDate": "Date d'achat",
+      "cars.openingCashTnd": "Trésorerie initiale (TND)",
+      "cars.notes": "Notes", "cars.photoUrl": "URL photo",
+      "cars.siteVisible": "Visible sur le site", "cars.sitePriceDay": "Prix/jour site web (TND)",
+      "cars.gpsLat": "GPS Latitude", "cars.gpsLng": "GPS Longitude",
+      "cars.gpsSpeed": "GPS Vitesse (km/h)", "cars.gpsUpdatedAt": "GPS Mis à jour le",
+      // Clients
+      "customers.name": "Nom complet", "customers.phone": "Téléphone",
+      "customers.email": "E-mail", "customers.address": "Adresse", "customers.type": "Type",
+      // Contrats
+      "contracts.customerId": "Client", "contracts.carId": "Véhicule",
+      "contracts.customerName": "Nom client", "contracts.carPlate": "Immatriculation",
+      "contracts.type": "Type", "contracts.startDate": "Date début", "contracts.endDate": "Date fin",
+      "contracts.days": "Jours", "contracts.months": "Mois", "contracts.rate": "Tarif",
+      "contracts.rateCurrency": "Devise tarif", "contracts.quotient": "Caution",
+      "contracts.quotientCurrency": "Devise caution", "contracts.quotientTnd": "Caution (TND)",
+      "contracts.totalAmountOriginal": "Montant total", "contracts.totalAmountTnd": "Montant total (TND)",
+      "contracts.status": "Statut", "contracts.paymentMoment": "Paiement",
+      "contracts.paymentPlan": "Plan de paiement", "contracts.quoteId": "Devis",
+      // Factures
+      "invoices.contractId": "Contrat", "invoices.customerName": "Client",
+      "invoices.dueDate": "Date d'échéance", "invoices.currency": "Devise",
+      "invoices.amountTnd": "Montant (TND)", "invoices.paidAmountTnd": "Payé (TND)",
+      "invoices.dueAmountTnd": "Reste à payer (TND)", "invoices.rib": "RIB",
+      "invoices.ribLabel": "Libellé RIB", "invoices.status": "Statut",
+      "invoices.lastReminderAt": "Dernier rappel",
+      // Paiements
+      "payments.contractId": "Contrat", "payments.invoiceId": "Facture",
+      "payments.customerName": "Client", "payments.date": "Date",
+      "payments.amount": "Montant", "payments.currency": "Devise",
+      "payments.amountTnd": "Montant (TND)", "payments.method": "Mode de paiement",
+      "payments.contractType": "Type contrat",
+      // Maintenance
+      "maintenanceCosts.carId": "Véhicule", "maintenanceCosts.carPlate": "Immatriculation",
+      "maintenanceCosts.type": "Type", "maintenanceCosts.date": "Date",
+      "maintenanceCosts.amountOriginal": "Montant", "maintenanceCosts.currency": "Devise",
+      "maintenanceCosts.amountTnd": "Montant (TND)", "maintenanceCosts.status": "Statut",
+      "maintenanceCosts.note": "Note", "maintenanceCosts.sourceKey": "Clé source",
+      // Réservations
+      "reservations.customerId": "Client", "reservations.carId": "Véhicule",
+      "reservations.customerName": "Nom client", "reservations.carPlate": "Immatriculation",
+      "reservations.startDate": "Date début", "reservations.startTime": "Heure début",
+      "reservations.endDate": "Date fin", "reservations.endTime": "Heure fin",
+      "reservations.status": "Statut",
+      // Assurances
+      "insurances.carId": "Véhicule", "insurances.carPlate": "Immatriculation",
+      "insurances.insuranceCompany": "Assureur", "insurances.policyNumber": "N° police",
+      "insurances.startDate": "Date début", "insurances.endDate": "Date fin",
+      "insurances.monthlyAmount": "Mensualité", "insurances.currency": "Devise",
+      "insurances.monthlyAmountTnd": "Mensualité (TND)", "insurances.status": "Statut",
+      // Leasing
+      "leasingContracts.carId": "Véhicule", "leasingContracts.carPlate": "Immatriculation",
+      "leasingContracts.leasingCompany": "Société de leasing",
+      "leasingContracts.contractNumber": "N° contrat",
+      "leasingContracts.startDate": "Date début", "leasingContracts.endDate": "Date fin",
+      "leasingContracts.monthlyAmount": "Mensualité", "leasingContracts.currency": "Devise",
+      "leasingContracts.monthlyAmountTnd": "Mensualité (TND)", "leasingContracts.status": "Statut",
+      // Vignettes
+      "vignettes.carId": "Véhicule", "vignettes.carPlate": "Immatriculation",
+      "vignettes.fiscalYear": "Année fiscale", "vignettes.amountOriginal": "Montant",
+      "vignettes.currency": "Devise", "vignettes.amountTnd": "Montant (TND)",
+      "vignettes.dueDate": "Date d'échéance", "vignettes.status": "Statut",
+      // Devis
+      "quotes.customerId": "Client", "quotes.customerName": "Client",
+      "quotes.carId": "Véhicule", "quotes.carPlate": "Immatriculation",
+      "quotes.type": "Type", "quotes.status": "Statut",
+      "quotes.validUntil": "Valide jusqu'au", "quotes.totalAmountTnd": "Montant total (TND)",
+      "quotes.notes": "Notes",
+    };
+
     function getEditorFieldConfig(entity, key, currentValue) {
       const enumMap = {
         "cars.status": ["dispo", "loue", "maintenance"],
@@ -14081,7 +14155,12 @@
       };
 
       const inputTypeMap = {
+        "cars.odometerKm": "number",
+        "cars.purchasePrice": "number",
+        "cars.purchaseDate": "date",
+        "cars.registrationDate": "date",
         "cars.openingCashTnd": "number",
+        "cars.sitePriceDay": "number",
         "invoices.dueDate": "date",
         "invoices.lastReminderAt": "date",
         "reservations.startDate": "date",
@@ -14090,25 +14169,31 @@
         "reservations.endTime": "time",
       };
 
+      const enumMap2 = {
+        "cars.fuelType": [
+          { value: "diesel", label: "Diesel" },
+          { value: "essence", label: "Essence" },
+          { value: "hybride", label: "Hybride" },
+          { value: "electrique", label: "Électrique" },
+          { value: "gpl", label: "GPL" },
+        ],
+      };
+
       const compound = `${entity}.${key}`;
       const isCalculated = (calculatedFields[entity] || []).includes(key);
+      const label = fieldLabelMap[compound] || fieldLabelMap[key] || key;
 
-      // L'identifiant est la cle primaire (referencee par d'autres entites) : non modifiable,
-      // sauf exception pour les contrats et factures (numero de contrat / numero de facture),
-      // ou la modification est repercutee sur les enregistrements lies (cf. cascadeIdChange).
       if (key === "id") {
         const idEditable = entity === "contracts" || entity === "invoices";
-        return { control: "input", readOnly: !idEditable, inputType: "text" };
+        return { control: "input", readOnly: !idEditable, inputType: "text", label };
       }
 
-      // BR23 : piste d'audit, toujours en lecture seule (alimentee par le backend
-      // a partir de l'utilisateur authentifie, cf. stampCreate/stampUpdate)
       if (["createdAt", "updatedAt", "createdBy", "updatedBy"].includes(key)) {
-        return { control: "input", readOnly: true, inputType: "text" };
+        return { control: "input", readOnly: true, inputType: "text", label };
       }
 
       if (lookupMap[compound]) {
-        return { control: "select", options: lookupMap[compound], readOnly: isCalculated };
+        return { control: "select", options: lookupMap[compound], readOnly: isCalculated, label };
       }
 
       if (enumMap[compound]) {
@@ -14116,10 +14201,15 @@
           control: "select",
           options: enumMap[compound].map((v) => ({ value: v, label: v })),
           readOnly: isCalculated,
+          label,
         };
       }
 
-      return { control: "input", readOnly: isCalculated, inputType: inputTypeMap[compound] || "text" };
+      if (enumMap2[compound]) {
+        return { control: "select", options: enumMap2[compound], readOnly: isCalculated, label };
+      }
+
+      return { control: "input", readOnly: isCalculated, inputType: inputTypeMap[compound] || "text", label };
     }
 
     function applyDerivedFields(entity, record) {
@@ -15173,7 +15263,9 @@
       editorState.entity = entity;
       editorState.id = id;
 
-      byId("recordEditorTitle").textContent = editorState.isNew ? `Nouveau ${entity}` : `Modifier ${entity} - ${id}`;
+      const entityLabels = { cars: "véhicule", customers: "client", maintenanceCosts: "coût de maintenance", reservations: "réservation", contracts: "contrat", invoices: "facture", payments: "paiement", quotes: "devis", insurances: "assurance", leasingContracts: "leasing", vignettes: "vignette" };
+      const entityLabel = entityLabels[entity] || entity;
+      byId("recordEditorTitle").textContent = editorState.isNew ? `Nouveau ${entityLabel}` : `Modifier ${entityLabel} — ${id}`;
       const body = byId("recordEditorBody");
       body.innerHTML = "";
 
@@ -15184,7 +15276,7 @@
 
         const wrapper = document.createElement("div");
         const label = document.createElement("label");
-        label.textContent = key;
+        label.textContent = config.label || key;
 
         let control;
         if (config.control === "select") {
@@ -15242,13 +15334,16 @@
     }
 
     function closeRecordEditor() {
+      let draftRemoved = false;
       if (editorState.isNew && editorState.entity && editorState.id && Array.isArray(state[editorState.entity])) {
         state[editorState.entity] = state[editorState.entity].filter((r) => String(r.id) !== String(editorState.id));
+        draftRemoved = true;
       }
       byId("recordEditorModal").classList.remove("open");
       editorState.entity = null;
       editorState.id = null;
       editorState.isNew = false;
+      if (draftRemoved) saveAndRender();
     }
 
     // Repercute le changement d'Id d'un contrat/facture sur les enregistrements lies en memoire
@@ -15348,6 +15443,22 @@
           if (idx >= 0) collection[idx].id = savedMntE.id;
           editorState.id = savedMntE.id;
         }
+      }
+
+      if (editorState.isNew && entity === "cars") {
+        if (!record.plate || !record.model) {
+          alert("L'immatriculation et le modèle sont obligatoires.");
+          return;
+        }
+        const savedCar = await apiPost("/cars", { ...mapCarToApi(record), id: record.id });
+        if (savedCar && savedCar.id && String(savedCar.id) !== String(record.id)) {
+          const idx = collection.findIndex((r) => String(r.id) === String(record.id));
+          if (idx >= 0) collection[idx].id = savedCar.id;
+          record.id = savedCar.id;
+          editorState.id = savedCar.id;
+        }
+        // Ensure GPS fields are present after creation
+        if (!("gpsLat" in record)) { record.gpsLat = null; record.gpsLng = null; record.gpsSpeed = 0; record.gpsUpdatedAt = "-"; }
       }
 
       const apiEntry = !editorState.isNew && ENTITY_API_PUT[entity];

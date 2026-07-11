@@ -50,16 +50,21 @@
 ## 2. Module Parc Véhicules
 
 ### UC-CAR-1 : Ajouter un véhicule
-**En tant que gestionnaire**, je veux ajouter un nouveau véhicule au parc.
+**En tant que gestionnaire**, je veux ajouter un nouveau véhicule au parc avec tous ses détails.
 
-- [ ] **Formulaire nouveau véhicule** : cliquer "+ Nouveau véhicule" → formulaire apparaît avec champs Immatriculation, Marque, Modèle, Année, Couleur, Statut, Agence, Kilométrage, Carburant
-- [ ] **Immatriculation obligatoire** : soumettre sans immatriculation → erreur inline, pas d'appel API
-- [ ] **Création réussie** : remplir tous les champs requis → `POST /cars` → voiture apparaît dans la grille, rechargement F5 la confirme en base
+- [ ] **Modal de création** : cliquer "Nouveau" → le modal "Nouveau véhicule" (même modal que l'éditeur de détail) s'ouvre avec tous les champs vides : Immatriculation, Modèle, Marque, Couleur, VIN, N° carte grise, Date d'immatriculation, Type de carburant (select), Kilométrage, Statut, Agence, Propriétaire, Prix d'achat, Date d'achat, Trésorerie initiale, Notes
+- [ ] **Libellés en français** : chaque champ du modal affiche son libellé en français (pas le nom camelCase de la propriété JS)
+- [ ] **Champs obligatoires** : cliquer "Enregistrer" sans Immatriculation ou sans Modèle → alerte "L'immatriculation et le modèle sont obligatoires", aucun appel API
+- [ ] **Création réussie** : remplir immatriculation + modèle (au minimum) → `POST /cars` avec tous les champs renseignés → modal se ferme, voiture apparaît dans la grille, rechargement F5 la confirme en base avec tous les champs persistés
+- [ ] **Carburant via sélecteur** : le champ "Type de carburant" est un `<select>` (Diesel, Essence, Hybride, Électrique, GPL), idem dans le modal d'édition
+- [ ] **Annuler** : cliquer "Annuler" dans le modal → modal se ferme, aucun enregistrement créé, la grille est inchangée
 - [ ] **Doublon d'immatriculation** : créer un second véhicule avec la même immatriculation → erreur (contrainte unique en base), message clair
 
 ### UC-CAR-2 : Modifier un véhicule
-- [ ] **Double-clic → éditeur** : double-cliquer sur une ligne de la grille → éditeur générique s'ouvre avec tous les champs
-- [ ] **Statut via sélecteur** : le champ "Statut" dans l'éditeur est un `<select>` (dispo/loue/maintenance/hors-service), pas une saisie libre (règle cohérence contrôles)
+- [ ] **Double-clic → éditeur** : double-cliquer sur une ligne de la grille → éditeur générique s'ouvre avec tous les champs en français
+- [ ] **Libellés éditeur** : les noms des champs dans l'éditeur sont en français (ex. "Kilométrage (km)" au lieu de "odometerKm", "Trésorerie initiale (TND)" au lieu de "openingCashTnd")
+- [ ] **Statut via sélecteur** : le champ "Statut" dans l'éditeur est un `<select>` (dispo/loue/maintenance), pas une saisie libre
+- [ ] **Carburant via sélecteur** : le champ "Type de carburant" dans l'éditeur est un `<select>` avec les mêmes options que dans le formulaire de création
 - [ ] **Modification enregistrée** : changer la couleur, enregistrer → `PUT /cars/:id` → valeur persistée, visible après F5
 - [ ] **Annulation** : modifier un champ puis annuler → valeur d'origine restaurée, aucun appel API
 

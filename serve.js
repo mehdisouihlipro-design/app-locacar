@@ -528,7 +528,7 @@ const server = http.createServer((req, res) => {
       if (logoUrl) inject += `<script>window._LOGO_URL=${JSON.stringify(logoUrl)};</script>`;
       if (companyName) inject += `<script>window._COMPANY_NAME=${JSON.stringify(companyName)};</script>`;
       if (inject) content = content.replace('</head>', inject + '</head>');
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       res.end(content);
     });
     return;

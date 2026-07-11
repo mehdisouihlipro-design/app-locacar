@@ -31,18 +31,34 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { plate, model, brand, color, vin, status, odometer_km, agency, location, notes } = req.body;
+    const {
+      plate, model, brand, color, vin, status,
+      odometer_km, agency, location, notes,
+      registration_number, registration_date, fuel_type,
+      purchase_price, purchase_date, owner_name, opening_cash_tnd,
+      photo_url, site_visible, site_price_day,
+    } = req.body;
     if (!plate || !model) return res.status(400).json({ success: false, message: 'Immatriculation et modèle requis.' });
     const id = req.body.id || uuidv4();
     await global.db.post('/cars', stampCreate({
       id, plate, model,
-      ...(brand && { brand }),
-      ...(color && { color }),
-      ...(vin && { vin }),
+      ...(brand !== undefined && { brand }),
+      ...(color !== undefined && { color }),
+      ...(vin !== undefined && { vin }),
+      ...(registration_number !== undefined && { registration_number }),
+      ...(registration_date !== undefined && { registration_date }),
+      ...(fuel_type !== undefined && { fuel_type }),
       status: status || 'disponible',
       odometer_km: odometer_km || 0,
       location: location || agency || null,
-      ...(notes && { notes }),
+      ...(owner_name !== undefined && { owner_name }),
+      ...(purchase_price !== undefined && { purchase_price }),
+      ...(purchase_date !== undefined && { purchase_date }),
+      opening_cash_tnd: opening_cash_tnd || 0,
+      ...(notes !== undefined && { notes }),
+      ...(photo_url !== undefined && { photo_url }),
+      ...(site_visible !== undefined && { site_visible }),
+      ...(site_price_day !== undefined && { site_price_day }),
     }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: { id, plate, model, status: status || 'disponible' } });
   } catch (err: any) {
