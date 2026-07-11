@@ -13,11 +13,13 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
             quotes = [], quote_lines = [] } = req.body;
 
     // Delete in reverse FK order
+    // Attention : contracts.quote_id REFERENCES quotes(id) → contracts doit être supprimé AVANT quotes
     const tables = [
       'inspection_details', 'inspections', 'vignettes', 'insurances',
       'leasing_contracts', 'maintenance_costs', 'payments', 'invoice_lines', 'invoice_schedule', 'invoices',
-      'collections', 'quote_lines', 'quotes', 'contract_lines', 'contracts',
-      'reservations', 'cars', 'customers',
+      'collections', 'contract_lines', 'contracts', 'reservations',
+      'quote_lines', 'quotes',
+      'cars', 'customers',
     ];
     for (const t of tables) {
       await global.db.delete(`/${t}?id=gte.`).catch(() => {});
@@ -40,21 +42,22 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
       results[table] = { ok, fail };
     }
 
+    // Ordre FK : quotes avant contracts (contracts.quote_id → quotes)
     await insertMany('cars', cars);
     await insertMany('customers', customers);
+    await insertMany('quotes', quotes);
+    await insertMany('quote_lines', quote_lines);
     await insertMany('contracts', contracts);
-    await insertMany('contract_lines', contract_lines); // FK contract_lines.contract_id → contracts (CASCADE)
+    await insertMany('contract_lines', contract_lines);
     await insertMany('invoices', invoices);
     await insertMany('invoice_lines', invoice_lines);
-    await insertMany('invoice_schedule', invoice_schedule); // FK invoice_schedule.contract_id → contracts, .invoice_id → invoices
+    await insertMany('invoice_schedule', invoice_schedule);
     await insertMany('payments', payments);
     await insertMany('maintenance_costs', maintenance);
     await insertMany('vignettes', vignettes);
     await insertMany('reservations', reservations);
     await insertMany('insurances', insurances);
     await insertMany('leasing_contracts', leasing);
-    await insertMany('quotes', quotes);
-    await insertMany('quote_lines', quote_lines);
 
     res.json({ success: true, results });
   } catch (err: any) {
@@ -66,12 +69,14 @@ router.post('/reset', async (req: AuthRequest, res: Response) => {
 // Efface toutes les tables métier + settings + remet les souches à zéro
 router.post('/clear', async (req: AuthRequest, res: Response) => {
   try {
+    // Ordre inverse des FK — contracts.quote_id → quotes : contracts supprimé AVANT quotes
     const tables = [
       'inspection_details', 'inspections', 'site_unavailability',
       'vignettes', 'insurances', 'leasing_contracts', 'maintenance_costs',
       'payments', 'invoice_lines', 'invoice_schedule', 'invoices',
-      'collections', 'quote_lines', 'quotes', 'contract_lines', 'contracts',
-      'reservations', 'cars', 'customers',
+      'collections', 'contract_lines', 'contracts', 'reservations',
+      'quote_lines', 'quotes',
+      'cars', 'customers',
     ];
     for (const t of tables) {
       await global.db.delete(`/${t}?id=gte.`).catch(() => {});
