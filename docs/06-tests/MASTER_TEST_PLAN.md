@@ -77,6 +77,20 @@
 - [ ] **Navigation vers les réservations** : depuis la grille Voitures, cliquer sur la plaque d'un véhicule → navigue vers Réservations filtré sur cette plaque (ou comportement documenté équivalent)
 - [ ] **Navigation vers les contrats** : depuis une ligne de contrat, cliquer sur la plaque → navigue vers Voitures, voiture surlignée ou filtrée
 
+### UC-CAR-5 : Sélecteur de colonnes dynamique (tous les grids)
+**En tant qu'utilisateur**, je veux choisir les colonnes affichées dans chaque liste pour adapter l'affichage à mon besoin.
+
+- [ ] **Ouverture du sélecteur** : cliquer sur ⚙ Colonnes dans un panel → popover s'ouvre avec la liste des colonnes disponibles, cases cochées pour les colonnes actives
+- [ ] **Masquer une colonne** : décocher une colonne dans le popover → colonne disparaît immédiatement du header et du body (entête + cellules masqués)
+- [ ] **Réafficher une colonne** : cocher une colonne masquée → colonne réapparaît immédiatement
+- [ ] **Bouton Défaut** : cliquer Défaut → colonnes reviennent au jeu par défaut défini dans `DEFAULT_COLS`
+- [ ] **Bouton Tout** : cliquer Tout → toutes les colonnes disponibles s'affichent
+- [ ] **Persistance des préférences** : masquer une colonne, recharger la page (F5) → colonne toujours masquée (prefs dans `localStorage`)
+- [ ] **Fermeture popover** : cliquer en dehors du popover ou sur ✕ Fermer → popover se ferme sans erreur
+- [ ] **Grids couverts** : véhicules, clients, paiements, réservations, maintenance, assurances, leasing, vignettes — chacun dispose de son bouton ⚙ Colonnes
+- [ ] **Colonnes supplémentaires véhicules** : activer Marque, Couleur, VIN → colonnes s'affichent dans la grille véhicules avec les données correctes
+- [ ] **Tri/filtre préservé** : masquer une colonne pendant qu'un filtre est actif sur une autre colonne → filtre reste actif, résultats inchangés
+
 ---
 
 ## 3. Module Clients

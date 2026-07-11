@@ -1486,6 +1486,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newCarBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="cars" onclick="openColumnPicker('cars', this)">⚙ Colonnes</button>
       </div>
 
 
@@ -1529,6 +1530,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newCustomerBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="customers" onclick="openColumnPicker('customers', this)">⚙ Colonnes</button>
       </div>
 
       <div id="customerLegacyForm" style="display:none;">
@@ -1578,10 +1580,10 @@
       <table>
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Telephone</th>
-            <th>Email</th>
-            <th>Type</th>
+            <th data-col="name">Nom</th>
+            <th data-col="phone">Telephone</th>
+            <th data-col="email">Email</th>
+            <th data-col="type">Type</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -1976,6 +1978,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newPaymentBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="payments" onclick="openColumnPicker('payments', this)">⚙ Colonnes</button>
       </div>
 
       <div id="paymentLegacyForm" style="display:none;">
@@ -2035,13 +2038,14 @@
       <table>
         <thead>
           <tr>
-            <th>Paiement client</th>
-            <th>Facture</th>
-            <th>Contrat</th>
-            <th>Client</th>
-            <th>Montant (TND)</th>
-            <th>Mode</th>
-            <th>Date</th>
+            <th data-col="id">Ref.</th>
+            <th data-col="invoiceId">Facture</th>
+            <th data-col="contractId">Contrat</th>
+            <th data-col="customerName">Client</th>
+            <th data-col="amount">Montant</th>
+            <th data-col="amountTnd">Montant TND</th>
+            <th data-col="method">Mode</th>
+            <th data-col="date">Date</th>
           </tr>
         </thead>
         <tbody id="paymentsTable"></tbody>
@@ -2054,6 +2058,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newReservationBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="reservations" onclick="openColumnPicker('reservations', this)">⚙ Colonnes</button>
       </div>
 
       <div id="reservationLegacyForm" style="display:none;">
@@ -2124,12 +2129,14 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Client</th>
-            <th>Vehicule</th>
-            <th>Debut</th>
-            <th>Fin</th>
-            <th>Statut</th>
+            <th data-col="id">ID</th>
+            <th data-col="customerName">Client</th>
+            <th data-col="carPlate">Vehicule</th>
+            <th data-col="startDate">Debut</th>
+            <th data-col="startTime">Heure deb.</th>
+            <th data-col="endDate">Fin</th>
+            <th data-col="endTime">Heure fin</th>
+            <th data-col="status">Statut</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -2171,6 +2178,7 @@
 
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newMaintenanceBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="maintenance" onclick="openColumnPicker('maintenance', this)">⚙ Colonnes</button>
       </div>
 
       <div class="row">
@@ -2201,14 +2209,14 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Vehicule</th>
-            <th>Type</th>
-            <th>Date</th>
-            <th>Montant original</th>
-            <th>Montant (TND)</th>
-            <th>Statut</th>
-            <th>Description</th>
+            <th data-col="id">ID</th>
+            <th data-col="carPlate">Vehicule</th>
+            <th data-col="type">Type</th>
+            <th data-col="date">Date</th>
+            <th data-col="amountOriginal">Montant original</th>
+            <th data-col="amountTnd">Montant (TND)</th>
+            <th data-col="status">Statut</th>
+            <th data-col="note">Description</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -2442,6 +2450,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newInsuranceBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="insurances" onclick="openColumnPicker('insurances', this)">⚙ Colonnes</button>
       </div>
 
       <div id="insuranceLegacyForm" style="display:none;">
@@ -2501,11 +2510,14 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Vehicule</th>
-            <th>Assureur</th>
-            <th>Prime/mois</th>
-            <th>Periode</th>
+            <th data-col="id">ID</th>
+            <th data-col="carPlate">Vehicule</th>
+            <th data-col="insuranceCompany">Assureur</th>
+            <th data-col="policyNumber">N° Police</th>
+            <th data-col="monthlyAmount">Prime/mois</th>
+            <th data-col="startDate">Debut</th>
+            <th data-col="endDate">Fin</th>
+            <th data-col="status">Statut</th>
             <th>Piece jointe</th>
             <th>Action</th>
           </tr>
@@ -2562,16 +2574,18 @@
         </div>
       </div>
       <button id="addVignetteBtn">Ajouter vignette</button>
+      <button class="secondary" data-col-picker="vignettes" onclick="openColumnPicker('vignettes', this)">⚙ Colonnes</button>
 
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Vehicule</th>
-            <th>Annee</th>
-            <th>Montant</th>
-            <th>Echeance</th>
-            <th>Statut</th>
+            <th data-col="id">ID</th>
+            <th data-col="carPlate">Vehicule</th>
+            <th data-col="fiscalYear">Annee</th>
+            <th data-col="amountOriginal">Montant</th>
+            <th data-col="amountTnd">Montant TND</th>
+            <th data-col="dueDate">Echeance</th>
+            <th data-col="status">Statut</th>
             <th>Piece jointe</th>
             <th>Action</th>
           </tr>
@@ -2586,6 +2600,7 @@
 
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newLeasingBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="leasingContracts" onclick="openColumnPicker('leasingContracts', this)">⚙ Colonnes</button>
       </div>
 
       <div id="leasingLegacyForm" style="display:none;">
@@ -2634,11 +2649,14 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Vehicule</th>
-            <th>Bailleur</th>
-            <th>Mensualite</th>
-            <th>Periode</th>
+            <th data-col="id">ID</th>
+            <th data-col="carPlate">Vehicule</th>
+            <th data-col="leasingCompany">Bailleur</th>
+            <th data-col="contractNumber">N° Contrat</th>
+            <th data-col="monthlyAmount">Mensualite</th>
+            <th data-col="startDate">Debut</th>
+            <th data-col="endDate">Fin</th>
+            <th data-col="status">Statut</th>
             <th>Piece jointe</th>
             <th>Action</th>
           </tr>
@@ -2818,6 +2836,17 @@
         <div id="gpsMap" class="gps-map"></div>
       </div>
     </section>
+
+    <!-- Column picker popover (global) -->
+    <div id="colPickerModal" style="display:none;position:fixed;z-index:2000;background:white;border:1px solid #cbd5e1;border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.18);max-height:380px;overflow-y:auto;min-width:220px;">
+      <div style="font-weight:600;margin-bottom:10px;font-size:13px;color:#1e40af;">Colonnes visibles</div>
+      <div id="colPickerList"></div>
+      <div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;display:flex;gap:6px;">
+        <button class="secondary" id="colPickerResetBtn" style="font-size:11px;padding:3px 8px;">Défaut</button>
+        <button class="secondary" id="colPickerAllBtn" style="font-size:11px;padding:3px 8px;">Tout</button>
+        <button class="secondary" id="colPickerCloseBtn" style="font-size:11px;padding:3px 8px;margin-left:auto;">✕ Fermer</button>
+      </div>
+    </div>
 
     <div id="recordEditorModal" class="modal" aria-hidden="true">
       <div class="modal-card">
@@ -4846,6 +4875,7 @@
           });
         }
         const fth = document.createElement("th");
+        if (col.key) fth.setAttribute("data-col", col.key);
         if (col.filterable !== false) {
           if (col.filterType === "select") {
             const sel = document.createElement("select");
@@ -4961,6 +4991,26 @@
       const tabId = (e.state && e.state.tab) || location.hash.replace("#", "") || "home";
       switchToTab(tabId);
     });
+
+    if (byId("colPickerResetBtn")) {
+      byId("colPickerResetBtn").addEventListener("click", () => {
+        if (!_colPickerEntity) return;
+        saveColPrefs(_colPickerEntity, DEFAULT_COLS[_colPickerEntity] || []);
+        openColumnPicker(_colPickerEntity, document.querySelector(`[data-col-picker="${_colPickerEntity}"]`));
+        applyColPrefs(_colPickerEntity);
+        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+        if (renderMap[_colPickerEntity]) renderMap[_colPickerEntity]();
+      });
+      byId("colPickerAllBtn").addEventListener("click", () => {
+        if (!_colPickerEntity) return;
+        saveColPrefs(_colPickerEntity, (COL_DEFS[_colPickerEntity]||[]).map(c=>c.key));
+        openColumnPicker(_colPickerEntity, document.querySelector(`[data-col-picker="${_colPickerEntity}"]`));
+        applyColPrefs(_colPickerEntity);
+        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+        if (renderMap[_colPickerEntity]) renderMap[_colPickerEntity]();
+      });
+      byId("colPickerCloseBtn").addEventListener("click", () => { byId("colPickerModal").style.display = "none"; });
+    }
 
     byId("cancelRecordBtn").addEventListener("click", closeRecordEditor);
     byId("saveRecordBtn").addEventListener("click", saveRecordEditor);
@@ -8862,6 +8912,8 @@
       if (currentUser && (supabaseClient || authTransport === "proxy")) {
         queueRemoteSave();
       }
+      // Apply column preferences (CSS hide)
+      ["customers","maintenance","payments","reservations","insurances","leasingContracts","vignettes"].forEach(applyColPrefs);
     }
 
     function serializeStateForStorage(inputState) {
@@ -10148,7 +10200,9 @@
       { key: "customerName" },
       { key: "carPlate" },
       { key: "startDate", sortType: "date" },
+      { key: "startTime" },
       { key: "endDate", sortType: "date" },
+      { key: "endTime" },
       { key: "status", filterType: "select", options: ["en_attente", "confirmee", "annulee", "terminee"] },
       { key: "actions", sortable: false, filterable: false },
     ];
@@ -10157,6 +10211,8 @@
       const tbody = byId("reservationsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const reservationsTableEl = tbody.closest("table");
+      if (reservationsTableEl) reservationsTableEl.dataset.entity = "reservations";
 
       const statusFilter = dashboardFilters.reservations.status;
       const rows = applySortAndColumnFilters([...state.reservations]
@@ -10177,12 +10233,14 @@
         tr.addEventListener("dblclick", () => openRecordEditor("reservations", r.id));
         const pillClass = r.status === "confirmee" ? "dispo" : r.status === "annulee" ? "impaye" : "maintenance";
         tr.innerHTML = `
-          <td><a href="#" data-open-reservation="${safe(r.id)}">${safe(r.id)}</a></td>
-          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(r.customerName)}">${safe(r.customerName || "-")}</a></td>
-          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(r.carPlate)}">${safe(r.carPlate || "-")}</a></td>
-          <td>${safe(r.startDate)} ${safe(r.startTime || "")}</td>
-          <td>${safe(r.endDate)} ${safe(r.endTime || "")}</td>
-          <td><span class="pill ${pillClass}">${safe(r.status)}</span></td>
+          <td data-col="id"><a href="#" data-open-reservation="${safe(r.id)}">${safe(r.id)}</a></td>
+          <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(r.customerName)}">${safe(r.customerName || "-")}</a></td>
+          <td data-col="carPlate"><a class="xref" data-goto-tab="cars" data-goto-query="${safe(r.carPlate)}">${safe(r.carPlate || "-")}</a></td>
+          <td data-col="startDate">${safe(r.startDate || "-")}</td>
+          <td data-col="startTime">${safe(r.startTime || "-")}</td>
+          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="endTime">${safe(r.endTime || "-")}</td>
+          <td data-col="status"><span class="pill ${pillClass}">${safe(r.status)}</span></td>
           <td><button data-del-reservation="${safe(r.id)}" class="secondary">Supprimer</button></td>
         `;
         tbody.appendChild(tr);
@@ -10213,6 +10271,7 @@
           saveAndRender();
         });
       });
+      applyColPrefs("reservations");
     }
 
     function renderReservationCalendar() {
@@ -10536,6 +10595,179 @@
       }
     }
 
+    // ── Sélecteur de colonnes (column picker) ────────────────────────────────
+    const COL_DEFS = {
+      cars: [
+        { key: "plate",              label: "Immatriculation",      render: c => safe(c.plate) },
+        { key: "model",              label: "Modèle",               render: c => safe(c.model) },
+        { key: "brand",              label: "Marque",               render: c => safe(c.brand || "") },
+        { key: "color",              label: "Couleur",              render: c => safe(c.color || "") },
+        { key: "vin",                label: "VIN",                  render: c => safe(c.vin || "") },
+        { key: "registrationNumber", label: "N° carte grise",       render: c => safe(c.registrationNumber || "") },
+        { key: "registrationDate",   label: "Date immat.",          render: c => safe(c.registrationDate || "") },
+        { key: "fuelType",           label: "Carburant",            render: c => safe(c.fuelType || "") },
+        { key: "odometerKm",         label: "Kilométrage",          render: c => c.odometerKm ? `${Number(c.odometerKm).toLocaleString("fr-FR")} km` : "" },
+        { key: "status",             label: "Statut",               render: c => `<span class="pill ${safe(c.status)}">${safe(c.status)}</span>` },
+        { key: "agency",             label: "Agence",               render: c => safe(c.agency || "") },
+        { key: "ownerName",          label: "Propriétaire",         render: c => safe(c.ownerName || "") },
+        { key: "purchasePrice",      label: "Prix d'achat",         render: c => c.purchasePrice ? `${Number(c.purchasePrice).toLocaleString("fr-FR")} TND` : "" },
+        { key: "openingCashTnd",     label: "Trésorerie initiale",  render: c => `${(Number(c.openingCashTnd)||0).toLocaleString("fr-FR")} TND` },
+        { key: "notes",              label: "Notes",                render: c => safe(c.notes || "") },
+      ],
+      customers: [
+        { key: "name",  label: "Nom",       render: c => safe(c.name) },
+        { key: "phone", label: "Téléphone", render: c => safe(c.phone || "") },
+        { key: "email", label: "E-mail",    render: c => safe(c.email || "-") },
+        { key: "type",  label: "Type",      render: c => safe(c.type) },
+      ],
+      maintenance: [
+        { key: "id",             label: "Réf.",       render: r => safe(r.id) },
+        { key: "carPlate",       label: "Véhicule",   render: r => safe(r.carPlate || "-") },
+        { key: "type",           label: "Type",        render: r => safe(r.type || "-") },
+        { key: "date",           label: "Date",        render: r => safe(r.date || "-") },
+        { key: "amountOriginal", label: "Montant",     render: r => `${Number(r.amountOriginal||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
+        { key: "amountTnd",      label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "status",         label: "Statut",      render: r => safe(r.status || "-") },
+        { key: "note",           label: "Note",        render: r => safe(r.note || "") },
+      ],
+      payments: [
+        { key: "id",           label: "Réf.",       render: r => safe(r.id) },
+        { key: "customerName", label: "Client",     render: r => safe(r.customerName || "-") },
+        { key: "contractId",   label: "Contrat",    render: r => safe(r.contractId || "-") },
+        { key: "invoiceId",    label: "Facture",    render: r => safe(r.invoiceId || "-") },
+        { key: "date",         label: "Date",        render: r => safe(r.date || "-") },
+        { key: "amount",       label: "Montant",     render: r => `${Number(r.amount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
+        { key: "amountTnd",    label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "method",       label: "Mode",        render: r => safe(r.method || "-") },
+      ],
+      reservations: [
+        { key: "id",           label: "Réf.",       render: r => safe(r.id) },
+        { key: "customerName", label: "Client",     render: r => safe(r.customerName || "-") },
+        { key: "carPlate",     label: "Véhicule",   render: r => safe(r.carPlate || "-") },
+        { key: "startDate",    label: "Début",       render: r => safe(r.startDate || "-") },
+        { key: "startTime",    label: "Heure déb.", render: r => safe(r.startTime || "-") },
+        { key: "endDate",      label: "Fin",         render: r => safe(r.endDate || "-") },
+        { key: "endTime",      label: "Heure fin",  render: r => safe(r.endTime || "-") },
+        { key: "status",       label: "Statut",      render: r => safe(r.status || "-") },
+      ],
+      insurances: [
+        { key: "id",               label: "Réf.",          render: r => safe(r.id) },
+        { key: "carPlate",         label: "Véhicule",      render: r => safe(r.carPlate || "-") },
+        { key: "insuranceCompany", label: "Assureur",      render: r => safe(r.insuranceCompany || r.provider || "-") },
+        { key: "policyNumber",     label: "N° police",     render: r => safe(r.policyNumber || "-") },
+        { key: "monthlyAmount",    label: "Mensualité",    render: r => `${Number(r.monthlyAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
+        { key: "startDate",        label: "Début",          render: r => safe(r.startDate || "-") },
+        { key: "endDate",          label: "Fin",            render: r => safe(r.endDate || "-") },
+        { key: "status",           label: "Statut",         render: r => safe(r.status || "-") },
+      ],
+      leasingContracts: [
+        { key: "id",             label: "Réf.",         render: r => safe(r.id) },
+        { key: "carPlate",       label: "Véhicule",     render: r => safe(r.carPlate || "-") },
+        { key: "leasingCompany", label: "Société",      render: r => safe(r.leasingCompany || r.lender || "-") },
+        { key: "contractNumber", label: "N° contrat",   render: r => safe(r.contractNumber || "-") },
+        { key: "monthlyAmount",  label: "Mensualité",   render: r => `${Number(r.monthlyAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
+        { key: "startDate",      label: "Début",         render: r => safe(r.startDate || "-") },
+        { key: "endDate",        label: "Fin",           render: r => safe(r.endDate || "-") },
+        { key: "status",         label: "Statut",        render: r => safe(r.status || "-") },
+      ],
+      vignettes: [
+        { key: "id",             label: "Réf.",        render: v => safe(v.id) },
+        { key: "carPlate",       label: "Véhicule",    render: v => safe(v.carPlate || "-") },
+        { key: "fiscalYear",     label: "Année",       render: v => safe(v.fiscalYear) },
+        { key: "amountOriginal", label: "Montant",     render: v => `${Number(v.amountOriginal||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(v.currency||"TND")}` },
+        { key: "amountTnd",      label: "Montant TND", render: v => `${Number(v.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "dueDate",        label: "Échéance",    render: v => safe(v.dueDate) },
+        { key: "status",         label: "Statut",      render: v => safe(v.status) },
+      ],
+    };
+
+    const DEFAULT_COLS = {
+      cars:             ["plate", "model", "status", "agency"],
+      customers:        ["name", "phone", "email", "type"],
+      maintenance:      ["carPlate", "type", "date", "amountTnd", "status"],
+      payments:         ["customerName", "contractId", "date", "amountTnd", "method"],
+      reservations:     ["customerName", "carPlate", "startDate", "endDate", "status"],
+      insurances:       ["carPlate", "insuranceCompany", "monthlyAmount", "startDate", "endDate"],
+      leasingContracts: ["carPlate", "leasingCompany", "monthlyAmount", "startDate", "endDate"],
+      vignettes:        ["carPlate", "fiscalYear", "amountOriginal", "dueDate", "status"],
+    };
+
+    function getColPrefs(entity) {
+      try {
+        const p = JSON.parse(localStorage.getItem("locacar-col-prefs") || "{}");
+        return p[entity] || DEFAULT_COLS[entity] || (COL_DEFS[entity] || []).map(c => c.key);
+      } catch (_) { return DEFAULT_COLS[entity] || []; }
+    }
+
+    function saveColPrefs(entity, keys) {
+      try {
+        const p = JSON.parse(localStorage.getItem("locacar-col-prefs") || "{}");
+        p[entity] = keys;
+        localStorage.setItem("locacar-col-prefs", JSON.stringify(p));
+      } catch (_) {}
+    }
+
+    function getActiveDefs(entity) {
+      const all = COL_DEFS[entity] || [];
+      const active = new Set(getColPrefs(entity));
+      return all.filter(c => active.has(c.key));
+    }
+
+    // Injecte du CSS pour cacher les colonnes non-actives via data-col
+    function applyColPrefs(entity) {
+      const defs = COL_DEFS[entity];
+      if (!defs) return;
+      const active = new Set(getColPrefs(entity));
+      let el = byId(`colStyle_${entity}`);
+      if (!el) {
+        el = document.createElement("style");
+        el.id = `colStyle_${entity}`;
+        document.head.appendChild(el);
+      }
+      const rules = defs
+        .filter(c => !active.has(c.key))
+        .map(c => `[data-entity="${entity}"] [data-col="${c.key}"] { display: none !important; }`)
+        .join("\n");
+      el.textContent = rules;
+    }
+
+    let _colPickerEntity = null;
+    function openColumnPicker(entity, btn) {
+      _colPickerEntity = entity;
+      const defs = COL_DEFS[entity] || [];
+      const active = new Set(getColPrefs(entity));
+      const list = byId("colPickerList");
+      list.innerHTML = defs.map(c => `
+        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px;">
+          <input type="checkbox" value="${safe(c.key)}" ${active.has(c.key) ? "checked" : ""}/>
+          ${safe(c.label)}
+        </label>
+      `).join("");
+      const modal = byId("colPickerModal");
+      const rect = btn.getBoundingClientRect();
+      modal.style.top = (rect.bottom + window.scrollY + 4) + "px";
+      modal.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 240) + "px";
+      modal.style.display = "block";
+
+      list.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        cb.addEventListener("change", () => {
+          const keys = Array.from(list.querySelectorAll("input:checked")).map(c => c.value);
+          saveColPrefs(entity, keys);
+          applyColPrefs(entity);
+          // Re-render if entity has a dedicated render function
+          const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+          if (renderMap[entity]) renderMap[entity]();
+        });
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const modal = byId("colPickerModal");
+      if (modal && modal.style.display !== "none" && !modal.contains(e.target) && !e.target.closest("[data-col-picker]")) {
+        modal.style.display = "none";
+      }
+    });
+
     const CARS_COLUMNS = [
       { key: "plate" },
       { key: "model" },
@@ -10545,52 +10777,84 @@
     ];
 
     function renderCars() {
-      const tbody = byId("carsTable");
-      tbody.innerHTML = "";
+      const table = byId("carsTable")?.closest("table");
+      if (!table) return;
+      table.dataset.entity = "cars";
+      const activeDefs = getActiveDefs("cars");
+      const tState = getTableState("cars");
+
+      // Rebuild thead dynamically
+      const thead = table.querySelector("thead");
+      const sortHtml = activeDefs.map(c => {
+        const isActive = tState.sort.key === c.key;
+        const ind = isActive ? (tState.sort.dir === "asc" ? "▲" : "▼") : "⇕";
+        return `<th class="sortable${isActive?" sort-active":""}" data-sort-col="${safe(c.key)}" data-col="${safe(c.key)}" style="cursor:pointer;">${safe(c.label)} <span class="sort-indicator">${ind}</span></th>`;
+      }).join("") + "<th>Action</th>";
+      const filterHtml = activeDefs.map(c => {
+        const val = safe(tState.columnFilters[c.key] || "");
+        return `<th data-col="${safe(c.key)}"><input type="text" placeholder="Filtrer…" data-filter-col="${safe(c.key)}" value="${val}" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px 4px;"/></th>`;
+      }).join("") + "<th></th>";
+      thead.innerHTML = `<tr>${sortHtml}</tr><tr class="filter-row">${filterHtml}</tr>`;
+
+      thead.querySelectorAll("[data-sort-col]").forEach(th => {
+        th.addEventListener("click", () => {
+          const k = th.dataset.sortCol;
+          if (tState.sort.key === k) tState.sort.dir = tState.sort.dir === "asc" ? "desc" : "asc";
+          else { tState.sort.key = k; tState.sort.dir = "asc"; }
+          renderCars();
+        });
+      });
+      thead.querySelectorAll("[data-filter-col]").forEach(el => {
+        el.addEventListener("input", () => { tState.columnFilters[el.dataset.filterCol] = el.value; renderCars(); });
+      });
+
+      // Filter + sort data
       const statusFilter = dashboardFilters.cars.status;
       const query = String(dashboardFilters.cars.query || "").trim().toLowerCase();
-      const filtered = state.cars.filter((car) => {
-          const matchesStatus = statusFilter ? car.status === statusFilter : true;
-          const haystack = `${car.plate || ""} ${car.model || ""} ${car.agency || ""}`.toLowerCase();
-          const matchesQuery = query ? haystack.includes(query) : true;
-          return matchesStatus && matchesQuery;
+      let filtered = state.cars.filter(car => {
+        if (statusFilter && car.status !== statusFilter) return false;
+        const hay = `${car.plate||""} ${car.model||""} ${car.brand||""} ${car.agency||""} ${car.color||""} ${car.vin||""}`.toLowerCase();
+        if (query && !hay.includes(query)) return false;
+        for (const col of activeDefs) {
+          const fv = (tState.columnFilters[col.key] || "").toLowerCase();
+          if (!fv) continue;
+          if (!String(car[col.key] ?? "").toLowerCase().includes(fv)) return false;
+        }
+        return true;
+      });
+      if (tState.sort.key) {
+        const k = tState.sort.key;
+        filtered = [...filtered].sort((a, b) => {
+          const cmp = String(a[k]??  "").localeCompare(String(b[k]??""), "fr", {numeric:true});
+          return tState.sort.dir === "asc" ? cmp : -cmp;
         });
-      const sorted = applySortAndColumnFilters(filtered, "cars", CARS_COLUMNS);
-      const { items, page, pages, total } = paginateArray(sorted, "cars");
-      items.forEach((car) => {
+      }
+
+      const tbody = byId("carsTable");
+      tbody.innerHTML = "";
+      const { items, page, pages, total } = paginateArray(filtered, "cars");
+      items.forEach(car => {
         const tr = document.createElement("tr");
         tr.className = "clickable-row";
         if (selectedRows.cars === String(car.id)) tr.classList.add("selected");
-        tr.addEventListener("click", () => {
-          selectRow("cars", car.id);
-          renderCars();
-        });
+        tr.addEventListener("click", () => { selectRow("cars", car.id); renderCars(); });
         tr.addEventListener("dblclick", () => openRecordEditor("cars", car.id));
-        tr.innerHTML = `
-          <td>${safe(car.plate)}</td>
-          <td>${safe(car.model)}</td>
-          <td>${safe(car.agency)}</td>
-          <td><span class="pill ${safe(car.status)}">${safe(car.status)}</span></td>
+        tr.innerHTML = activeDefs.map(c => `<td data-col="${safe(c.key)}">${c.render(car)}</td>`).join("") + `
           <td>
-            <button data-open-car="${car.id}" class="secondary">Details</button>
-            <button data-del-car="${car.id}" class="secondary">Supprimer</button>
-          </td>
-        `;
+            <button data-open-car="${safe(car.id)}" class="secondary">Détails</button>
+            <button data-del-car="${safe(car.id)}" class="secondary">Supprimer</button>
+          </td>`;
         tbody.appendChild(tr);
       });
-      tbody.querySelectorAll("[data-open-car]").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const id = e.target.getAttribute("data-open-car");
-          openRecordEditor("cars", id);
-        });
+      tbody.querySelectorAll("[data-open-car]").forEach(btn => {
+        btn.addEventListener("click", e => { e.stopPropagation(); openRecordEditor("cars", e.target.getAttribute("data-open-car")); });
       });
-      tbody.querySelectorAll("[data-del-car]").forEach(async (btn) => {
-        btn.addEventListener("click", async (e) => {
+      tbody.querySelectorAll("[data-del-car]").forEach(btn => {
+        btn.addEventListener("click", async e => {
           e.stopPropagation();
           const id = e.target.getAttribute("data-del-car");
           await apiDelete(`/cars/${id}`);
-          state.cars = state.cars.filter((c) => c.id !== id);
+          state.cars = state.cars.filter(c => c.id !== id);
           saveAndRender();
         });
       });
@@ -10941,6 +11205,8 @@
     function renderCustomers() {
       const tbody = byId("customersTable");
       tbody.innerHTML = "";
+      const customersTable = tbody.closest("table");
+      if (customersTable) customersTable.dataset.entity = "customers";
       const typeFilter = dashboardFilters.customers.type;
       const query = String(dashboardFilters.customers.query || "").trim().toLowerCase();
       const filtered = state.customers.filter((customer) => {
@@ -10961,10 +11227,10 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("customers", customer.id));
         tr.innerHTML = `
-          <td>${safe(customer.name)}</td>
-          <td>${safe(customer.phone)}</td>
-          <td>${safe(customer.email || "-")}</td>
-          <td>${safe(customer.type)}</td>
+          <td data-col="name">${safe(customer.name)}</td>
+          <td data-col="phone">${safe(customer.phone)}</td>
+          <td data-col="email">${safe(customer.email || "-")}</td>
+          <td data-col="type">${safe(customer.type)}</td>
           <td>
             <button data-open-customer="${customer.id}" class="secondary">Details</button>
             <button data-del-customer="${customer.id}" class="secondary">Supprimer</button>
@@ -10989,6 +11255,7 @@
         });
       });
       renderPaginationControls(null, "customers", total, page, pages);
+      applyColPrefs("customers");
     }
 
     function renderContractOptions() {
@@ -12970,6 +13237,7 @@
       { key: "invoiceId" },
       { key: "contractId" },
       { key: "customerName" },
+      { key: "amount", sortType: "number" },
       { key: "amountTnd", sortType: "number" },
       { key: "method", filterType: "select", options: ["especes", "virement", "carte", "cheque"] },
       { key: "date", sortType: "date" },
@@ -12978,6 +13246,8 @@
     function renderPayments() {
       const tbody = byId("paymentsTable");
       tbody.innerHTML = "";
+      const paymentsTableEl = tbody.closest("table");
+      if (paymentsTableEl) paymentsTableEl.dataset.entity = "payments";
       const methodFilter = dashboardFilters.payments.method;
       const query = String(dashboardFilters.payments.query || "").trim().toLowerCase();
       const filtered = state.payments
@@ -12998,13 +13268,14 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("payments", p.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-payment="${safe(p.id)}">${safe(p.id)}</a></td>
-          <td><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(p.invoiceId)}">${safe(p.invoiceId || "-")}</a></td>
-          <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(p.contractId)}">${safe(p.contractId || "-")}</a></td>
-          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(p.customerName)}">${safe(p.customerName || "-")}</a></td>
-          <td>${Number(p.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${safe(p.method)}</td>
-          <td>${safe(p.date)}</td>
+          <td data-col="id"><a href="#" data-open-payment="${safe(p.id)}">${safe(p.id)}</a></td>
+          <td data-col="invoiceId"><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(p.invoiceId)}">${safe(p.invoiceId || "-")}</a></td>
+          <td data-col="contractId"><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(p.contractId)}">${safe(p.contractId || "-")}</a></td>
+          <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(p.customerName)}">${safe(p.customerName || "-")}</a></td>
+          <td data-col="amount">${Number(p.amount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(p.currency || "TND")}</td>
+          <td data-col="amountTnd">${Number(p.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="method">${safe(p.method || "-")}</td>
+          <td data-col="date">${safe(p.date || "-")}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -13023,6 +13294,7 @@
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
+      applyColPrefs("payments");
     }
 
     const MAINTENANCE_COLUMNS = [
@@ -13041,6 +13313,8 @@
       const tbody = byId("maintenanceTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const mainTable = tbody.closest("table");
+      if (mainTable) mainTable.dataset.entity = "maintenance";
 
       const carFilter = String(dashboardFilters.maintenance.carId || "");
       const typeFilter = String(dashboardFilters.maintenance.type || "");
@@ -13072,14 +13346,14 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("maintenanceCosts", row.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-maintenance="${safe(row.id)}">${safe(row.id)}</a></td>
-          <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(row.carPlate)}">${safe(row.carPlate || "-")}</a></td>
-          <td>${safe(row.type || "-")}</td>
-          <td>${safe(row.date || "-")}</td>
-          <td>${Number(row.amountOriginal || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(row.currency || "TND")}</td>
-          <td>${amountTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${safe(row.status || "-")}</td>
-          <td>${safe(row.note || "")}</td>
+          <td data-col="id"><a href="#" data-open-maintenance="${safe(row.id)}">${safe(row.id)}</a></td>
+          <td data-col="carPlate"><a class="xref" data-goto-tab="cars" data-goto-query="${safe(row.carPlate)}">${safe(row.carPlate || "-")}</a></td>
+          <td data-col="type">${safe(row.type || "-")}</td>
+          <td data-col="date">${safe(row.date || "-")}</td>
+          <td data-col="amountOriginal">${Number(row.amountOriginal || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(row.currency || "TND")}</td>
+          <td data-col="amountTnd">${amountTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="status">${safe(row.status || "-")}</td>
+          <td data-col="note">${safe(row.note || "")}</td>
           <td>
             <button class="secondary" data-toggle-maintenance-status="${safe(row.id)}">${row.status === "paye" ? "Marquer a payer" : "Marquer paye"}</button>
             <button class="secondary" data-del-maintenance="${safe(row.id)}">Supprimer</button>
@@ -13123,6 +13397,7 @@
           saveAndRender();
         });
       });
+      applyColPrefs("maintenance");
     }
 
     function renderInsuranceCarOptions() {
@@ -13356,9 +13631,12 @@
     const INSURANCES_COLUMNS = [
       { key: "id" },
       { key: "carPlate" },
-      { key: "provider" },
+      { key: "insuranceCompany" },
+      { key: "policyNumber" },
       { key: "monthlyAmount", sortType: "number" },
       { key: "startDate", sortType: "date" },
+      { key: "endDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["actif", "expire", "annule"] },
       { key: "attachmentName", sortable: false, filterable: false },
       { key: "actions", sortable: false, filterable: false },
     ];
@@ -13367,6 +13645,8 @@
       const tbody = byId("insurancesTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const insurancesTable = tbody.closest("table");
+      if (insurancesTable) insurancesTable.dataset.entity = "insurances";
       const query = String(dashboardFilters.insurances.query || "").trim().toLowerCase();
 
       const filtered = state.insurances
@@ -13387,11 +13667,14 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("insurances", r.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-insurance="${safe(r.id)}">${safe(r.id)}</a></td>
-          <td>${safe(r.carPlate || "-")}</td>
-          <td>${safe(r.provider)}</td>
-          <td>${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
-          <td>${safe(r.startDate)} -> ${safe(r.endDate)}</td>
+          <td data-col="id"><a href="#" data-open-insurance="${safe(r.id)}">${safe(r.id)}</a></td>
+          <td data-col="carPlate">${safe(r.carPlate || "-")}</td>
+          <td data-col="insuranceCompany">${safe(r.insuranceCompany || r.provider || "-")}</td>
+          <td data-col="policyNumber">${safe(r.policyNumber || "-")}</td>
+          <td data-col="monthlyAmount">${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
+          <td data-col="startDate">${safe(r.startDate || "-")}</td>
+          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="status">${safe(r.status || "-")}</td>
           <td>${attachmentLinkHtml(r.attachmentName, r.attachmentData)}</td>
           <td><button data-del-insurance="${safe(r.id)}" class="secondary">Supprimer</button></td>
         `;
@@ -13417,6 +13700,7 @@
           saveAndRender();
         });
       });
+      applyColPrefs("insurances");
     }
 
     const INSURANCE_INSTALLMENTS_COLUMNS = [
@@ -13505,9 +13789,12 @@
     const LEASING_CONTRACTS_COLUMNS = [
       { key: "id" },
       { key: "carPlate" },
-      { key: "lender" },
+      { key: "leasingCompany" },
+      { key: "contractNumber" },
       { key: "monthlyAmount", sortType: "number" },
       { key: "startDate", sortType: "date" },
+      { key: "endDate", sortType: "date" },
+      { key: "status", filterType: "select", options: ["actif", "termine", "annule"] },
       { key: "attachmentName", sortable: false, filterable: false },
       { key: "actions", sortable: false, filterable: false },
     ];
@@ -13516,6 +13803,8 @@
       const tbody = byId("leasingContractsTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const leasingTable = tbody.closest("table");
+      if (leasingTable) leasingTable.dataset.entity = "leasingContracts";
 
       applySortAndColumnFilters(state.leasingContracts, "leasingContracts", LEASING_CONTRACTS_COLUMNS).forEach((r) => {
         const tr = document.createElement("tr");
@@ -13528,11 +13817,14 @@
         });
         tr.addEventListener("dblclick", () => openRecordEditor("leasingContracts", r.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-leasing="${safe(r.id)}">${safe(r.id)}</a></td>
-          <td>${safe(r.carPlate || "-")}</td>
-          <td>${safe(r.lender)}</td>
-          <td>${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
-          <td>${safe(r.startDate)} -> ${safe(r.endDate)}</td>
+          <td data-col="id"><a href="#" data-open-leasing="${safe(r.id)}">${safe(r.id)}</a></td>
+          <td data-col="carPlate">${safe(r.carPlate || "-")}</td>
+          <td data-col="leasingCompany">${safe(r.leasingCompany || r.lender || "-")}</td>
+          <td data-col="contractNumber">${safe(r.contractNumber || "-")}</td>
+          <td data-col="monthlyAmount">${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
+          <td data-col="startDate">${safe(r.startDate || "-")}</td>
+          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="status">${safe(r.status || "-")}</td>
           <td>${attachmentLinkHtml(r.attachmentName, r.attachmentData)}</td>
           <td><button data-del-leasing="${safe(r.id)}" class="secondary">Supprimer</button></td>
         `;
@@ -13558,6 +13850,7 @@
           saveAndRender();
         });
       });
+      applyColPrefs("leasingContracts");
     }
 
     const LEASING_INSTALLMENTS_COLUMNS = [
@@ -13647,6 +13940,7 @@
       { key: "id" },
       { key: "carPlate" },
       { key: "fiscalYear" },
+      { key: "amountOriginal", sortType: "number" },
       { key: "amountTnd", sortType: "number" },
       { key: "dueDate", sortType: "date" },
       { key: "status", filterType: "select", options: ["paye", "a_payer"] },
@@ -13658,6 +13952,8 @@
       const tbody = byId("vignettesTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const vignettesTableEl = tbody.closest("table");
+      if (vignettesTableEl) vignettesTableEl.dataset.entity = "vignettes";
 
       const rows = applySortAndColumnFilters([...state.vignettes].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))), "vignettes", VIGNETTES_COLUMNS);
       rows.forEach((v) => {
@@ -13675,12 +13971,13 @@
           : `<button class="secondary" data-pay-vig="${safe(v.id)}">Marquer paye</button>`;
 
         tr.innerHTML = `
-          <td><a href="#" data-open-vignette="${safe(v.id)}">${safe(v.id)}</a></td>
-          <td>${safe(v.carPlate || "-")}</td>
-          <td>${safe(v.fiscalYear)}</td>
-          <td>${formatMoney(Number(v.amountOriginal || 0), v.currency || "TND")}<div class="small">${Number(v.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</div></td>
-          <td>${safe(v.dueDate)}</td>
-          <td><span class="pill ${statusClass}">${safe(v.status)}</span></td>
+          <td data-col="id"><a href="#" data-open-vignette="${safe(v.id)}">${safe(v.id)}</a></td>
+          <td data-col="carPlate">${safe(v.carPlate || "-")}</td>
+          <td data-col="fiscalYear">${safe(v.fiscalYear)}</td>
+          <td data-col="amountOriginal">${formatMoney(Number(v.amountOriginal || 0), v.currency || "TND")}<div class="small">${Number(v.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</div></td>
+          <td data-col="amountTnd">${Number(v.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="dueDate">${safe(v.dueDate)}</td>
+          <td data-col="status"><span class="pill ${statusClass}">${safe(v.status)}</span></td>
           <td>${attachmentLinkHtml(v.attachmentName, v.attachmentData)}</td>
           <td>${action} <button class="secondary" data-del-vig="${safe(v.id)}">Supprimer</button></td>
         `;
@@ -13729,6 +14026,7 @@
           saveAndRender();
         });
       });
+      applyColPrefs("vignettes");
     }
 
     function buildMonthlyInstallments({ ownerType, ownerId, carId, carPlate, startDate, endDate, amountOriginal, currency }) {
@@ -15642,7 +15940,7 @@
     }
 
     function setupAllSortableTables() {
-      setupSortableTable(byId("carsTable")?.closest("table"), "cars", CARS_COLUMNS, renderCars);
+      // cars: thead is rebuilt dynamically by renderCars (column picker), no setupSortableTable needed
       setupSortableTable(byId("customersTable")?.closest("table"), "customers", CUSTOMERS_COLUMNS, renderCustomers);
       setupSortableTable(byId("contractsTable")?.closest("table"), "contracts", CONTRACTS_COLUMNS, renderContracts);
       setupSortableTable(byId("invoicesTable")?.closest("table"), "invoices", INVOICES_COLUMNS, renderInvoices);

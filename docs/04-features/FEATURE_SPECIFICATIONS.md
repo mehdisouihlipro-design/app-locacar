@@ -1513,6 +1513,44 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 - `worksheet-mini-app/index.html` — `#carLegacyForm`, `addCarBtn` handler, `newCarBtn` handler, `loadDataFromAPI` (cars mapping), `mapCarToApi`, `fieldLabelMap`, `getEditorFieldConfig` (inputTypeMap + enumMap2 + label dans retours), `openRecordEditor` (label display)
 - `src/backend/routes/cars.routes.ts` — `POST /` accepte tous les champs
 
+### 9.18 ✅ Implémenté (2026-07) — Sélecteur de colonnes dynamique (column picker) pour tous les grids
+
+**Problème résolu** : les grids affichaient des colonnes fixes ; l'utilisateur ne pouvait pas masquer/afficher les colonnes selon ses besoins.
+
+**Fonctionnement** :
+- Bouton `⚙ Colonnes` présent sur chaque panel (véhicules, clients, paiements, réservations, maintenance, assurances, leasing, vignettes).
+- Un popover liste toutes les colonnes disponibles avec des cases à cocher ; décocher masque la colonne, cocher la réaffiche — en temps réel, sans rechargement.
+- Préférences persistées dans `localStorage` (`locacar-col-prefs`, clé par entité).
+- Boutons **Défaut** (rétablir les colonnes par défaut) et **Tout** (tout afficher) dans le popover.
+
+**Architecture** :
+- `COL_DEFS[entity]` — tableau de définitions `{ key, label, render }` pour toutes les colonnes disponibles par entité.
+- `DEFAULT_COLS[entity]` — sous-ensemble de clés affiché par défaut.
+- `getColPrefs(entity)` / `saveColPrefs(entity, keys)` — lecture/écriture dans localStorage.
+- `applyColPrefs(entity)` — injecte un `<style id="colStyle_entity">` avec des règles CSS `[data-entity="X"] [data-col="Y"] { display: none !important }` pour les colonnes désactivées.
+- `openColumnPicker(entity, btn)` — ouvre le popover positionné sous le bouton.
+- `getActiveDefs(entity)` — filtre `COL_DEFS[entity]` par les prefs actives.
+
+**Grids couverts** :
+| Entité | Colonnes par défaut | Colonnes supplémentaires disponibles |
+|---|---|---|
+| cars | plate, model, status, agency | brand, color, vin, registrationNumber, registrationDate, fuelType, odometerKm, ownerName, purchasePrice, openingCashTnd, notes |
+| customers | name, phone, email, type | — |
+| maintenance | carPlate, type, date, amountTnd, status | id, amountOriginal, note |
+| payments | customerName, contractId, date, amountTnd, method | id, invoiceId, amount |
+| reservations | customerName, carPlate, startDate, endDate, status | id, startTime, endTime |
+| insurances | carPlate, insuranceCompany, monthlyAmount, startDate, endDate | id, policyNumber, status |
+| leasingContracts | carPlate, leasingCompany, monthlyAmount, startDate, endDate | id, contractNumber, status |
+| vignettes | carPlate, fiscalYear, amountOriginal, dueDate, status | id, amountTnd |
+
+**Véhicules** — `renderCars` entièrement dynamique : reconstruit `<thead>` à chaque rendu en fonction des colonnes actives (tri, filtre inline, data-col sur th et td). Pour les autres entités, les `<th>` du thead statique portent `data-col` et les `<td>` du tbody aussi ; la CSS masque/révèle les deux simultanément.
+
+**Nouvelles colonnes DB (migration 015)** : `registration_number`, `registration_date`, `fuel_type`, `owner_name`, `purchase_price`, `purchase_date` ajoutées à la table `cars`.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — `COL_DEFS`, `DEFAULT_COLS`, `getColPrefs/saveColPrefs/getActiveDefs/applyColPrefs/openColumnPicker`, `renderCars` (refonte complète), `renderCustomers/renderMaintenance/renderPayments/renderReservationsTable/renderInsurances/renderLeasingContracts/renderVignettes` (ajout data-col + data-entity), HTML theads mis à jour, modal `#colPickerModal`, boutons `⚙ Colonnes`, `saveAndRender` (appel `applyColPrefs`), `setupSortableTable` (data-col sur filter-row th), COLUMNS arrays mis à jour (PAYMENTS, RESERVATIONS, INSURANCES, LEASING, VIGNETTES)
+- `src/backend/migrations/015_car_extra_columns.sql` — migration à exécuter dans Supabase SQL Editor
+
 ---
 
 **Document Version**: 1.0  
