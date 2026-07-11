@@ -1597,6 +1597,7 @@
       
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newContractBtn">Nouveau</button>
+        <button class="secondary" data-col-picker="contracts" onclick="openColumnPicker('contracts', this)">⚙ Colonnes</button>
       </div>
 
       <!-- Phase 2B : formulaire simplifié (entête uniquement). Les lignes (véhicules,
@@ -1678,15 +1679,15 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Type</th>
-            <th>Client</th>
-            <th>Devis d'origine</th>
-            <th>Date début</th>
-            <th>Date fin</th>
-            <th>Lignes</th>
-            <th>Total (TND)</th>
-            <th>Statut</th>
+            <th data-col="id">ID</th>
+            <th data-col="type">Type</th>
+            <th data-col="customerName">Client</th>
+            <th data-col="quoteId">Devis d'origine</th>
+            <th data-col="periodStart">Date début</th>
+            <th data-col="periodEnd">Date fin</th>
+            <th data-col="lignes">Lignes</th>
+            <th data-col="totalTnd">Total (TND)</th>
+            <th data-col="status">Statut</th>
           </tr>
         </thead>
         <tbody id="contractsTable"></tbody>
@@ -1702,6 +1703,7 @@
 
       <div class="actions" style="margin-bottom:10px;">
         <button id="newQuoteBtn">+ Nouveau devis</button>
+        <button class="secondary" data-col-picker="quotes" onclick="openColumnPicker('quotes', this)">⚙ Colonnes</button>
       </div>
 
       <div id="quoteLegacyForm" style="display:none;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;background:#fafbff;">
@@ -1756,13 +1758,13 @@
       <table id="quotesTableWrapper">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Client</th>
-            <th>Début</th>
-            <th>Fin</th>
-            <th>Lignes</th>
-            <th>Total TTC</th>
-            <th>Statut</th>
+            <th data-col="id">ID</th>
+            <th data-col="customerName">Client</th>
+            <th data-col="periodStart">Début</th>
+            <th data-col="periodEnd">Fin</th>
+            <th data-col="lignes">Lignes</th>
+            <th data-col="totalAmountTtc">Total TTC</th>
+            <th data-col="status">Statut</th>
           </tr>
         </thead>
         <tbody id="quotesTable"></tbody>
@@ -1822,6 +1824,7 @@
 
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newInvoiceBtn">Nouvelle facture</button>
+        <button class="secondary" data-col-picker="invoices" onclick="openColumnPicker('invoices', this)">⚙ Colonnes</button>
       </div>
 
       <div id="invoiceLegacyForm" style="display:none;">
@@ -1911,15 +1914,15 @@
       <table>
         <thead>
           <tr>
-            <th>Facture</th>
-            <th>Contrat</th>
-            <th>Client</th>
-            <th>Lignes</th>
-            <th>Echeance</th>
-            <th>Total (TND)</th>
-            <th>Paye (TND)</th>
-            <th>Restant (TND)</th>
-            <th>Statut</th>
+            <th data-col="id">Facture</th>
+            <th data-col="contractId">Contrat</th>
+            <th data-col="customerName">Client</th>
+            <th data-col="lignes">Lignes</th>
+            <th data-col="dueDate">Echeance</th>
+            <th data-col="amountTnd">Total (TND)</th>
+            <th data-col="paidAmountTnd">Paye (TND)</th>
+            <th data-col="dueAmountTnd">Restant (TND)</th>
+            <th data-col="status">Statut</th>
           </tr>
         </thead>
         <tbody id="invoicesTable"></tbody>
@@ -4998,7 +5001,7 @@
         saveColPrefs(_colPickerEntity, DEFAULT_COLS[_colPickerEntity] || []);
         openColumnPicker(_colPickerEntity, document.querySelector(`[data-col-picker="${_colPickerEntity}"]`));
         applyColPrefs(_colPickerEntity);
-        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes, contracts: renderContracts, quotes: renderQuotes, invoices: renderInvoices };
         if (renderMap[_colPickerEntity]) renderMap[_colPickerEntity]();
       });
       byId("colPickerAllBtn").addEventListener("click", () => {
@@ -5006,7 +5009,7 @@
         saveColPrefs(_colPickerEntity, (COL_DEFS[_colPickerEntity]||[]).map(c=>c.key));
         openColumnPicker(_colPickerEntity, document.querySelector(`[data-col-picker="${_colPickerEntity}"]`));
         applyColPrefs(_colPickerEntity);
-        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+        const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes, contracts: renderContracts, quotes: renderQuotes, invoices: renderInvoices };
         if (renderMap[_colPickerEntity]) renderMap[_colPickerEntity]();
       });
       byId("colPickerCloseBtn").addEventListener("click", () => { byId("colPickerModal").style.display = "none"; });
@@ -8913,7 +8916,7 @@
         queueRemoteSave();
       }
       // Apply column preferences (CSS hide)
-      ["customers","maintenance","payments","reservations","insurances","leasingContracts","vignettes"].forEach(applyColPrefs);
+      ["customers","maintenance","payments","reservations","insurances","leasingContracts","vignettes","contracts","quotes","invoices"].forEach(applyColPrefs);
     }
 
     function serializeStateForStorage(inputState) {
@@ -10679,6 +10682,37 @@
         { key: "dueDate",        label: "Échéance",    render: v => safe(v.dueDate) },
         { key: "status",         label: "Statut",      render: v => safe(v.status) },
       ],
+      contracts: [
+        { key: "id",           label: "N° Contrat",    render: c => safe(c.contractNumber || c.id) },
+        { key: "type",         label: "Type",           render: c => safe(c.type) },
+        { key: "customerName", label: "Client",         render: c => safe(c.customerName || "-") },
+        { key: "quoteId",      label: "Devis origine",  render: c => safe(c.quoteId || "—") },
+        { key: "periodStart",  label: "Date début",     render: () => "—" },
+        { key: "periodEnd",    label: "Date fin",       render: () => "—" },
+        { key: "lignes",       label: "Lignes",         render: () => "—" },
+        { key: "totalTnd",     label: "Total (TND)",    render: () => "—" },
+        { key: "status",       label: "Statut",         render: c => safe(c.status) },
+      ],
+      quotes: [
+        { key: "id",             label: "N° Devis",   render: q => safe(q.quoteNumber || q.id) },
+        { key: "customerName",   label: "Client",      render: q => safe(q.customerName || "-") },
+        { key: "periodStart",    label: "Début",       render: () => "—" },
+        { key: "periodEnd",      label: "Fin",         render: () => "—" },
+        { key: "lignes",         label: "Lignes",      render: () => "—" },
+        { key: "totalAmountTtc", label: "Total TTC",   render: q => `${(q.totalAmountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "status",         label: "Statut",      render: q => safe(q.status) },
+      ],
+      invoices: [
+        { key: "id",           label: "N° Facture",    render: i => safe(i.invoiceNumber || i.id) },
+        { key: "contractId",   label: "Contrat",       render: i => safe(i.contractId || "-") },
+        { key: "customerName", label: "Client",        render: i => safe(i.customerName || "-") },
+        { key: "lignes",       label: "Lignes",        render: () => "—" },
+        { key: "dueDate",      label: "Échéance",      render: i => safe(i.dueDate || "-") },
+        { key: "amountTnd",    label: "Total (TND)",   render: i => `${Number(i.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "paidAmountTnd",label: "Payé (TND)",    render: i => `${Number(i.paidAmountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "dueAmountTnd", label: "Restant (TND)", render: i => `${Number(i.dueAmountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "status",       label: "Statut",        render: () => "—" },
+      ],
     };
 
     const DEFAULT_COLS = {
@@ -10690,6 +10724,9 @@
       insurances:       ["carPlate", "insuranceCompany", "monthlyAmount", "startDate", "endDate"],
       leasingContracts: ["carPlate", "leasingCompany", "monthlyAmount", "startDate", "endDate"],
       vignettes:        ["carPlate", "fiscalYear", "amountOriginal", "dueDate", "status"],
+      contracts:        ["id", "type", "customerName", "periodStart", "periodEnd", "totalTnd", "status"],
+      quotes:           ["id", "customerName", "periodStart", "periodEnd", "totalAmountTtc", "status"],
+      invoices:         ["id", "contractId", "customerName", "dueDate", "amountTnd", "dueAmountTnd", "status"],
     };
 
     function getColPrefs(entity) {
@@ -10755,7 +10792,7 @@
           saveColPrefs(entity, keys);
           applyColPrefs(entity);
           // Re-render if entity has a dedicated render function
-          const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes };
+          const renderMap = { cars: renderCars, customers: renderCustomers, maintenance: renderMaintenance, payments: renderPayments, reservations: renderReservationsTable, insurances: renderInsurances, leasingContracts: renderLeasingContracts, vignettes: renderVignettes, contracts: renderContracts, quotes: renderQuotes, invoices: renderInvoices };
           if (renderMap[entity]) renderMap[entity]();
         });
       });
@@ -11414,6 +11451,8 @@
       const tbody = byId("quotesTable");
       if (!tbody) return;
       tbody.innerHTML = "";
+      const quotesTableEl = tbody.closest("table");
+      if (quotesTableEl) quotesTableEl.dataset.entity = "quotes";
       const statusFilter = byId("quotesFilterStatus") ? byId("quotesFilterStatus").value : "";
       const query = String(byId("quotesSearch") ? byId("quotesSearch").value : "").trim().toLowerCase();
       const filtered = (state.quotes || []).filter(q => {
@@ -11434,13 +11473,13 @@
         tr.className = "clickable-row";
         tr.addEventListener("dblclick", () => openQuoteDetail(q.id));
         tr.innerHTML = `
-          <td><a href="#" data-open-quote="${safe(q.id)}">${safe(q.quoteNumber || q.id)}</a></td>
-          <td>${safe(q.customerName || "-")}</td>
-          <td style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
-          <td style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
-          <td><a href="#" data-open-quote-detail="${safe(q.id)}" class="badge-lignes">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
-          <td>${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td><span class="badge-status ${statusCss}">${displayStatus}</span></td>
+          <td data-col="id"><a href="#" data-open-quote="${safe(q.id)}">${safe(q.quoteNumber || q.id)}</a></td>
+          <td data-col="customerName">${safe(q.customerName || "-")}</td>
+          <td data-col="periodStart" style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodEnd" style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="lignes"><a href="#" data-open-quote-detail="${safe(q.id)}" class="badge-lignes">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
+          <td data-col="totalAmountTtc">${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="status"><span class="badge-status ${statusCss}">${displayStatus}</span></td>
         `;
         tr.querySelectorAll("[data-open-quote],[data-open-quote-detail]").forEach(a => a.addEventListener("click", e => {
           e.preventDefault(); e.stopPropagation();
@@ -11449,6 +11488,7 @@
         tbody.appendChild(tr);
       });
       renderPaginationControls(null, "quotes", total, page, pages);
+      applyColPrefs("quotes");
     }
 
     // ── Entête devis ─────────────────────────────────────────────────────────
@@ -12242,6 +12282,8 @@
     function renderContracts() {
       const tbody = byId("contractsTable");
       tbody.innerHTML = "";
+      const contractsTableEl = tbody.closest("table");
+      if (contractsTableEl) contractsTableEl.dataset.entity = "contracts";
       const typeFilter  = dashboardFilters.contracts.type;
       const query       = String(dashboardFilters.contracts.query   || "").trim().toLowerCase();
       const quoteFilter = String(dashboardFilters.contracts.quoteId || "").trim().toLowerCase();
@@ -12281,18 +12323,18 @@
         const period = getContractPeriod(contract.id);
         const dateStyle = "white-space:nowrap;font-size:13px;";
         tr.innerHTML = `
-          <td>
+          <td data-col="id">
             <a href="#" data-open-contract="${safe(contract.id)}">${safe(contract.contractNumber || contract.id)}</a>
             <div class="small"><a class="xref" data-goto-tab="invoices" data-goto-query="${safe(contract.id)}" title="Voir les factures de ce contrat">Factures →</a></div>
           </td>
-          <td>${safe(contract.type)}</td>
-          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
-          <td>${quoteCell}</td>
-          <td style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
-          <td style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
-          <td><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
-          <td>${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${safe(contract.status)}</td>
+          <td data-col="type">${safe(contract.type)}</td>
+          <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
+          <td data-col="quoteId">${quoteCell}</td>
+          <td data-col="periodStart" style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodEnd" style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="lignes"><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
+          <td data-col="totalTnd">${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="status">${safe(contract.status)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -12328,6 +12370,7 @@
         });
       });
       renderPaginationControls(null, "contracts", total, page, pages);
+      applyColPrefs("contracts");
     }
 
     function getInvoiceStatusInfo(invoice) {
@@ -13066,6 +13109,8 @@
     function renderInvoices() {
       const tbody = byId("invoicesTable");
       tbody.innerHTML = "";
+      const invoicesTableEl = tbody.closest("table");
+      if (invoicesTableEl) invoicesTableEl.dataset.entity = "invoices";
       const statusFilter = dashboardFilters.invoices.status;
       const query = String(dashboardFilters.invoices.query || "").trim().toLowerCase();
       const filtered = state.invoices
@@ -13092,18 +13137,18 @@
         });
         tr.addEventListener("dblclick", () => openInvoiceEditModal(invoice.id));
         tr.innerHTML = `
-          <td>
+          <td data-col="id">
             <a href="#" class="xref" data-open-invoice="${safe(invoice.id)}">${safe(invoice.invoiceNumber || invoice.id)}</a>
             ${invoice.status === "brouillon" ? '<div class="small" style="color:#854d0e;">brouillon — non confirmé</div>' : `<div class="small">${safe(invoice.label || "")}</div>`}
           </td>
-          <td><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
-          <td><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
-          <td><a href="#" class="badge-lignes" data-open-invoice="${safe(invoice.id)}">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
-          <td>${safe(invoice.dueDate || "-")}</td>
-          <td>${Number(invoice.amountTnd).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td>${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td><span class="pill ${statusClass}">${statusLabel}</span></td>
+          <td data-col="contractId"><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
+          <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
+          <td data-col="lignes"><a href="#" class="badge-lignes" data-open-invoice="${safe(invoice.id)}">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
+          <td data-col="dueDate">${safe(invoice.dueDate || "-")}</td>
+          <td data-col="amountTnd">${Number(invoice.amountTnd).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="paidAmountTnd">${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="dueAmountTnd">${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="status"><span class="pill ${statusClass}">${statusLabel}</span></td>
         `;
         tbody.appendChild(tr);
       });
@@ -13121,6 +13166,7 @@
           goToRecord(a.getAttribute("data-goto-tab"), a.getAttribute("data-goto-query") || "");
         });
       });
+      applyColPrefs("invoices");
     }
 
     const COLLECTIONS_COLUMNS = [

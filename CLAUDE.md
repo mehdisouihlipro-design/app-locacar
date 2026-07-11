@@ -74,6 +74,24 @@ Toute collection de lignes rattachée à un entête (ex. `invoice_lines` → `in
 
 **Exemple appliqué** : `invoice_lines` (BR21, juin 2026) — `src/backend/routes/invoice-lines.routes.ts`, migration `006_br21_invoice_lines.sql`, `state.invoiceLines` dans le frontend.
 
+### Sélecteur de colonnes sur tous les grids (règle absolue)
+**Tout nouvel écran liste (grid)** doit intégrer le sélecteur de colonnes `⚙ Colonnes` dès sa création. Liste des étapes obligatoires :
+
+1. **HTML** — ajouter `<button class="secondary" data-col-picker="<entity>" onclick="openColumnPicker('<entity>', this)">⚙ Colonnes</button>` dans la `div.actions` du panel.
+2. **Thead statique** — ajouter `data-col="<key>"` sur chaque `<th>` de données (pas sur la colonne Action).
+3. **Tbody render** — ajouter `data-col="<key>"` sur chaque `<td>` de données dans la boucle de rendu.
+4. **data-entity** — au début de la fonction `render<Entity>()`, ajouter `tbody.closest("table").dataset.entity = "<entity>"`.
+5. **COL_DEFS** — ajouter une entrée `<entity>: [{ key, label, render }, …]` dans l'objet `COL_DEFS` (avant `renderCars`). `render` est optionnel pour les entités non-dynamiques.
+6. **DEFAULT_COLS** — ajouter `<entity>: ["col1", "col2", …]` dans l'objet `DEFAULT_COLS` (sous-ensemble par défaut).
+7. **applyColPrefs** — appeler `applyColPrefs("<entity>")` **en fin** de la fonction `render<Entity>()`.
+8. **saveAndRender** — ajouter `"<entity>"` dans le tableau passé à `.forEach(applyColPrefs)`.
+9. **renderMap** — ajouter `<entity>: render<Entity>` dans les trois `renderMap` de `openColumnPicker` (inline change-handler + bouton Défaut + bouton Tout).
+10. **COLUMNS array** — s'assurer que le `<ENTITY>_COLUMNS` array contient exactement les mêmes clés (dans le même ordre) que les `<th>` du thead statique de données, pour que `setupSortableTable` génère les bons filtres avec `data-col`.
+
+**Règle de parité thead/tbody** : le nombre de `<th data-col>` dans le thead doit être **identique** au nombre de `<td data-col>` dans chaque `<tr>` du tbody. Toute colonne ajoutée au tbody doit aussi être ajoutée au thead (et au `<ENTITY>_COLUMNS` array).
+
+**Repère d'audit** : chercher `data-col-picker="<entity>"`, `data-entity="<entity>"`, `applyColPrefs("<entity>")`, `COL_DEFS.<entity>`, `DEFAULT_COLS.<entity>` dans `worksheet-mini-app/index.html`.
+
 ### Cohérence des contrôles de saisie (règle absolue)
 Un même champ doit utiliser **le même type de contrôle à la création et dans l'éditeur générique de détail/édition** (`openRecordEditor`). Si un champ est une liste de choix contrainte (select) dans le formulaire de création, il doit rester un select avec les mêmes options dans l'éditeur générique — jamais retomber en saisie libre (`input` texte).
 - Repère pour appliquer cette règle : dans `getEditorFieldConfig`, ajouter l'entrée `"<entity>.<champ>"` au `lookupMap` avec les mêmes options que le `<select>` du formulaire de création.
