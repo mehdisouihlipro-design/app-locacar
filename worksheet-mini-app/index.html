@@ -3228,8 +3228,8 @@
               <input id="eurToTnd" type="number" min="0.001" step="0.001" value="3.4" />
             </div>
             <div>
-              <label>Solde initial tresorerie (TND)</label>
-              <input id="openingCashTnd" type="number" step="0.01" value="0" />
+              <label>Solde initial tresorerie (TND) <span style="font-size:11px;color:var(--muted);font-weight:400;">— calculé automatiquement</span></label>
+              <input id="openingCashTnd" type="number" step="0.01" value="0" readonly style="background:#f0f4f8;color:#64748b;cursor:default;" title="Somme des soldes initiaux par voiture — modifiable depuis la fiche de chaque véhicule" />
             </div>
             <div>
               <label>Buffer reservations (heures)</label>
@@ -5436,6 +5436,7 @@
         agency: c.location || c.agency || "",
         // Normalize: "disponible" → "dispo" to match internal app values
         status: c.status === "disponible" ? "dispo" : (c.status || "dispo"),
+        openingCashTnd: Number(c.opening_cash_tnd || 0),
         gpsLat: null, gpsLng: null, gpsSpeed: 0, gpsUpdatedAt: "-",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
@@ -8341,18 +8342,15 @@
       const dailyTaxTnd = Number(byId("dailyTaxTnd").value || 0);
       const stampDutyTnd = Number(byId("stampDutyTnd").value || 0);
       const eurToTnd = Number(byId("eurToTnd").value || 3.4);
-      const openingCashTnd = Number(byId("openingCashTnd").value || 0);
       const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
 
       if (eurToTnd <= 0) return { ok: false, message: "❌ Le taux EUR→TND doit etre positif." };
-      if (!Number.isFinite(openingCashTnd)) return { ok: false, message: "❌ Le solde initial de tresorerie est invalide." };
       if (!Number.isFinite(reservationBufferHours) || reservationBufferHours < 0) return { ok: false, message: "❌ Le buffer des reservations doit etre >= 0." };
       if (!Number.isFinite(vatRate) || vatRate < 0) return { ok: false, message: "❌ Le taux de TVA doit etre >= 0." };
       if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) return { ok: false, message: "❌ La taxe par jour doit etre >= 0." };
       if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) return { ok: false, message: "❌ Le timbre fiscal doit etre >= 0." };
 
       state.settings.eurToTnd = eurToTnd;
-      state.settings.openingCashTnd = openingCashTnd;
       state.settings.reservationBufferHours = reservationBufferHours;
       state.settings.vatRate = vatRate;
       state.settings.dailyTaxTnd = dailyTaxTnd;
@@ -8369,7 +8367,6 @@
 
       const saved = await apiPut("/settings", {
         eur_to_tnd: eurToTnd,
-        opening_cash_tnd: openingCashTnd,
         reservation_buffer_hours: reservationBufferHours,
         vat_rate: vatRate,
         daily_tax_tnd: dailyTaxTnd,
@@ -8484,7 +8481,7 @@
     }
 
     function mapCarToApi(c) {
-      return { plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible") };
+      return { plate: c.plate, model: c.model, location: c.agency || c.location || "", status: c.status === "dispo" ? "disponible" : (c.status || "disponible"), opening_cash_tnd: Number(c.openingCashTnd || 0) };
     }
 
     function mapCustomerToApi(c) {
@@ -8506,7 +8503,7 @@
 
     function populateSettingsFields() {
       byId("eurToTnd").value = state.settings.eurToTnd;
-      byId("openingCashTnd").value = state.settings.openingCashTnd || 0;
+      byId("openingCashTnd").value = (state.cars || []).reduce((s, c) => s + Number(c.openingCashTnd || 0), 0).toFixed(2);
       byId("reservationBufferHours").value = Number(state.settings.reservationBufferHours || 2);
       byId("vatRate").value = state.settings.vatRate ?? 19;
       byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
@@ -9685,7 +9682,7 @@
       endDate.setDate(endDate.getDate() + resolvedHorizonDays);
       const endIso = toIsoDate(endDate);
 
-      const openingCash = Number(state.settings.openingCashTnd || 0);
+      const openingCash = (state.cars || []).reduce((s, c) => s + Number(c.openingCashTnd || 0), 0);
       const realizedIn = state.payments
         .filter((p) => String(p.date || "") <= today)
         .reduce((sum, p) => sum + Number(p.amountTnd || 0), 0);
@@ -14084,6 +14081,7 @@
       };
 
       const inputTypeMap = {
+        "cars.openingCashTnd": "number",
         "invoices.dueDate": "date",
         "invoices.lastReminderAt": "date",
         "reservations.startDate": "date",
