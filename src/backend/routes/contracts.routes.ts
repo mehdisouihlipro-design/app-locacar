@@ -206,10 +206,6 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
         return res.status(409).json({ success: false, message: 'Un échéancier existe déjà pour ce contrat. Utilisez override:true pour régénérer.' });
     }
 
-    // Mensualité HT = somme des tarifs mensuels (rate) de toutes les lignes actives
-    // amount_ht = tarif × durée totale ; rate = tarif mensuel → on utilise rate, pas amount_ht
-    const monthlyAmountHt = lines.reduce((sum, l) => sum + Number(l.rate || 0), 0);
-
     // Lire le taux de TVA depuis les paramètres
     let vatRate = 0.19;
     try {
@@ -218,8 +214,12 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
       if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
     } catch (_) { /* fallback 19% */ }
 
-    const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
-    const lineTtc   = Math.round((monthlyAmountHt + vatAmount) * 1000) / 1000;
+    // Taux journalier par ligne = amount_ht / durée en jours de la ligne.
+    // Indépendant de la sémantique de `rate` (journalier ou mensuel selon la source du contrat).
+    const linesDailyRates = lines.map((l: any) => {
+      const lineDays = daysOverlap(l.period_start, l.period_end, l.period_start, l.period_end);
+      return { ...l, dailyRate: Number(l.amount_ht || 0) / Math.max(lineDays, 1) };
+    });
 
     // Générer une entrée par mois entre globalStart et globalEnd
     const entries: any[] = [];
@@ -235,7 +235,18 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
       // Ne pas dépasser globalEnd
       const periodEnd = toIso(nextMonth > end ? end : new Date(nextMonth.getTime() - 86400000));
 
-      const carPlates = lines.map(l => l.car_plate || '').filter(Boolean).join(', ');
+      // Montant HT de ce mois = somme sur chaque ligne du (taux journalier × jours chevauchant ce mois)
+      const monthlyAmountHt = Math.round(
+        linesDailyRates.reduce((sum: number, l: any) => {
+          const overlap = daysOverlap(periodStart, periodEnd, l.period_start, l.period_end);
+          return sum + l.dailyRate * overlap;
+        }, 0) * 1000
+      ) / 1000;
+
+      const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
+      const lineTtc   = Math.round((monthlyAmountHt + vatAmount) * 1000) / 1000;
+
+      const carPlates = lines.map((l: any) => l.car_plate || '').filter(Boolean).join(', ');
       const label = `Loyer ${formatMonthLabel(periodStart)}${carPlates ? ' — ' + carPlates : ''}`;
 
       const id = `SCH-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -266,6 +277,13 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
 
 function toIso(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+// Nombre de jours inclusifs dans l'intersection de deux périodes ISO
+function daysOverlap(startA: string, endA: string, startB: string, endB: string): number {
+  const s = Math.max(new Date(`${startA}T00:00:00`).getTime(), new Date(`${startB}T00:00:00`).getTime());
+  const e = Math.min(new Date(`${endA}T00:00:00`).getTime(),   new Date(`${endB}T00:00:00`).getTime());
+  return s > e ? 0 : Math.round((e - s) / 86400000) + 1;
 }
 
 function formatMonthLabel(isoDate: string): string {
