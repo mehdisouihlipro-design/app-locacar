@@ -1793,6 +1793,7 @@
           <button id="qdSendBtn" class="secondary" style="font-size:12px;">📤 Marquer envoyé</button>
           <button id="qdRefuseBtn" class="secondary" style="font-size:12px;color:#c53030;">✗ Refuser</button>
           <button id="qdValidateBtn" style="background:var(--success,#22c55e);color:#fff;font-weight:600;">✓ Valider → Contrat</button>
+          <button id="qdUnlockBtn" class="secondary" style="display:none;font-size:12px;">🔓 Débloquer</button>
           <button id="qdPdfBtn" class="secondary" style="font-size:12px;">🖨 PDF</button>
         </div>
 
@@ -11597,6 +11598,7 @@
       byId("qdSendBtn").style.display    = (!isLocked && q.status === "brouillon") ? "" : "none";
       byId("qdRefuseBtn").style.display  = isEditable ? "" : "none";
       byId("qdValidateBtn").style.display = isEditable ? "" : "none";
+      byId("qdUnlockBtn").style.display  = isLocked ? "" : "none";
       byId("qdPdfBtn").style.display     = "";
     }
 
@@ -12194,6 +12196,18 @@
       };
       byId("qdValidateBtn").onclick = () => validateQuote(quoteId);
       byId("qdPdfBtn").onclick      = () => generateQuotePdf(quoteId);
+      byId("qdUnlockBtn").onclick   = async () => {
+        const cur = (state.quotes || []).find(x => x.id === quoteId);
+        const contractRef = cur && cur.convertedContractId ? ` (contrat ${cur.convertedContractId})` : "";
+        if (!confirm(`Débloquer ce devis pour pouvoir le revalider ?\nLe contrat associé${contractRef} ne sera PAS supprimé automatiquement — supprimez-le manuellement si nécessaire.`)) return;
+        const res = await apiPutWithError(`/quotes/${quoteId}`, { status: "envoye", converted_contract_id: null });
+        if (!res.ok) { alert(res.errorMsg || "Erreur lors du déblocage."); return; }
+        const idx = state.quotes.findIndex(x => x.id === quoteId);
+        if (idx >= 0) { state.quotes[idx].status = "envoye"; state.quotes[idx].convertedContractId = null; }
+        renderQuoteDetailHeader(quoteId, false);
+        renderQuoteDetailLines(quoteId);
+        renderQuotes();
+      };
       byId("qdCloseBtn").onclick    = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
       byId("qdCloseBtn2").onclick   = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
       renderQuoteDetailHeader(quoteId, false);
