@@ -1597,6 +1597,41 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.21 ✅ Implémenté (2026-07) — Diagramme de Gantt des réservations sur le dashboard
+
+**Problème résolu** : le planning véhicules (Gantt) n'était visible que dans l'onglet Réservations, obligeant l'utilisateur à naviguer pour avoir une vue rapide de l'occupation de la flotte.
+
+**Implémentation** :
+- Nouvelle carte `cardGantt` (`dash-span-3`, pleine largeur) ajoutée sur la page d'accueil après les graphiques existants.
+- Contrôles autonomes : boutons zoom (Jour/Semaine/Mois), navigation ◀/▶ (mois), filtre véhicule — état séparé du Gantt de l'onglet Réservations (`dashboardFilters.homeTimeline`, `homeTimelineCursor`).
+- `renderReservationTimeline()` refactorisé pour accepter un paramètre `opts` (`containerId`, `vehicleSelectId`, `filters`, `calCursor`) — une seule fonction gère les deux instances.
+- `renderHomeGantt()` appelée depuis `renderHomeDashboard()` à chaque mise à jour.
+- La carte répond aux boutons toolbar (masquer/rétrécir/élargir/déplacer) comme les autres cartes du dashboard.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — HTML de la carte, `dashboardFilters.homeTimeline`, `homeTimelineCursor`, `renderReservationTimeline(opts)`, `renderHomeGantt()`, appel dans `renderHomeDashboard()`
+
+---
+
+### 9.22 ✅ Implémenté (2026-07) — Suppression d'un contrat
+
+**Problème résolu** : il n'était pas possible de supprimer un contrat créé par erreur depuis l'interface.
+
+**Implémentation** :
+- Bouton "🗑 Supprimer le contrat" ajouté dans le pied du modal de détail contrat.
+- Confirmation obligatoire via `window.confirm` avant suppression.
+- Backend `DELETE /contracts/:id` : vérifie l'absence de factures non-brouillon et de paiements avant de supprimer. Retourne 422 avec message explicite si des dépendances bloquantes existent.
+- Les `contract_lines` sont supprimées en cascade en base (FK `ON DELETE CASCADE`).
+- Les réservations liées voient leur `contract_line_id` mis à `null` (FK `ON DELETE SET NULL`).
+- L'état local (`state.contracts`, `state.contractLines`, `state.invoiceSchedule`, `state.invoices`) est nettoyé immédiatement sans rechargement complet.
+- Le modal se ferme et `saveAndRender()` met à jour la liste des contrats.
+
+**Fichiers modifiés** :
+- `src/backend/routes/contracts.routes.ts` — `DELETE /:id` : ajout des vérifications de sécurité
+- `worksheet-mini-app/index.html` — bouton `cdlDeleteBtn`, zone d'erreur `cdlDeleteError`, handler `openContractDetail`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026

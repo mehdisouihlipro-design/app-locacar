@@ -874,5 +874,30 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12).*  
+### UC-CTR-13 : Supprimer un contrat
+**En tant que gestionnaire**, je veux pouvoir supprimer définitivement un contrat sans factures confirmées ni paiements.
+
+- [ ] **Scénario nominal** : ouvrir fiche contrat sans facture confirmée → "🗑 Supprimer le contrat" → confirmer la boîte de dialogue → contrat disparaît de la liste
+- [ ] **Persistance** : F5 → le contrat n'est plus présent (supprimé en base via `DELETE /contracts/:id`)
+- [ ] **Lignes supprimées** : les `contract_lines` associées sont supprimées en cascade (FK `ON DELETE CASCADE`)
+- [ ] **Réservations conservées** : les réservations liées voient leur `contractLineId` mis à `null` mais ne sont pas supprimées
+- [ ] **Erreur backend — facture confirmée** : si une facture au statut `confirmée` existe → message "Impossible de supprimer : il possède des factures confirmées" affiché dans le modal
+- [ ] **Erreur backend — paiements** : si un paiement existe → message "Impossible de supprimer : des paiements y sont associés" affiché dans le modal
+- [ ] **Annuler** : cliquer "Annuler" dans la boîte de dialogue → aucune action
+
+---
+
+### UC-DASH-7 : Diagramme de Gantt des réservations sur le dashboard
+**En tant que gestionnaire**, je veux voir le planning des véhicules (type Gantt) directement sur la page d'accueil sans naviguer vers l'onglet Réservations.
+
+- [ ] **Scénario nominal** : se connecter → page d'accueil → carte "Planning véhicules" visible en pleine largeur avec les réservations en cours
+- [ ] **Zoom** : cliquer "Jour" / "Semaine" / "Mois" → la vue se met à jour immédiatement
+- [ ] **Navigation** : cliquer ◀ / ▶ → le mois (ou la période) change et la carte se rafraîchit
+- [ ] **Filtre véhicule** : sélectionner un véhicule dans le menu déroulant → seul ce véhicule est affiché
+- [ ] **Indépendance** : les contrôles du Gantt du dashboard sont indépendants de ceux de l'onglet Réservations (état séparé)
+- [ ] **Masquage/redimensionnement** : la carte répond aux boutons ✕ / ◂ / ▸ du toolbar comme les autres cartes
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*
