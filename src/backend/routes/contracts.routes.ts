@@ -206,13 +206,19 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
         return res.status(409).json({ success: false, message: 'Un échéancier existe déjà pour ce contrat. Utilisez override:true pour régénérer.' });
     }
 
-    // Lire le taux de TVA depuis les paramètres
+    // Lire TVA et taxe journalière depuis les paramètres
     let vatRate = 0.19;
+    let dailyTaxTnd = 2;
     try {
-      const settingsRes = await global.db.get('/settings?id=eq.1&select=vat_rate');
-      const vr = Number((settingsRes.data || [])[0]?.vat_rate);
-      if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
-    } catch (_) { /* fallback 19% */ }
+      const settingsRes = await global.db.get('/settings?id=eq.1&select=vat_rate,daily_tax_tnd');
+      const s = (settingsRes.data || [])[0];
+      if (s) {
+        const vr = Number(s.vat_rate);
+        if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
+        const dt = Number(s.daily_tax_tnd);
+        if (!isNaN(dt) && dt >= 0) dailyTaxTnd = dt;
+      }
+    } catch (_) { /* fallback */ }
 
     // Taux journalier par ligne = amount_ht / durée en jours de la ligne.
     // Indépendant de la sémantique de `rate` (journalier ou mensuel selon la source du contrat).
@@ -244,7 +250,15 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
       ) / 1000;
 
       const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
-      const lineTtc   = Math.round((monthlyAmountHt + vatAmount) * 1000) / 1000;
+
+      // Taxe journalière : dailyTaxTnd × jours de la période × nombre de lignes chevauchant ce mois
+      const periodDays = daysOverlap(periodStart, periodEnd, globalStart, globalEnd);
+      const overlappingLinesCount = linesDailyRates.filter(
+        (l: any) => daysOverlap(periodStart, periodEnd, l.period_start, l.period_end) > 0
+      ).length;
+      const dailyTaxAmount = Math.round(dailyTaxTnd * periodDays * overlappingLinesCount * 1000) / 1000;
+
+      const lineTtc = Math.round((monthlyAmountHt + vatAmount + dailyTaxAmount) * 1000) / 1000;
 
       const carPlates = lines.map((l: any) => l.car_plate || '').filter(Boolean).join(', ');
       const label = `Loyer ${formatMonthLabel(periodStart)}${carPlates ? ' — ' + carPlates : ''}`;
@@ -258,7 +272,7 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
         period_end:       periodEnd,
         amount_ht:        monthlyAmountHt,
         vat_amount:       vatAmount,
-        daily_tax_amount: 0,
+        daily_tax_amount: dailyTaxAmount,
         line_ttc:         lineTtc,
         label,
         status:           'planifie',

@@ -6425,12 +6425,23 @@
       const usedLines = pdfLines.length > 0 ? pdfLines : (invoice.lines || []);
 
       if (usedLines && usedLines.length) {
+        // Recalcul si les taxes stockées sont à 0 (factures générées avant le fix ou manuellement)
+        const storedDailyTax  = Number(invoice.dailyTaxAmount  || 0);
+        const storedStampDuty = Number(invoice.stampDutyAmount || 0);
+        const totalLineDays   = usedLines.reduce((s, l) => s + Number(l.days || 0), 0);
+        const computedDailyTax  = storedDailyTax  > 0 ? storedDailyTax  : Number(settings.dailyTaxTnd  || 0) * totalLineDays;
+        const computedStampDuty = storedStampDuty > 0 ? storedStampDuty : Number(settings.stampDutyTnd || 0);
+        const computedAmountHt  = Number(invoice.amountHt  || 0);
+        const computedVatAmount = Number(invoice.vatAmount  || 0);
+        const computedAmountTtc = computedAmountHt + computedVatAmount + computedDailyTax + computedStampDuty;
         breakdown = {
-          amountHt: Number(invoice.amountHt || 0),
-          vatAmount: Number(invoice.vatAmount || 0),
-          dailyTaxAmount: Number(invoice.dailyTaxAmount || 0),
-          stampDutyAmount: Number(invoice.stampDutyAmount || 0),
-          amountTtc: Number(invoice.amountTnd || 0),
+          amountHt:        computedAmountHt,
+          vatAmount:       computedVatAmount,
+          dailyTaxAmount:  computedDailyTax,
+          stampDutyAmount: computedStampDuty,
+          amountTtc:       computedAmountTtc,
+          totalLineDays,
+          lineCount: usedLines.length,
         };
         contractsLabel = usedLines.map((l) => l.contractId || "-").join(", ");
         lineRowsHtml = usedLines.map((line) => {
@@ -6572,7 +6583,7 @@
         <table width="100%">
           <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.amountHt)}</td></tr>
           <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 0)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.vatAmount)}</td></tr>
-          <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/j (${days || 0} j)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.dailyTaxAmount)}</td></tr>
+          <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/j (${breakdown.totalLineDays != null ? `${Math.round(breakdown.totalLineDays / Math.max(breakdown.lineCount || 1, 1))}j &times; ${breakdown.lineCount || 1} v&eacute;h` : `${days || 0} j`})</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.dailyTaxAmount)}</td></tr>
           <tr><td style="padding:4px 8px;">Timbre fiscal</td><td style="padding:4px 8px;text-align:right;">${formatTnd(breakdown.stampDutyAmount)}</td></tr>
           <tr style="font-weight:bold;border-top:2px solid #0d244a;">
             <td style="padding:6px 8px;">Total T.T.C</td>

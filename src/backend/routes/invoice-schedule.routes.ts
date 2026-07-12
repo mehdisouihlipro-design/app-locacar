@@ -83,6 +83,30 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
     const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${entry.contract_id}&status=eq.active&select=*`);
     const contractLines: any[] = linesRes.data || [];
 
+    // Lire taxe journalière et timbre depuis les paramètres
+    let dailyTaxTnd = 2;
+    let stampDutyTnd = 1;
+    try {
+      const settingsRes = await global.db.get('/settings?id=eq.1&select=daily_tax_tnd,stamp_duty_tnd');
+      const s = (settingsRes.data || [])[0];
+      if (s) {
+        const dt = Number(s.daily_tax_tnd);
+        if (!isNaN(dt) && dt >= 0) dailyTaxTnd = dt;
+        const sd = Number(s.stamp_duty_tnd);
+        if (!isNaN(sd) && sd >= 0) stampDutyTnd = sd;
+      }
+    } catch (_) { /* fallback */ }
+
+    const periodDays = daysBetween(entry.period_start, entry.period_end);
+    const nbLines = Math.max(contractLines.length, 1);
+
+    // daily_tax_amount = taxe/j × jours_période × nb_véhicules (une ligne = un véhicule)
+    const dailyTaxAmount = Math.round(dailyTaxTnd * periodDays * contractLines.length * 1000) / 1000;
+    const stampDutyAmount = stampDutyTnd;
+    const amountHt = Number(entry.amount_ht || 0);
+    const vatAmount = Number(entry.vat_amount || 0);
+    const amountTtc = Math.round((amountHt + vatAmount + dailyTaxAmount + stampDutyAmount) * 100) / 100;
+
     const invoiceId = `FAC-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
     // Attribuer le numéro de facture via la souche configurée
@@ -95,18 +119,18 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
       contract_id: entry.contract_id,
       customer_name: contract.customer_name || '',
       label: entry.label || `Loyer ${formatPeriodLabel(entry.period_start, entry.period_end)}`,
-      amount_ht: entry.amount_ht,
-      vat_amount: entry.vat_amount,
-      daily_tax_amount: entry.daily_tax_amount,
-      stamp_duty_amount: 0,
-      amount_tnd: entry.line_ttc,
-      amount_original: entry.amount_ht,
+      amount_ht: amountHt,
+      vat_amount: vatAmount,
+      daily_tax_amount: dailyTaxAmount,
+      stamp_duty_amount: stampDutyAmount,
+      amount_tnd: amountTtc,
+      amount_original: amountHt,
       currency: 'TND',
       period_start: entry.period_start,
       period_end: entry.period_end,
-      rental_days: daysBetween(entry.period_start, entry.period_end),
+      rental_days: periodDays,
       paid_amount_tnd: 0,
-      due_amount_tnd: entry.line_ttc,
+      due_amount_tnd: amountTtc,
       due_date: entry.scheduled_date,
       status: 'brouillon',
       invoice_number: invoiceNumber,
@@ -116,8 +140,13 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
     await global.db.post('/invoices', invoiceBody, { headers: { Prefer: 'resolution=merge-duplicates' } });
 
     // Créer les lignes de facture (une par contract_line)
+    // Chaque ligne reçoit : sa part du HT/TVA + dailyTaxTnd × jours (taxe par véhicule)
+    const lineDailyTax = Math.round(dailyTaxTnd * periodDays * 1000) / 1000;
     for (const cl of contractLines) {
       const lineId = `ILN-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const lineAmountHt  = Math.round(amountHt / nbLines * 1000) / 1000;
+      const lineVatAmount = Math.round(vatAmount / nbLines * 1000) / 1000;
+      const lineLineTtc   = Math.round((lineAmountHt + lineVatAmount + lineDailyTax) * 1000) / 1000;
       await global.db.post('/invoice_lines', stampCreate({
         id: lineId,
         invoice_id: invoiceId,
@@ -125,15 +154,15 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
         contract_line_id: cl.id || null,
         car_plate: cl.car_plate || '',
         designation: cl.car_plate || '',
-        amount_original: Number(cl.amount_ht || 0) / Math.max(1, contractLines.length),
+        amount_original: Number(cl.amount_ht || 0) / nbLines,
         currency: 'TND',
-        amount_ht: Number(entry.amount_ht) / Math.max(1, contractLines.length),
-        vat_amount: Number(entry.vat_amount) / Math.max(1, contractLines.length),
-        daily_tax_amount: Number(entry.daily_tax_amount) / Math.max(1, contractLines.length),
-        days: daysBetween(entry.period_start, entry.period_end),
+        amount_ht: lineAmountHt,
+        vat_amount: lineVatAmount,
+        daily_tax_amount: lineDailyTax,
+        days: periodDays,
         period_start: entry.period_start,
         period_end: entry.period_end,
-        line_ttc: Number(entry.line_ttc) / Math.max(1, contractLines.length),
+        line_ttc: lineLineTtc,
       }, req), { headers: { Prefer: 'return=minimal' } });
     }
 
