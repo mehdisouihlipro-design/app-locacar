@@ -12943,37 +12943,59 @@
         ieConfirmBtn.style.cssText = "background:var(--success,#22c55e);color:#fff;font-weight:600;";
         byId("ieAddLineBtn").parentNode.insertBefore(ieConfirmBtn, byId("ieAddLineBtn").nextSibling);
       }
+      // Bouton "Supprimer" — visible uniquement pour les brouillons
+      let ieDeleteBtn = byId("ieDeleteBtn");
+      if (!ieDeleteBtn) {
+        ieDeleteBtn = document.createElement("button");
+        ieDeleteBtn.id = "ieDeleteBtn";
+        ieDeleteBtn.className = "secondary";
+        ieDeleteBtn.style.cssText = "color:#c53030;border-color:#c53030;";
+        byId("ieAddLineBtn").parentNode.insertBefore(ieDeleteBtn, byId("ieAddLineBtn"));
+      }
       if (invoice.status === "brouillon") {
         ieConfirmBtn.style.display = "";
         ieConfirmBtn.textContent = "✓ Confirmer la facture";
         ieConfirmBtn.onclick = async () => {
-          if (!confirm("Confirmer cette facture ? Un numéro séquentiel lui sera attribué et elle ne pourra plus être supprimée.")) return;
-          // Générer le numéro côté frontend (appel direct Supabase RPC)
-          const invoiceNumber = await fetchNextSequenceNumber('invoices');
-          if (!invoiceNumber) { alert("Impossible de générer le numéro de facture. Vérifiez la configuration des souches."); return; }
+          if (!confirm("Confirmer cette facture ? Elle ne pourra plus être supprimée après confirmation.")) return;
+          // Si la facture a déjà un numéro (généré à la création), on le conserve sans incrémenter la souche
+          let invoiceNumber = invoice.invoiceNumber || null;
+          if (!invoiceNumber) {
+            invoiceNumber = await fetchNextSequenceNumber('invoices');
+            if (!invoiceNumber) { alert("Impossible de générer le numéro de facture. Vérifiez la configuration des souches."); return; }
+          }
           const res = await apiPutWithError(`/invoices/${invoice.id}`, { status: "en_attente", invoice_number: invoiceNumber });
           if (!res.ok) { alert(res.errorMsg || "Erreur lors de la confirmation."); return; }
           const idx = state.invoices.findIndex(i => String(i.id) === String(invoice.id));
-          if (idx >= 0) {
-            state.invoices[idx].status = "en_attente";
-            state.invoices[idx].invoiceNumber = invoiceNumber;
-          }
-          // Mettre à jour l'entrée d'échéancier dans le state local
+          if (idx >= 0) { state.invoices[idx].status = "en_attente"; state.invoices[idx].invoiceNumber = invoiceNumber; }
           if (invoice.scheduleId) {
             const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
-            if (sIdx >= 0) {
-              state.invoiceSchedule[sIdx].status = "confirme";
-              await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "confirme" });
-            }
+            if (sIdx >= 0) { state.invoiceSchedule[sIdx].status = "confirme"; await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "confirme" }); }
           }
           ieConfirmBtn.style.display = "none";
+          ieDeleteBtn.style.display = "none";
           byId("ieNumber").textContent = invoiceNumber;
           renderInvoiceDetailHeader(invoice.id, false);
           renderInvoices();
           if (invoice.contractId) renderContractSchedule(invoice.contractId);
         };
+        ieDeleteBtn.style.display = "";
+        ieDeleteBtn.textContent = "🗑 Supprimer";
+        ieDeleteBtn.onclick = async () => {
+          if (!confirm("Supprimer définitivement cette facture brouillon ?")) return;
+          const res = await apiDeleteWithError(`/invoices/${invoice.id}`);
+          if (!res || !res.ok) { alert((res && res.errorMsg) || "Erreur lors de la suppression."); return; }
+          state.invoices = state.invoices.filter(i => String(i.id) !== String(invoice.id));
+          if (invoice.scheduleId) {
+            const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
+            if (sIdx >= 0) { state.invoiceSchedule[sIdx].status = "planifie"; state.invoiceSchedule[sIdx].invoiceId = null; await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "planifie", invoice_id: null }); }
+          }
+          byId("invoiceEditModal").style.display = "none";
+          renderInvoices();
+          if (invoice.contractId) renderContractSchedule(invoice.contractId);
+        };
       } else {
         ieConfirmBtn.style.display = "none";
+        ieDeleteBtn.style.display = "none";
       }
 
       byId("ieAddLineBtn").textContent = "+ Ajouter une ligne";

@@ -155,8 +155,11 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     const contractDate = new Date().toISOString().split('T')[0];
     const contractType = quote.type || 'court';
     const paymentPlan = contractType === 'long' ? 'mensualite' : 'paiement client debut';
+    let contractNumber: string | null = null;
+    try { contractNumber = await nextSequenceNumber('contracts'); } catch (e) { console.error('[quotes/validate] nextSequenceNumber contracts:', e); }
     const contractBody = stampCreate({
       id: contractId,
+      contract_number: contractNumber,
       quote_id: req.params.id,
       customer_id: quote.customer_id,
       customer_name: quote.customer_name,

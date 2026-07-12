@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { stampCreate, stampUpdate } from '../utils/audit';
+import { nextSequenceNumber } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -84,7 +85,11 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
 
     const invoiceId = `FAC-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-    // Créer la facture brouillon (sans invoice_number)
+    // Attribuer le numéro de facture via la souche configurée
+    let invoiceNumber: string | null = null;
+    try { invoiceNumber = await nextSequenceNumber('invoices'); } catch (e) { console.error('[schedule/generate] nextSequenceNumber invoices:', e); }
+
+    // Créer la facture brouillon avec numéro de souche
     const invoiceBody = stampCreate({
       id: invoiceId,
       contract_id: entry.contract_id,
@@ -104,7 +109,7 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
       due_amount_tnd: entry.line_ttc,
       due_date: entry.scheduled_date,
       status: 'brouillon',
-      invoice_number: null,
+      invoice_number: invoiceNumber,
       schedule_id: entry.id,
       lines: [],
     }, req);
