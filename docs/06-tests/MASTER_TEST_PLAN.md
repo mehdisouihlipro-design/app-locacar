@@ -98,15 +98,24 @@
 ### UC-CUST-1 : Créer un client
 **En tant qu'agent**, je veux enregistrer un nouveau client.
 
-- [ ] **Formulaire client** : Nom (obligatoire), Téléphone, Email, Adresse, Notes
+- [ ] **Formulaire client** : Nom (obligatoire), Téléphone, Email, Adresse, Matricule fiscal, Type
 - [ ] **Nom vide → bloqué** : soumettre sans nom → erreur inline
+- [ ] **Matricule fiscal** : saisir un MF dans le formulaire → `POST /customers` avec `tax_id` → récupéré après F5
+- [ ] **Adresse** : saisir une adresse → persistée et visible dans le détail client
 - [ ] **Création et persistance** : créer un client → `POST /customers` → visible dans la grille, persiste après F5
 - [ ] **Recherche client** : dans le champ de recherche de la grille, taper une partie du nom → grille filtrée en temps réel
 
 ### UC-CUST-2 : Modifier / supprimer
-- [ ] **Édition via éditeur générique** : double-clic → modifier l'email → enregistrer → persisté
+- [ ] **Édition via éditeur générique** : double-clic → modifier le matricule fiscal ou l'adresse → enregistrer → persisté
 - [ ] **Suppression** : supprimer un client sans réservations/contrats actifs → `DELETE /customers/:id` → disparaît de la grille après F5
 - [ ] **Suppression bloquée (FK)** : tenter de supprimer un client qui a des contrats actifs → erreur de contrainte d'intégrité, message explicite, client non supprimé
+
+### UC-CUST-3 : Matricule fiscal et adresse dans le PDF facture
+**En tant qu'agent**, je veux que le PDF de facture affiche les coordonnées complètes du client.
+
+- [ ] **Nominal** : client avec adresse + email + MF → PDF facture affiche les 4 lignes (nom, adresse, tél, e-mail, MF)
+- [ ] **Champs vides** : client sans MF → ligne MF absente du PDF (pas de ligne vide)
+- [ ] **Persistance** : modifier le MF d'un client → regénérer le PDF → nouveau MF affiché
 
 ---
 

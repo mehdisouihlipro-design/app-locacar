@@ -1544,6 +1544,14 @@
           <input id="custPhone" placeholder="06XXXXXXXX" />
         </div>
         <div>
+          <label>Adresse</label>
+          <input id="custAddress" placeholder="12 rue de la Liberté, Tunis" />
+        </div>
+        <div>
+          <label>Matricule fiscal</label>
+          <input id="custTaxId" placeholder="0123456/A/M/000" />
+        </div>
+        <div>
           <label>Email</label>
           <input id="custEmail" placeholder="client@email.com" />
         </div>
@@ -5488,6 +5496,7 @@
       if (customers) state.customers = customers.map(c => ({
         id: c.id, name: c.name, phone: c.phone || "", email: c.email || "",
         address: c.address || "", type: c.type || "particulier",
+        taxId: c.tax_id || "",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
@@ -5765,21 +5774,25 @@
     });
 
     document.getElementById("addCustomerBtn").addEventListener("click", async () => {
-      const name = byId("custName").value.trim();
-      const phone = byId("custPhone").value.trim();
-      const email = byId("custEmail").value.trim();
-      const type = byId("custType").value;
+      const name    = byId("custName").value.trim();
+      const phone   = byId("custPhone").value.trim();
+      const email   = byId("custEmail").value.trim();
+      const address = byId("custAddress").value.trim();
+      const taxId   = byId("custTaxId").value.trim();
+      const type    = byId("custType").value;
 
       if (!name || !phone) { alert("Nom et telephone sont obligatoires."); return; }
 
       let id = uid("CLI");
-      const saved = await apiPost("/customers", { name, phone, email, type });
+      const saved = await apiPost("/customers", { name, phone, email, address, tax_id: taxId, type });
       if (saved && saved.id) id = saved.id;
 
-      state.customers.push({ id, name, phone, email, type });
+      state.customers.push({ id, name, phone, email, address, taxId, type });
       byId("custName").value = "";
       byId("custPhone").value = "";
       byId("custEmail").value = "";
+      byId("custAddress").value = "";
+      byId("custTaxId").value = "";
       saveAndRender();
     });
 
@@ -6306,9 +6319,10 @@
       const settings = state.settings || {};
 
       const clientName = safe(invoice.customerName || (customer && customer.name) || "-");
-      const clientInfo = (customer && (customer.address || customer.phone))
-        ? [customer.address, customer.phone].filter(Boolean).join(" · ")
-        : "";
+      const clientAddress = customer && customer.address ? safe(customer.address) : "";
+      const clientEmail   = customer && customer.email   ? safe(customer.email)   : "";
+      const clientTaxId   = customer && customer.taxId   ? safe(customer.taxId)   : "";
+      const clientPhone   = customer && customer.phone   ? safe(customer.phone)   : "";
 
       let breakdown;
       let lineRowsHtml;
@@ -6432,7 +6446,10 @@
   <div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px 10px;background:#f5f7ff;">
     <p style="font-size:10px;color:#1540c8;font-weight:bold;margin-bottom:4px;">Client</p>
     <p style="font-size:10px;"><strong>${clientName}</strong></p>
-    ${clientInfo ? `<p style="font-size:9px;color:#4d6a97;">${safe(clientInfo)}</p>` : ""}
+    ${clientAddress ? `<p style="font-size:9px;color:#4d6a97;">${clientAddress}</p>` : ""}
+    ${clientPhone   ? `<p style="font-size:9px;color:#4d6a97;">Tél : ${clientPhone}</p>` : ""}
+    ${clientEmail   ? `<p style="font-size:9px;color:#4d6a97;">E-mail : ${clientEmail}</p>` : ""}
+    ${clientTaxId   ? `<p style="font-size:9px;color:#4d6a97;">MF : ${clientTaxId}</p>` : ""}
   </div>
 
   <!-- Lignes de facture -->
@@ -7090,6 +7107,8 @@
             byId("custName").value = "";
             byId("custPhone").value = "";
             byId("custEmail").value = "";
+            byId("custAddress").value = "";
+            byId("custTaxId").value = "";
             byId("custType").value = "particulier";
             byId("custName").focus();
           }
@@ -8531,7 +8550,7 @@
     }
 
     function mapCustomerToApi(c) {
-      return { name: c.name, phone: c.phone || "", email: c.email || "" };
+      return { name: c.name, phone: c.phone || "", email: c.email || "", address: c.address || null, tax_id: c.taxId || null };
     }
 
     function mapReservationToApi(c) {
@@ -14376,7 +14395,7 @@
       "cars.gpsSpeed": "GPS Vitesse (km/h)", "cars.gpsUpdatedAt": "GPS Mis à jour le",
       // Clients
       "customers.name": "Nom complet", "customers.phone": "Téléphone",
-      "customers.email": "E-mail", "customers.address": "Adresse", "customers.type": "Type",
+      "customers.email": "E-mail", "customers.address": "Adresse", "customers.taxId": "Matricule fiscal", "customers.type": "Type",
       // Contrats
       "contracts.customerId": "Client", "contracts.carId": "Véhicule",
       "contracts.customerName": "Nom client", "contracts.carPlate": "Immatriculation",
