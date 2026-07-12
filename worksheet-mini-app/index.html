@@ -3243,8 +3243,8 @@
               <input id="eurToTnd" type="number" min="0.001" step="0.001" value="3.4" />
             </div>
             <div>
-              <label>Solde initial tresorerie (TND) <span style="font-size:11px;color:var(--muted);font-weight:400;">— calculé automatiquement</span></label>
-              <input id="openingCashTnd" type="number" step="0.01" value="0" readonly style="background:#f0f4f8;color:#64748b;cursor:default;" title="Somme des soldes initiaux par voiture — modifiable depuis la fiche de chaque véhicule" />
+              <label>Capital (TND)</label>
+              <input id="openingCashTnd" type="number" step="0.01" value="0" />
             </div>
             <div>
               <label>Buffer reservations (heures)</label>
@@ -8387,6 +8387,7 @@
       const dailyTaxTnd = Number(byId("dailyTaxTnd").value || 0);
       const stampDutyTnd = Number(byId("stampDutyTnd").value || 0);
       const eurToTnd = Number(byId("eurToTnd").value || 3.4);
+      const openingCashTnd = Number(byId("openingCashTnd").value || 0);
       const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
 
       if (eurToTnd <= 0) return { ok: false, message: "❌ Le taux EUR→TND doit etre positif." };
@@ -8396,6 +8397,7 @@
       if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) return { ok: false, message: "❌ Le timbre fiscal doit etre >= 0." };
 
       state.settings.eurToTnd = eurToTnd;
+      state.settings.openingCashTnd = openingCashTnd;
       state.settings.reservationBufferHours = reservationBufferHours;
       state.settings.vatRate = vatRate;
       state.settings.dailyTaxTnd = dailyTaxTnd;
@@ -8412,6 +8414,7 @@
 
       const saved = await apiPut("/settings", {
         eur_to_tnd: eurToTnd,
+        opening_cash_tnd: openingCashTnd,
         reservation_buffer_hours: reservationBufferHours,
         vat_rate: vatRate,
         daily_tax_tnd: dailyTaxTnd,
@@ -8568,7 +8571,7 @@
 
     function populateSettingsFields() {
       byId("eurToTnd").value = state.settings.eurToTnd;
-      byId("openingCashTnd").value = (state.cars || []).reduce((s, c) => s + Number(c.openingCashTnd || 0), 0).toFixed(2);
+      byId("openingCashTnd").value = Number(state.settings.openingCashTnd || 0).toFixed(2);
       byId("reservationBufferHours").value = Number(state.settings.reservationBufferHours || 2);
       byId("vatRate").value = state.settings.vatRate ?? 19;
       byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
@@ -9749,7 +9752,7 @@
       endDate.setDate(endDate.getDate() + resolvedHorizonDays);
       const endIso = toIsoDate(endDate);
 
-      const openingCash = (state.cars || []).reduce((s, c) => s + Number(c.openingCashTnd || 0), 0);
+      const openingCash = Number(state.settings.openingCashTnd || 0);
       const realizedIn = state.payments
         .filter((p) => String(p.date || "") <= today)
         .reduce((sum, p) => sum + Number(p.amountTnd || 0), 0);
@@ -12274,7 +12277,7 @@
     }
 
     function isContractFactured(contractId) {
-      return (state.invoices || []).some(inv => inv.contractId === contractId);
+      return (state.invoices || []).some(inv => inv.contractId === contractId && inv.status !== "brouillon");
     }
 
     function getContractPeriod(contractId) {
@@ -14698,12 +14701,16 @@
         const invoiceLink = linkedInvoice
           ? `<a href="#" data-open-invoice="${safe(linkedInvoice.id)}" style="font-family:monospace;">${safe(linkedInvoice.id)}</a>`
           : "";
+        const rateLabel = contract.rate ? `${Number(contract.rate).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${contract.rateCurrency || "TND"}` : "—";
+        const quotientLabel = contract.quotient ? `${Number(contract.quotient).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${contract.quotientCurrency || "TND"}` : "—";
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
           <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
           <div><span class="label-small">Statut</span><br><span style="${statusStyle}">${isBrouillon ? "⚠ brouillon" : safe(contract.status || "-")}</span></div>
+          <div><span class="label-small">Tarif</span><br>${rateLabel}</div>
+          <div><span class="label-small">Caution</span><br>${quotientLabel}</div>
           <div><span class="label-small">Devis d'origine</span><br>${quoteLink}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
@@ -14747,6 +14754,8 @@
         const custOpts = state.customers.map(c =>
           `<option value="${safe(c.id)}"${c.id === contract.customerId ? " selected" : ""}>${safe(c.name)}</option>`
         ).join("");
+        const CURRENCIES = ["TND","EUR","SAR","CAD","AED","USD","JPY","KWD","CHF","BHD","CNY","OMR","GBP"];
+        const currOpts = (sel) => CURRENCIES.map(c => `<option value="${c}"${c === sel ? " selected" : ""}>${c}</option>`).join("");
         byId("cdlHeader").innerHTML = `
           <div>
             <label class="label-small">Client</label>
@@ -14780,6 +14789,26 @@
               <option value="annule"${contract.status === "annule" ? " selected" : ""}>annulé</option>
             </select>
           </div>
+          <div style="display:flex;gap:6px;align-items:flex-end;">
+            <div style="flex:1;">
+              <label class="label-small">Tarif</label>
+              <input id="cdlERate" type="number" step="0.01" min="0" value="${contract.rate || 0}" style="width:100%;" />
+            </div>
+            <div style="flex:0 0 80px;">
+              <label class="label-small">Devise</label>
+              <select id="cdlERateCurrency" style="width:100%;">${currOpts(contract.rateCurrency || "TND")}</select>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:flex-end;">
+            <div style="flex:1;">
+              <label class="label-small">Caution</label>
+              <input id="cdlEQuotient" type="number" step="0.01" min="0" value="${contract.quotient || 0}" style="width:100%;" />
+            </div>
+            <div style="flex:0 0 80px;">
+              <label class="label-small">Devise</label>
+              <select id="cdlEQuotientCurrency" style="width:100%;">${currOpts(contract.quotientCurrency || "TND")}</select>
+            </div>
+          </div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
         `;
@@ -14792,19 +14821,28 @@
           const contractDate = byId("cdlEDate").value;
           const paymentMoment = byId("cdlEPayment").value;
           const status = byId("cdlEStatus").value;
+          const rate = Number(byId("cdlERate").value || 0);
+          const rateCurrency = byId("cdlERateCurrency").value;
+          const quotient = Number(byId("cdlEQuotient").value || 0);
+          const quotientCurrency = byId("cdlEQuotientCurrency").value;
           const customer = state.customers.find(c => c.id === customerId);
           const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
+          const eurToTnd = state.settings.eurToTnd || 3.4;
+          const quotientTnd = quotientCurrency === "TND" ? quotient : quotientCurrency === "EUR" ? quotient * eurToTnd : quotient;
           await apiPut(`/contracts/${contractId}`, {
             customer_id: customerId,
             customer_name: customer ? customer.name : contract.customerName,
             type, contract_date: contractDate,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
+            rate, rate_currency: rateCurrency,
+            quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd,
           });
           const idx = state.contracts.findIndex(c => c.id === contractId);
           if (idx >= 0) {
             Object.assign(state.contracts[idx], {
               customerId, customerName: customer ? customer.name : contract.customerName,
               type, contractDate, paymentMoment, paymentPlan, status,
+              rate, rateCurrency, quotient, quotientCurrency, quotientTnd,
             });
           }
           renderContractDetailHeader(contractId, false);
@@ -14844,7 +14882,7 @@
           : `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}`;
         const contractForLock = state.contracts.find(c => c.id === contractId);
         const isContractLockedForLine = contractForLock ? isContractFactured(contractId) : false;
-        const canEdit      = !isContractLockedForLine && (displayStatus === "active" || displayStatus === "brouillon");
+        const canEdit      = !isContractLockedForLine && displayStatus !== "annule" && displayStatus !== "resilie";
         const canTerminate = !isContractLockedForLine && displayStatus === "active";
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
@@ -14966,10 +15004,19 @@
         return;
       }
       const idx = (state.contractLines || []).findIndex(l => l.id === lineId);
-      if (idx >= 0) Object.assign(state.contractLines[idx], {
-        carId, carPlate: car ? car.plate : "", periodStart, periodEnd, days, months,
-        rate, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
-      });
+      if (idx >= 0) {
+        const prevLine = state.contractLines[idx];
+        const datesChanged = periodStart !== prevLine.periodStart || periodEnd !== prevLine.periodEnd;
+        Object.assign(state.contractLines[idx], {
+          carId, carPlate: car ? car.plate : "", periodStart, periodEnd, days, months,
+          rate, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+        });
+        // Sync reservation dates in state if period changed
+        if (datesChanged && prevLine.reservationId) {
+          const rsvIdx = (state.reservations || []).findIndex(r => r.id === prevLine.reservationId);
+          if (rsvIdx >= 0) { state.reservations[rsvIdx].startDate = periodStart; state.reservations[rsvIdx].endDate = periodEnd; }
+        }
+      }
       renderContractDetailLines(contractId);
       renderContractDetailHeader(contractId, false);
       renderContracts();

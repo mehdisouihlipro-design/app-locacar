@@ -1553,6 +1553,50 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.19 ✅ Implémenté (2026-07) — Capital (ex-Trésorerie initiale globale)
+
+**Problème résolu** : La trésorerie initiale globale était calculée automatiquement comme la somme des trésoreries initiales par véhicule ; ce champ était en lecture seule. L'utilisateur souhaitait un capital global indépendant des véhicules, saisissable directement.
+
+**Nouveau comportement** :
+- Le champ `opening_cash_tnd` de la table `settings` est désormais le **Capital global** de l'entreprise, saisissable librement dans les paramètres.
+- Le champ `opening_cash_tnd` de chaque voiture reste présent à titre informatif (non impacté sur la trésorerie globale).
+- Le calcul de la trésorerie actuelle dans le dashboard utilise `state.settings.openingCashTnd` (Capital) et non plus la somme des véhicules.
+
+**Règle annulée** : l'ancienne règle "tréso globale = Σ tréso initiale par voiture" est supprimée.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` :
+  - Paramètres : label renommé en "Capital (TND)", `readonly` supprimé, style grisé supprimé
+  - `populateSettingsFields` : lit `state.settings.openingCashTnd` au lieu de calculer la somme des voitures
+  - `persistSettingsFromModal` : lit l'input, met à jour `state.settings.openingCashTnd`, envoie `opening_cash_tnd` dans `PUT /settings`
+  - Dashboard (fonction `computeTreasury`) : `openingCash = Number(state.settings.openingCashTnd || 0)` au lieu du reduce sur les voitures
+
+---
+
+### 9.20 ✅ Implémenté (2026-07) — Lignes de contrat modifiables + champs entête complets
+
+**Problèmes résolus** :
+1. Les lignes de contrat étaient verrouillées dès qu'une facture brouillon existait (`isContractFactured` retournait `true` pour tout statut de facture), empêchant toute édition de dates → le changement des dates pour régénérer l'échéancier était impossible.
+2. Les lignes ayant une date de fin passée affichaient `displayStatus = "terminee"` et le bouton ✎ était masqué, même si le contrat n'était pas facturé.
+3. L'éditeur d'entête de contrat n'affichait que 5 champs (client, type, date signature, paiement, statut) ; les champs tarif et caution étaient absents.
+
+**Corrections** :
+- `isContractFactured(contractId)` : retourne `true` uniquement si une facture **non-brouillon** existe pour ce contrat. Les factures en statut "brouillon" ne verrouillent plus les lignes.
+- `canEdit` (lignes de contrat) : autorise désormais l'édition des lignes de statut "terminee" (expiré par date) — seules les lignes "annule" et "resilie" ne sont pas éditables.
+- Éditeur d'entête (mode édition) : ajout des champs `Tarif` + `Devise tarif` + `Caution` + `Devise caution`.
+- Vue lecture de l'entête : affiche désormais `Tarif` et `Caution`.
+- Sauvegarde de l'entête : envoie `rate`, `rate_currency`, `quotient`, `quotient_currency`, `quotient_tnd` dans `PUT /contracts/:id` et met à jour `state.contracts`.
+- Backend `PUT /contract-lines/:id` : synchronise automatiquement les dates de la réservation liée (`reservation_id`) quand `period_start`/`period_end` changent.
+- Frontend `saveContractLineEdit` : met à jour `state.reservations` pour la réservation liée si les dates ont changé.
+
+**Flux schedule → nouvelles dates** : L'utilisateur peut maintenant éditer les dates des lignes → sauvegarder → cliquer "↺ Régénérer" → le backend relit les lignes en DB (avec les nouvelles dates) et génère le bon échéancier.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — `isContractFactured`, `canEdit` (lignes), `renderContractDetailHeader` (vue lecture + vue édition + handler save)
+- `src/backend/routes/contract-lines.routes.ts` — `PUT /:id` : sync réservation liée si dates changent
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026

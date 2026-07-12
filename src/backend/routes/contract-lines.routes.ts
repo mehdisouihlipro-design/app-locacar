@@ -257,6 +257,19 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     const result = await global.db.patch(`/contract_lines?id=eq.${req.params.id}`, stampUpdate(req.body, req), {
       headers: { Prefer: 'return=representation' },
     });
+
+    // Sync reservation dates if period changed
+    const datesChanged = periodStart !== current.period_start || periodEnd !== current.period_end;
+    if (datesChanged && current.reservation_id) {
+      try {
+        await global.db.patch(
+          `/reservations?id=eq.${current.reservation_id}`,
+          stampUpdate({ start_date: periodStart, end_date: periodEnd }, req),
+          { headers: { Prefer: 'return=minimal' } }
+        );
+      } catch (_) { /* non-bloquant */ }
+    }
+
     res.json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
   } catch (err) {
     if (isExclusionViolation(err)) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: 'Ce véhicule est déjà engagé sur cette période.' });

@@ -828,5 +828,51 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-11 (POST /demo/clear, backup/restore, UC-SEQ-5 et UC-BAK-1/2).*  
+## 13. Module Paramètres — Capital
+
+### UC-SET-1 : Saisir le Capital de départ
+**En tant qu'administrateur**, je veux saisir un montant de capital global afin que la trésorerie actuelle du dashboard parte de ce montant.
+
+- [ ] **Scénario nominal** : ouvrir Paramètres → champ "Capital (TND)" éditable → saisir 50 000 → Enregistrer → le dashboard affiche une trésorerie actuelle cohérente avec ce capital
+- [ ] **Validation UI** : saisir une valeur négative → le champ l'accepte (capital négatif autorisé) ; saisir une valeur non numérique → le navigateur bloque (type="number")
+- [ ] **Persistance** : F5 après enregistrement → le champ Capital affiche toujours 50 000
+- [ ] **Dashboard** : trésorerie actuelle = Capital + encaissements réalisés − dépenses réalisées (plus de lien avec les trésoreries initiales des véhicules)
+- [ ] **Indépendance véhicules** : modifier la trésorerie initiale d'un véhicule → la trésorerie globale dans le dashboard n'est PAS impactée
+- [ ] **Rétro-compatibilité** : les champs "Trésorerie initiale" par véhicule restent affichés dans la fiche véhicule à titre informatif (non supprimés)
+
+---
+
+## 14. Module Contrats — Lignes modifiables + entête complet
+
+### UC-CTR-10 : Modifier les dates d'une ligne de contrat
+**En tant que gestionnaire**, je veux pouvoir modifier les dates d'une ligne de contrat existante afin de corriger une période ou de régénérer un échéancier cohérent.
+
+- [ ] **Scénario nominal** : ouvrir la fiche d'un contrat → cliquer ✎ sur une ligne active → modifier `periodStart`/`periodEnd` → ✓ → dates mises à jour, entête rafraîchi
+- [ ] **Ligne "terminée"** : une ligne dont `periodEnd < aujourd'hui` affiche bien le bouton ✎ (même si expirée par date) → modification possible
+- [ ] **Contrat avec facture brouillon** : si le contrat a uniquement des factures en statut "brouillon", les lignes restent éditables (le cadenas ne se déclenche que sur une facture non-brouillon)
+- [ ] **Contrat facturé (non-brouillon)** : si une facture confirmée existe, toutes les lignes sont verrouillées (pas de bouton ✎)
+- [ ] **Chevauchement BR19** : changer les dates vers une période déjà prise par un autre contrat → erreur 409 affichée sous la ligne
+- [ ] **Sync réservation** : après modification des dates, la réservation liée a ses `startDate`/`endDate` mis à jour en base et en mémoire
+- [ ] **Persistance** : F5 → les nouvelles dates sont toujours affichées
+
+### UC-CTR-11 : Régénérer l'échéancier après modification des dates
+**En tant que gestionnaire**, je veux régénérer l'échéancier d'un contrat long terme après avoir changé les dates d'une ligne pour que les mois de l'échéancier correspondent à la nouvelle période.
+
+- [ ] **Scénario nominal** : modifier les dates d'une ligne → cliquer "↺ Régénérer" → confirmer → l'échéancier affiche les mois correspondant aux nouvelles dates
+- [ ] **Entrées planifiées supprimées** : après régénération, les anciennes entrées "planifié" sont supprimées et remplacées par les nouvelles
+- [ ] **Entrées facturées conservées** : les entrées au statut "brouillon" ou "confirmé" (déjà facturées) ne sont PAS supprimées par la régénération
+- [ ] **Erreur : pas de lignes actives** : si toutes les lignes sont annulées → erreur 422 affichée
+
+### UC-CTR-12 : Modifier l'entête d'un contrat (tous les champs)
+**En tant que gestionnaire**, je veux modifier tous les champs de l'entête d'un contrat (client, type, date signature, paiement, statut, tarif, caution) depuis la modale de détail.
+
+- [ ] **Scénario nominal** : ouvrir fiche contrat → "✏ Modifier entête" → modifier le tarif et la devise → "✓ Enregistrer" → la vue lecture affiche les nouvelles valeurs
+- [ ] **Champs présents** : Client, Type, Date signature, Paiement, Statut, Tarif + Devise, Caution + Devise
+- [ ] **Vue lecture** : affiche Tarif et Caution avec leur devise respective
+- [ ] **Persistance** : F5 → les valeurs modifiées sont toujours affichées (sauvegardées via `PUT /contracts/:id`)
+- [ ] **Annuler** : cliquer "✗ Annuler" → les anciennes valeurs sont rétablies sans appel API
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*
