@@ -1477,6 +1477,39 @@
           </div>
         </div>
 
+        <!-- ── Gantt planning ── -->
+        <div class="chart-card dash-span-3" data-card-id="cardGantt" data-default-span="3" data-label="Planning véhicules (Gantt)">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <h4 style="margin:0;">Planning vehicules</h4>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div class="zoom-buttons">
+                  <button id="homeZoomDay" class="zoom-btn home-zoom-btn">Jour</button>
+                  <button id="homeZoomWeek" class="zoom-btn home-zoom-btn">Semaine</button>
+                  <button id="homeZoomMonth" class="zoom-btn home-zoom-btn active">Mois</button>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button id="homePrevMonth" class="secondary" style="padding:4px 10px;font-size:12px;">◀</button>
+                <span id="homeTimelineTitle" style="font-size:13px;font-weight:600;min-width:120px;text-align:center;">-</span>
+                <button id="homeNextMonth" class="secondary" style="padding:4px 10px;font-size:12px;">▶</button>
+              </div>
+              <div>
+                <select id="homeTimelineVehicleFilter" style="padding:4px 8px;border-radius:4px;border:1px solid #d1d5db;font-size:12px;">
+                  <option value="">Tous les vehicules</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="homeReservationTimeline" class="reservation-timeline"></div>
+        </div>
+
       </div>
     </section>
 
@@ -3144,8 +3177,10 @@
           <div id="cdlScheduleEmpty" style="display:none;text-align:center;padding:16px;color:var(--muted);font-size:13px;">Aucun échéancier — cliquez sur "Générer l'échéancier" pour créer les entrées mensuelles.</div>
         </div>
 
+        <div id="cdlDeleteError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:13px;"></div>
         <div class="actions" style="margin-top:16px;">
           <button id="cdlCloseBtn" class="secondary">Fermer</button>
+          <button id="cdlDeleteBtn" class="secondary" style="color:#c53030;border-color:#c53030;margin-left:auto;">🗑 Supprimer le contrat</button>
         </div>
       </div>
     </div>
@@ -3471,6 +3506,7 @@
     state.invoiceLines = [];
     state.invoiceSchedule = [];
     const reservationCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const homeTimelineCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     let supabaseClient = null;
     let currentUser = null;
     let remoteSaveTimer = null;
@@ -3510,6 +3546,7 @@
       insurances: { query: "" },
       alerts: { level: "" },
       timeline: { zoomMode: "month", vehicleFilter: "", focusDateIso: today },
+      homeTimeline: { zoomMode: "month", vehicleFilter: "" },
     };
     let selectedGpsCarId = "";
     const inspectionDraftPoints = {};
@@ -3631,6 +3668,60 @@
       byId("timelineVehicleFilter").addEventListener("change", (e) => {
         dashboardFilters.timeline.vehicleFilter = e.target.value;
         renderReservationTimeline();
+      });
+    }
+
+    // Home Gantt controls
+    const homeGanttOpts = () => ({ containerId: "homeReservationTimeline", vehicleSelectId: "homeTimelineVehicleFilter", filters: dashboardFilters.homeTimeline, calCursor: homeTimelineCursor });
+    function renderHomeGantt() {
+      const title = byId("homeTimelineTitle");
+      if (title) {
+        const zoomMode = dashboardFilters.homeTimeline.zoomMode || "month";
+        if (zoomMode === "month") title.textContent = homeTimelineCursor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+        else if (zoomMode === "week") {
+          const focusDate = new Date(`${dashboardFilters.homeTimeline.focusDateIso || today}T00:00:00`);
+          const dow = focusDate.getDay();
+          const startOfWeek = new Date(focusDate);
+          startOfWeek.setDate(focusDate.getDate() - (dow === 0 ? 6 : dow - 1));
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          title.textContent = `${startOfWeek.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} – ${endOfWeek.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`;
+        } else {
+          const fd = new Date(`${dashboardFilters.homeTimeline.focusDateIso || today}T00:00:00`);
+          title.textContent = fd.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+        }
+      }
+      renderReservationTimeline(homeGanttOpts());
+    }
+    if (byId("homePrevMonth")) {
+      byId("homePrevMonth").addEventListener("click", () => {
+        homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() - 1);
+        dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        renderHomeGantt();
+      });
+    }
+    if (byId("homeNextMonth")) {
+      byId("homeNextMonth").addEventListener("click", () => {
+        homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() + 1);
+        dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        renderHomeGantt();
+      });
+    }
+    ["day", "week", "month"].forEach((mode) => {
+      const btn = byId(`homeZoom${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+      if (btn) {
+        btn.addEventListener("click", () => {
+          dashboardFilters.homeTimeline.zoomMode = mode;
+          document.querySelectorAll(".home-zoom-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderHomeGantt();
+        });
+      }
+    });
+    if (byId("homeTimelineVehicleFilter")) {
+      byId("homeTimelineVehicleFilter").addEventListener("change", (e) => {
+        dashboardFilters.homeTimeline.vehicleFilter = e.target.value;
+        renderHomeGantt();
       });
     }
 
@@ -9513,6 +9604,8 @@
           riskEl.style.color = "var(--ok)";
         }
       }
+
+      renderHomeGantt();
     }
 
     function renderBarChart(containerId, series) {
@@ -10456,13 +10549,18 @@
         </div>`;
     }
 
-    function renderReservationTimeline() {
-      const container = byId("reservationTimeline");
+    function renderReservationTimeline(opts) {
+      const containerId = opts && opts.containerId ? opts.containerId : "reservationTimeline";
+      const vehicleSelectId = opts && opts.vehicleSelectId ? opts.vehicleSelectId : "timelineVehicleFilter";
+      const filters = opts && opts.filters ? opts.filters : dashboardFilters.timeline;
+      const calCursor = opts && opts.calCursor ? opts.calCursor : reservationCalendarCursor;
+
+      const container = byId(containerId);
       if (!container) return;
 
-      const zoomMode = dashboardFilters.timeline.zoomMode || "month";
-      const vehicleFilter = dashboardFilters.timeline.vehicleFilter || "";
-      const focusDateIso = dashboardFilters.timeline.focusDateIso || today;
+      const zoomMode = filters.zoomMode || "month";
+      const vehicleFilter = filters.vehicleFilter || "";
+      const focusDateIso = filters.focusDateIso || today;
       const focusDate = new Date(`${focusDateIso}T00:00:00`);
       const safeFocusDate = Number.isFinite(focusDate.getTime()) ? focusDate : new Date(`${today}T00:00:00`);
 
@@ -10484,8 +10582,8 @@
         timelineEnd.setHours(23, 59, 59, 999);
       } else {
         // Month view
-        timelineStart = new Date(reservationCalendarCursor.getFullYear(), reservationCalendarCursor.getMonth(), 1, 0, 0, 0);
-        timelineEnd = new Date(reservationCalendarCursor.getFullYear(), reservationCalendarCursor.getMonth() + 1, 0, 23, 59, 59);
+        timelineStart = new Date(calCursor.getFullYear(), calCursor.getMonth(), 1, 0, 0, 0);
+        timelineEnd = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 0, 23, 59, 59);
       }
 
       const timelineDuration = timelineEnd.getTime() - timelineStart.getTime();
@@ -10507,7 +10605,7 @@
       }
 
       // Update vehicle filter dropdown options
-      const vehicleSelect = byId("timelineVehicleFilter");
+      const vehicleSelect = byId(vehicleSelectId);
       if (vehicleSelect) {
         const uniqueCarIds = new Set();
         state.reservations.forEach((r) => {
@@ -10560,7 +10658,7 @@
         endDate.setDate(timelineStart.getDate() + 6);
         headerText = `Semaine du ${timelineStart.toLocaleDateString("fr-FR", { month: "short", day: "numeric" })} au ${endDate.toLocaleDateString("fr-FR", { month: "short", day: "numeric" })}`;
       } else {
-        headerText = reservationCalendarCursor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+        headerText = calCursor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
       }
 
       const header = `<div class="timeline-header"><div>Vehicule</div><div>${headerText}</div></div>`;
@@ -15590,6 +15688,29 @@
       } else {
         scheduleSection.style.display = "none";
       }
+
+      // Bouton supprimer
+      byId("cdlDeleteError").style.display = "none";
+      byId("cdlDeleteBtn").onclick = async () => {
+        if (!confirm(`Supprimer définitivement le contrat ${contract.contractNumber || contractId} ? Cette action est irréversible.`)) return;
+        byId("cdlDeleteError").style.display = "none";
+        const res = await apiDeleteWithError(`/contracts/${contractId}`);
+        if (!res.ok) {
+          byId("cdlDeleteError").textContent = res.errorMsg || "Erreur lors de la suppression.";
+          byId("cdlDeleteError").style.display = "";
+          return;
+        }
+        // Nettoyer l'état local
+        state.contracts = (state.contracts || []).filter(c => c.id !== contractId);
+        const lineIds = (state.contractLines || []).filter(l => l.contractId === contractId).map(l => l.id);
+        state.contractLines = (state.contractLines || []).filter(l => l.contractId !== contractId);
+        // Les réservations liées voient leur contractLineId mis à null (cascade DB: SET NULL)
+        (state.reservations || []).forEach(r => { if (lineIds.includes(r.contractLineId)) r.contractLineId = null; });
+        state.invoiceSchedule = (state.invoiceSchedule || []).filter(s => s.contractId !== contractId);
+        state.invoices = (state.invoices || []).filter(i => i.contractId !== contractId);
+        byId("contractDetailModal").style.display = "none";
+        saveAndRender();
+      };
 
       byId("contractDetailModal").style.display = "flex";
     }

@@ -47,6 +47,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const check = await global.db.get(`/contracts?id=eq.${req.params.id}&select=id`);
+    if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
+
+    // Refuser si des factures non-brouillon existent
+    const invRes = await global.db.get(`/invoices?contract_id=eq.${req.params.id}&status=neq.brouillon&select=id&limit=1`);
+    if ((invRes.data || []).length > 0) {
+      return res.status(422).json({ success: false, message: 'Impossible de supprimer ce contrat : il possède des factures confirmées. Annulez-les d\'abord.' });
+    }
+
+    // Refuser si des paiements existent
+    const payRes = await global.db.get(`/payments?contract_id=eq.${req.params.id}&select=id&limit=1`);
+    if ((payRes.data || []).length > 0) {
+      return res.status(422).json({ success: false, message: 'Impossible de supprimer ce contrat : des paiements y sont associés.' });
+    }
+
     await global.db.delete(`/contracts?id=eq.${req.params.id}`);
     res.json({ success: true, message: 'Contrat supprimé.' });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
