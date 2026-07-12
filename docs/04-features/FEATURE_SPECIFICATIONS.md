@@ -1632,6 +1632,55 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.23 ✅ Implémenté (2026-07) — Corrections UX : modaux, formulaires, Gantt en tête de dashboard
+
+**Problèmes résolus** :
+1. Sélectionner du texte dans un modal et relâcher la souris sur le fond sombre fermait accidentellement le modal (perte des saisies).
+2. Le bouton "Voir brouillon →" dans l'échéancier d'un contrat n'ouvrait pas la facture (modal facture masquée derrière le modal contrat).
+3. Après avoir cliqué "Ajouter" dans les formulaires inline (client, contrat, réservation), le formulaire restait ouvert.
+4. Le Gantt était placé après les graphiques sur le dashboard ; demande utilisateur : le mettre en premier, pleine largeur.
+
+**Implémentation** :
+- **Backdrop click** : ajout d'un tracker `_mousedownInModalCard` (phase capture) qui mémorise si le `mousedown` a démarré dans un `.modal-card`. Si oui, le `click` sur le fond sombre est annulé via `stopImmediatePropagation`.
+- **"Voir brouillon"** : `z-index` du `#invoiceEditModal` relevé de 2000 à 3100 afin d'apparaître au-dessus du `#contractDetailModal` (z-index 2000) lorsque les deux modaux sont ouverts simultanément.
+- **Fermeture des formulaires inline** : les handlers `addCustomerBtn`, `addContractBtn`, `addReservationBtn` cachent maintenant leur formulaire (`form.style.display = "none"`) après un ajout réussi.
+- **Gantt en premier** : la carte `cardGantt` (`dash-span-3`) est déplacée en tête du `#dashGrid`, avant les KPIs, pour être visible immédiatement à l'ouverture de l'accueil.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — tracker mousedown, z-index invoiceEditModal, handlers add*Btn, position cardGantt dans le grid
+
+---
+
+### 9.24 ✅ Implémenté (2026-07) — Champ téléphone non obligatoire pour les clients
+
+**Problème résolu** : lors de la création d'un client, le téléphone était obligatoire ce qui bloquait la création de prospects dont on ne dispose pas encore du numéro.
+
+**Implémentation** :
+- Validation du handler `addCustomerBtn` réduite à `!name` uniquement.
+- Message d'alerte mis à jour : "Le nom du client est obligatoire."
+- Le champ téléphone reste présent dans le formulaire mais devient facultatif.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — condition `if (!name || !phone)` → `if (!name)`
+
+---
+
+### 9.25 ✅ Implémenté (2026-07) — Remise à zéro manuelle d'une souche de numéros
+
+**Problème résolu** : il n'existait pas de moyen de remettre un compteur de souche à 1 depuis l'interface (ex. début d'exercice, jeu de test).
+
+**Implémentation** :
+- Endpoint backend `POST /number-sequences/:id/reset` : met `last_number = 0` et `last_year = null` — le prochain appel à `nextSequenceNumber` génèrera donc le numéro 1.
+- Bouton "🔄 Remettre à 0" ajouté dans chaque carte de souche dans les Paramètres, à côté du bouton "Resynchroniser".
+- Confirmation obligatoire via `window.confirm` avant réinitialisation.
+- Après succès, la liste des souches est rechargée automatiquement.
+
+**Fichiers modifiés** :
+- `src/backend/routes/number-sequences.routes.ts` — `POST /:id/reset`
+- `worksheet-mini-app/index.html` — bouton "🔄 Remettre à 0" dans `renderNumberSequences`, fonction `nsReset()`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026

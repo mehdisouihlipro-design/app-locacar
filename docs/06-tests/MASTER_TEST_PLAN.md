@@ -899,5 +899,61 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13).*  
+### UC-SEQ-6 : Remettre à zéro une souche manuellement
+**En tant qu'administrateur**, je veux pouvoir réinitialiser le compteur d'une souche à 1 pour commencer un nouvel exercice ou corriger une erreur de paramétrage.
+
+- [ ] **Scénario nominal** : Paramètres → Souches → cliquer "🔄 Remettre à 0" sur une souche → confirmer → compteur repart à 1 (prochain document = numéro 1 du format configuré)
+- [ ] **Confirmation obligatoire** : la boîte de dialogue doit apparaître avant toute action ; cliquer "Annuler" → aucune modification
+- [ ] **Persistance** : F5 → la liste des souches affiche `Dernier n° : 0` (ou équivalent) et `Prochain : 1`
+- [ ] **Prochain document** : créer un document du type remis à zéro → son numéro commence bien à 1
+- [ ] **Erreur backend** : souche introuvable → 404 + message affiché
+
+---
+
+### UC-CUST-5 : Créer un client sans téléphone
+**En tant que commercial**, je veux créer une fiche client avec uniquement le nom, sans être bloqué par l'absence de numéro de téléphone.
+
+- [ ] **Scénario nominal** : formulaire client → remplir uniquement le champ Nom → cliquer "Ajouter" → client créé sans erreur
+- [ ] **Validation UI** : laisser le Nom vide → message "Le nom du client est obligatoire." ; téléphone vide → aucune erreur
+- [ ] **Persistance** : F5 → le client sans téléphone apparaît toujours dans la liste
+- [ ] **Édition ultérieure** : ouvrir la fiche client → pouvoir ajouter/modifier le téléphone via l'éditeur générique
+
+---
+
+### UC-UX-1 : Fermeture du formulaire inline après ajout
+**En tant qu'utilisateur**, je veux que le formulaire de création se referme automatiquement après avoir cliqué "Ajouter" pour ne pas avoir à le fermer manuellement.
+
+- [ ] **Client** : Ajouter un client → formulaire `#customerLegacyForm` se cache automatiquement
+- [ ] **Contrat** : Ajouter un contrat → formulaire `#contractLegacyForm` se cache automatiquement
+- [ ] **Réservation** : Ajouter une réservation → formulaire `#reservationLegacyForm` se cache automatiquement
+- [ ] **Données conservées** : la fermeture ne supprime pas l'enregistrement créé (déjà persisté)
+
+---
+
+### UC-UX-2 : Sélection de texte dans un modal sans fermeture accidentelle
+**En tant qu'utilisateur**, je veux pouvoir sélectionner du texte dans un modal (copier-coller) sans risquer de fermer le modal si ma souris sort du cadre.
+
+- [ ] **Scénario nominal** : cliquer dans un champ texte du modal → glisser la souris en dehors du `.modal-card` pour sélectionner → relâcher la souris → le modal reste ouvert
+- [ ] **Fermeture volontaire** : cliquer directement sur le fond sombre (sans sélection préalable) → le modal se ferme normalement
+
+---
+
+### UC-UX-3 : Voir le brouillon depuis l'échéancier d'un contrat
+**En tant que gestionnaire**, je veux que le lien "Voir brouillon →" dans l'échéancier d'un contrat ouvre la facture brouillon par-dessus le modal contrat.
+
+- [ ] **Scénario nominal** : ouvrir un contrat → onglet Échéancier → cliquer "Voir brouillon →" sur une ligne au statut `brouillon` → le modal facture s'ouvre et est visible (pas masqué derrière le modal contrat)
+- [ ] **Fermeture** : fermer le modal facture → le modal contrat est toujours visible en arrière-plan
+
+---
+
+### UC-DASH-8 : Gantt en tête de page d'accueil
+**En tant qu'utilisateur**, je veux voir le planning des véhicules en premier sur la page d'accueil, sans scroller.
+
+- [ ] **Position** : à l'ouverture de l'accueil, la carte Gantt est la première carte visible (avant les KPIs)
+- [ ] **Pleine largeur** : la carte occupe les 3 colonnes de la grille (`dash-span-3`)
+- [ ] **Indépendance** : les contrôles du Gantt de l'accueil (zoom, navigation, filtre véhicule) n'affectent pas le Gantt de l'onglet Réservations
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

@@ -126,4 +126,18 @@ router.get('/:id/audit', async (req: AuthRequest, res: Response) => {
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
+// ── POST /:id/reset — remet le compteur à 0 (prochain numéro = 1) ─────────────
+router.post('/:id/reset', async (req: AuthRequest, res: Response) => {
+  try {
+    const check = await global.db.get(`/number_sequences?id=eq.${req.params.id}&select=id`);
+    if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Souche introuvable.' });
+    await global.db.patch(
+      `/number_sequences?id=eq.${req.params.id}`,
+      { last_number: 0, last_year: null, updated_at: new Date().toISOString() },
+      { headers: { Prefer: 'return=minimal' } }
+    );
+    res.json({ success: true, message: 'Souche remise à zéro. Prochain numéro : 1.' });
+  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+});
+
 export default router;

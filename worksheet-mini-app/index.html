@@ -1301,6 +1301,39 @@
       <!-- Grille unique — KPIs + graphiques, tout déplaçable -->
       <div id="dashboardGrid" class="dashboard-grid">
 
+        <!-- ── Gantt planning ── -->
+        <div class="chart-card dash-span-3" data-card-id="cardGantt" data-default-span="3" data-label="Planning véhicules (Gantt)">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <h4 style="margin:0;">Planning vehicules</h4>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div class="zoom-buttons">
+                  <button id="homeZoomDay" class="zoom-btn home-zoom-btn">Jour</button>
+                  <button id="homeZoomWeek" class="zoom-btn home-zoom-btn">Semaine</button>
+                  <button id="homeZoomMonth" class="zoom-btn home-zoom-btn active">Mois</button>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button id="homePrevMonth" class="secondary" style="padding:4px 10px;font-size:12px;">◀</button>
+                <span id="homeTimelineTitle" style="font-size:13px;font-weight:600;min-width:120px;text-align:center;">-</span>
+                <button id="homeNextMonth" class="secondary" style="padding:4px 10px;font-size:12px;">▶</button>
+              </div>
+              <div>
+                <select id="homeTimelineVehicleFilter" style="padding:4px 8px;border-radius:4px;border:1px solid #d1d5db;font-size:12px;">
+                  <option value="">Tous les vehicules</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="homeReservationTimeline" class="reservation-timeline"></div>
+        </div>
+
         <!-- ── KPI cards ── -->
         <div class="card dash-span-1" data-card-id="kpiAvailCars" data-default-span="1" data-label="Véhicules disponibles">
           <div class="card-toolbar">
@@ -1477,38 +1510,6 @@
           </div>
         </div>
 
-        <!-- ── Gantt planning ── -->
-        <div class="chart-card dash-span-3" data-card-id="cardGantt" data-default-span="3" data-label="Planning véhicules (Gantt)">
-          <div class="card-toolbar">
-            <button class="cbt cbt-hide" title="Masquer">✕</button>
-            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
-            <button class="cbt cbt-expand" title="Élargir">▸</button>
-            <span class="drag-handle" title="Déplacer">⠿</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <h4 style="margin:0;">Planning vehicules</h4>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-              <div>
-                <div class="zoom-buttons">
-                  <button id="homeZoomDay" class="zoom-btn home-zoom-btn">Jour</button>
-                  <button id="homeZoomWeek" class="zoom-btn home-zoom-btn">Semaine</button>
-                  <button id="homeZoomMonth" class="zoom-btn home-zoom-btn active">Mois</button>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <button id="homePrevMonth" class="secondary" style="padding:4px 10px;font-size:12px;">◀</button>
-                <span id="homeTimelineTitle" style="font-size:13px;font-weight:600;min-width:120px;text-align:center;">-</span>
-                <button id="homeNextMonth" class="secondary" style="padding:4px 10px;font-size:12px;">▶</button>
-              </div>
-              <div>
-                <select id="homeTimelineVehicleFilter" style="padding:4px 8px;border-radius:4px;border:1px solid #d1d5db;font-size:12px;">
-                  <option value="">Tous les vehicules</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div id="homeReservationTimeline" class="reservation-timeline"></div>
-        </div>
 
       </div>
     </section>
@@ -3048,7 +3049,7 @@
     </div>
 
     <!-- Modal édition / impression de facture -->
-    <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:16px;">
+    <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3100;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(960px,100%);max-height:92vh;overflow:auto;">
         <button type="button" class="modal-close-x" data-close-target="ieCloseBtn" aria-label="Fermer">&times;</button>
         <h3 style="margin:0 0 12px;">Facture <span id="ieNumber" style="font-family:monospace;"></span></h3>
@@ -3637,6 +3638,19 @@
         resetInspectionFormForCreateMode();
       });
     }
+
+    // Empêche la fermeture du modal quand l'utilisateur sélectionne du texte
+    // et que la souris déborde sur le backdrop
+    let _mousedownInModalCard = false;
+    document.addEventListener('mousedown', (e) => {
+      _mousedownInModalCard = !!(e.target && e.target.closest && e.target.closest('.modal-card'));
+    }, true);
+    document.addEventListener('click', (e) => {
+      if (_mousedownInModalCard && e.target && e.target.classList && e.target.classList.contains('modal')) {
+        e.stopImmediatePropagation();
+      }
+      _mousedownInModalCard = false;
+    }, true);
 
     byId("prevCalendarMonth").addEventListener("click", () => {
       reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() - 1);
@@ -5873,7 +5887,7 @@
       const taxId   = byId("custTaxId").value.trim();
       const type    = byId("custType").value;
 
-      if (!name || !phone) { alert("Nom et telephone sont obligatoires."); return; }
+      if (!name) { alert("Le nom du client est obligatoire."); return; }
 
       let id = uid("CLI");
       const saved = await apiPost("/customers", { name, phone, email, address, tax_id: taxId, type });
@@ -5886,6 +5900,8 @@
       byId("custAddress").value = "";
       byId("custTaxId").value = "";
       saveAndRender();
+      const form = byId("customerLegacyForm");
+      if (form) form.style.display = "none";
     });
 
     document.getElementById("addContractBtn").addEventListener("click", async () => {
@@ -5940,6 +5956,8 @@
 
       renderContracts();
       openContractDetail(contractId);
+      const form = byId("contractLegacyForm");
+      if (form) form.style.display = "none";
     });
 
     if (byId("invoiceCustomer")) {
@@ -6867,6 +6885,8 @@
       });
 
       saveAndRender();
+      const form = byId("reservationLegacyForm");
+      if (form) form.style.display = "none";
     });
 
     if (byId("addMaintenanceBtn")) {
@@ -16280,6 +16300,7 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsOpenEdit('${s.id}')">✏ Configurer</button>
               <button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsResync('${s.id}','${safe(s.label)}')">↺ Resynchroniser</button>
+              <button class="secondary" style="font-size:11px;padding:4px 10px;color:#c53030;border-color:#c53030;" onclick="nsReset('${s.id}','${safe(s.label)}')">🔄 Remettre à 0</button>
               ${['invoices','contracts','quotes'].includes(s.id) ? `<button class="secondary" style="font-size:11px;padding:4px 10px;" onclick="nsOpenAudit('${s.id}','${safe(s.label)}')">🔍 Audit trous</button>` : ''}
             </div>
           </div>`).join('');
@@ -16354,6 +16375,18 @@
       const data = await res.json();
       if (!res.ok) { alert("Erreur : " + (data.message || "Resync échoué.")); return; }
       alert(`✅ ${data.message}`);
+      renderNumberSequences();
+    }
+
+    async function nsReset(seqId, label) {
+      if (!confirm(`Remettre à zéro la souche "${label}" ?\nLe prochain numéro généré sera 1.\nCette action est irréversible.`)) return;
+      const token = localStorage.getItem("locacar-jwt");
+      const res = await fetch(`${API_URL}/number-sequences/${seqId}/reset`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.message || 'Erreur lors de la remise à zéro.'); return; }
+      alert(data.message || 'Souche remise à zéro.');
       renderNumberSequences();
     }
 
