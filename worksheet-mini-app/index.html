@@ -12042,7 +12042,8 @@
         apiGet("/contracts"), apiGet("/contract-lines"), apiGet("/reservations"),
       ]);
       if (newContractsRaw) state.contracts = newContractsRaw.map(c => ({
-        id: c.id, customerId: c.customer_id, customerName: c.customer_name || "",
+        id: c.id, contractNumber: c.contract_number || null,
+        customerId: c.customer_id, customerName: c.customer_name || "",
         carId: c.car_id, carPlate: c.car_plate || "", contractDate: c.contract_date || "",
         type: c.type || "court", days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
