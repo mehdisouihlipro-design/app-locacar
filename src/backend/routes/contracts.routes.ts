@@ -191,10 +191,18 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
         return res.status(409).json({ success: false, message: 'Un échéancier existe déjà pour ce contrat. Utilisez override:true pour régénérer.' });
     }
 
-    // Montant HT mensuel total = somme des tarifs (rate) de toutes les lignes actives
-    // Pour un contrat long terme, rate = tarif mensuel par ligne
-    const monthlyAmountHt = lines.reduce((sum, l) => sum + Number(l.amount_ht || l.rate || 0), 0);
-    const vatRate = 0.19; // TODO: lire depuis settings si besoin
+    // Mensualité HT = somme des tarifs mensuels (rate) de toutes les lignes actives
+    // amount_ht = tarif × durée totale ; rate = tarif mensuel → on utilise rate, pas amount_ht
+    const monthlyAmountHt = lines.reduce((sum, l) => sum + Number(l.rate || 0), 0);
+
+    // Lire le taux de TVA depuis les paramètres
+    let vatRate = 0.19;
+    try {
+      const settingsRes = await global.db.get('/settings?id=eq.1&select=vat_rate');
+      const vr = Number((settingsRes.data || [])[0]?.vat_rate);
+      if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
+    } catch (_) { /* fallback 19% */ }
+
     const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
     const lineTtc   = Math.round((monthlyAmountHt + vatAmount) * 1000) / 1000;
 
