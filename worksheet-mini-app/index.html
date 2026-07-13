@@ -3048,6 +3048,40 @@
       </div>
     </div>
 
+    <!-- ── Gantt quick-create popover ── -->
+    <div id="ganttQuickPopover" style="display:none;position:fixed;z-index:4500;background:#fff;border:1px solid #d1d5db;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:18px 20px;min-width:290px;max-width:310px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <strong style="font-size:14px;">⚡ Nouvelle réservation</strong>
+        <button onclick="byId('ganttQuickPopover').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 2px;">✕</button>
+      </div>
+      <div id="gqpCarLabel" style="font-size:12px;color:#4b5563;background:#f3f4f6;border-radius:6px;padding:5px 10px;margin-bottom:12px;font-weight:600;"></div>
+      <input type="hidden" id="gqpCarId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Début</label>
+          <input type="date" id="gqpStartDate" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Heure</label>
+          <input type="time" id="gqpStartTime" value="09:00" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Fin</label>
+          <input type="date" id="gqpEndDate" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Heure</label>
+          <input type="time" id="gqpEndTime" value="18:00" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+      <input type="text" id="gqpNote" placeholder="Note (optionnel)" style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;">
+      <div id="gqpError" style="display:none;color:#c53030;font-size:12px;margin-bottom:8px;background:#fff5f5;border-radius:5px;padding:5px 8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button id="gqpSaveBtn" onclick="ganttQuickSave()" style="flex:1;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">⚡ Créer</button>
+        <button onclick="byId('ganttQuickPopover').style.display='none'" style="padding:9px 14px;border:1px solid #d1d5db;border-radius:7px;background:#f9fafb;font-size:13px;cursor:pointer;">Annuler</button>
+      </div>
+    </div>
+
     <!-- Modal édition / impression de facture -->
     <div id="invoiceEditModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3100;align-items:center;justify-content:center;padding:16px;">
       <div class="modal-card" style="width:min(960px,100%);max-height:92vh;overflow:auto;">
@@ -3644,6 +3678,11 @@
     let _mousedownInModalCard = false;
     document.addEventListener('mousedown', (e) => {
       _mousedownInModalCard = !!(e.target && e.target.closest && e.target.closest('.modal-card'));
+      // Fermer le popover Gantt si clic en dehors
+      const pop = byId('ganttQuickPopover');
+      if (pop && pop.style.display !== 'none' && !pop.contains(e.target)) {
+        pop.style.display = 'none';
+      }
     }, true);
     document.addEventListener('click', (e) => {
       if (_mousedownInModalCard && e.target && e.target.classList && e.target.classList.contains('modal')) {
@@ -10659,11 +10698,7 @@
         });
       }
 
-      if (activeReservations.length === 0) {
-        container.innerHTML = '<div class="timeline-empty">Aucune reservation sur la periode selectionnee.</div>';
-        return;
-      }
-
+      // Construire la map véhicule → réservations de la période
       const byCar = new Map();
       activeReservations.forEach((r) => {
         const list = byCar.get(String(r.carId)) || [];
@@ -10671,14 +10706,22 @@
         byCar.set(String(r.carId), list);
       });
 
-      const rows = [...byCar.entries()]
-        .map(([carId, reservations]) => {
-          const car = state.cars.find((c) => String(c.id) === String(carId));
-          return {
-            carLabel: car ? `${car.plate} - ${car.model}` : reservations[0].carPlate || carId,
-            reservations: reservations.sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b)),
-          };
-        })
+      // Afficher TOUS les véhicules (même sans réservation) pour que les pistes soient cliquables
+      const carsToShow = vehicleFilter
+        ? state.cars.filter((c) => String(c.id) === String(vehicleFilter))
+        : state.cars;
+
+      if (carsToShow.length === 0) {
+        container.innerHTML = '<div class="timeline-empty">Aucun vehicule enregistre.</div>';
+        return;
+      }
+
+      const rows = carsToShow
+        .map((car) => ({
+          carId: String(car.id),
+          carLabel: `${car.plate} - ${car.model}`,
+          reservations: (byCar.get(String(car.id)) || []).sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b)),
+        }))
         .sort((a, b) => a.carLabel.localeCompare(b.carLabel));
 
       let headerText = "";
@@ -10694,15 +10737,17 @@
 
       const header = `<div class="timeline-header"><div>Vehicule</div><div>${headerText}</div></div>`;
 
+      const tsStart = timelineStart.getTime();
+      const tsDur = timelineDuration;
       const body = rows
         .map((row) => {
           const bars = row.reservations
             .map((r) => {
-              const rs = Math.max(getReservationStartTs(r), timelineStart.getTime());
+              const rs = Math.max(getReservationStartTs(r), tsStart);
               const re = Math.min(getReservationEndTs(r), timelineEnd.getTime());
-              const leftPct = ((rs - timelineStart.getTime()) / timelineDuration) * 100;
-              const widthPct = Math.max(zoomMode === "day" ? 1 : 2, ((re - rs) / timelineDuration) * 100);
-              
+              const leftPct = ((rs - tsStart) / tsDur) * 100;
+              const widthPct = Math.max(zoomMode === "day" ? 1 : 2, ((re - rs) / tsDur) * 100);
+
               // Check for conflicts
               const conflict = findReservationConflict(r);
               const conflictClass = conflict ? "conflict" : "";
@@ -10719,7 +10764,7 @@
             <div class="timeline-row">
               <div class="timeline-car">${safe(row.carLabel)}</div>
               <div>
-                <div class="timeline-track">${bars}</div>
+                <div class="timeline-track" data-car-id="${safe(row.carId)}" data-ts-start="${tsStart}" data-ts-dur="${tsDur}" onclick="handleGanttTrackClick(event,this)" style="cursor:crosshair;" title="Cliquer pour créer une réservation">${bars}</div>
               </div>
             </div>`;
         })
@@ -10734,6 +10779,117 @@
       if (!Number.isFinite(d.getTime())) return isoDate;
       d.setDate(d.getDate() + Number(days || 0));
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    // ── Gantt quick-create ────────────────────────────────────────────────────────
+
+    function handleGanttTrackClick(e, trackEl) {
+      // Ignorer les clics sur les barres existantes
+      if (e.target && e.target.classList && e.target.classList.contains("timeline-bar")) return;
+      const carId = trackEl.dataset.carId;
+      const tsStart = Number(trackEl.dataset.tsStart);
+      const tsDur = Number(trackEl.dataset.tsDur);
+      const rect = trackEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const clickedTs = tsStart + pct * tsDur;
+      const d = new Date(clickedTs);
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      ganttQuickCreate(carId, iso, rect);
+    }
+
+    function ganttQuickCreate(carId, dateIso, anchorRect) {
+      const car = state.cars.find((c) => String(c.id) === String(carId));
+      if (!car) return;
+      byId("gqpCarId").value = carId;
+      byId("gqpCarLabel").textContent = `${car.plate} — ${car.model}`;
+      byId("gqpStartDate").value = dateIso;
+      byId("gqpStartTime").value = "09:00";
+      const nd = new Date(`${dateIso}T00:00:00`);
+      nd.setDate(nd.getDate() + 1);
+      const endIso = `${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,"0")}-${String(nd.getDate()).padStart(2,"0")}`;
+      byId("gqpEndDate").value = endIso;
+      byId("gqpEndTime").value = "18:00";
+      byId("gqpNote").value = "";
+      const errEl = byId("gqpError");
+      if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+      const pop = byId("ganttQuickPopover");
+      pop.style.display = "block";
+      // Positionner près du clic
+      let top = anchorRect ? anchorRect.bottom + 8 : window.innerHeight / 2 - 160;
+      let left = anchorRect ? anchorRect.left : window.innerWidth / 2 - 145;
+      if (top + 340 > window.innerHeight) top = (anchorRect ? anchorRect.top : window.innerHeight / 2 + 160) - 340;
+      if (left + 295 > window.innerWidth) left = window.innerWidth - 305;
+      pop.style.top = `${Math.max(8, top)}px`;
+      pop.style.left = `${Math.max(8, left)}px`;
+      setTimeout(() => byId("gqpEndDate").focus(), 60);
+    }
+
+    async function ganttQuickSave() {
+      const carId = byId("gqpCarId").value;
+      const startDate = byId("gqpStartDate").value;
+      const startTime = byId("gqpStartTime").value || "09:00";
+      const endDate = byId("gqpEndDate").value;
+      const endTime = byId("gqpEndTime").value || "18:00";
+      const note = byId("gqpNote").value.trim();
+      const errEl = byId("gqpError");
+      errEl.style.display = "none";
+
+      if (!carId || !startDate || !endDate) {
+        errEl.textContent = "Dates obligatoires.";
+        errEl.style.display = "block";
+        return;
+      }
+      const startAt = toReservationDateTime(startDate, startTime, true);
+      const endAt = toReservationDateTime(endDate, endTime, false);
+      if (!startAt || !endAt || startAt >= endAt) {
+        errEl.textContent = "La date/heure de fin doit être après le début.";
+        errEl.style.display = "block";
+        return;
+      }
+      const conflict = findReservationConflict({ id: "", carId, startDate, startTime, endDate, endTime, status: "en_attente" });
+      if (conflict) {
+        errEl.textContent = `Conflit : déjà réservé du ${conflict.startDate} ${conflict.startTime||"00:00"} au ${conflict.endDate} ${conflict.endTime||"23:59"}.`;
+        errEl.style.display = "block";
+        return;
+      }
+      const car = state.cars.find((c) => String(c.id) === String(carId));
+      const resId = uid("RES");
+      const btn = byId("gqpSaveBtn");
+      if (btn) btn.disabled = true;
+      const savedRes = await apiPost("/reservations", {
+        id: resId,
+        car_id: carId,
+        car_plate: car ? car.plate : "",
+        start_date: startDate,
+        start_time: startTime,
+        end_date: endDate,
+        end_time: endTime,
+        status: "en_attente",
+        notes: note || null,
+      });
+      if (btn) btn.disabled = false;
+      if (!savedRes) {
+        errEl.textContent = "Erreur lors de la création. Réessayez.";
+        errEl.style.display = "block";
+        return;
+      }
+      const actualId = (savedRes && savedRes.id) ? savedRes.id : resId;
+      state.reservations.push({
+        id: actualId,
+        customerId: null,
+        customerName: "",
+        carId,
+        carPlate: car ? car.plate : "",
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        status: "en_attente",
+        notes: note || null,
+      });
+      byId("ganttQuickPopover").style.display = "none";
+      saveAndRender();
+      renderReservationTimeline(homeGanttOpts());
     }
 
     function renderKpis() {

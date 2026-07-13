@@ -955,5 +955,23 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-12 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8).*  
+---
+
+### UC-RSV-10 : Créer une réservation rapide depuis le Gantt de l'accueil
+**En tant qu'opérateur**, je veux cliquer sur la piste d'un véhicule dans le Gantt pour créer une réservation en quelques secondes sans quitter la page d'accueil.
+
+- [ ] **Scénario nominal** : cliquer sur une zone vide de la piste d'un véhicule → popover s'ouvre avec le véhicule pré-rempli, date = date cliquée + 1 jour, heures 09h-18h → modifier si besoin → "⚡ Créer" → réservation créée et Gantt mis à jour
+- [ ] **Pré-remplissage date** : la date de début dans le popover correspond bien à la position du clic dans la timeline (ex. cliquer sur le 15 du mois → gqpStartDate = 15)
+- [ ] **Clic sur une barre existante** : le popover ne s'ouvre PAS quand on clique sur une réservation déjà affichée
+- [ ] **Validation UI** : date fin ≤ date début → message d'erreur inline dans le popover sans fermer celui-ci
+- [ ] **Conflit** : le véhicule est déjà réservé sur la période → message de conflit affiché dans le popover
+- [ ] **Client facultatif** : la réservation est créée sans client (champ absent du popover)
+- [ ] **Note** : renseigner une note → elle est enregistrée en base et visible dans la fiche réservation
+- [ ] **Fermeture** : cliquer en dehors du popover → il se ferme sans créer de réservation
+- [ ] **Tous les véhicules** : même les véhicules sans réservation dans la période affichent une piste cliquable
+- [ ] **Persistance** : F5 après création → la réservation est présente dans le Gantt et dans l'onglet Réservations
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

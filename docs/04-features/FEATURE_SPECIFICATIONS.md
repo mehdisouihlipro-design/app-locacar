@@ -1681,6 +1681,24 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.26 ✅ Implémenté (2026-07) — Création rapide de réservation depuis le Gantt
+
+**Problème résolu** : créer une réservation depuis l'accueil nécessitait de naviguer vers l'onglet Réservations, puis remplir un formulaire complet.
+
+**Implémentation** :
+- Le Gantt affiche désormais **tous les véhicules** (même ceux sans réservation sur la période), ce qui permet de cliquer sur n'importe quelle piste.
+- Cliquer sur la piste d'un véhicule (zone libre, pas sur une barre existante) calcule la date cliquée depuis la position horizontale du curseur et ouvre un **mini-popover ancré** (`#ganttQuickPopover`, z-index 4500).
+- Le popover pré-remplit : le véhicule (depuis la ligne), la date de début (depuis la position du clic), heure début 09h00, date fin + 1 jour, heure fin 18h00.
+- Champs du popover : Date début / Heure début / Date fin / Heure fin / Note (optionnel). Le client est **facultatif**.
+- Vérifications inline : date fin > date début, absence de conflit avec une réservation existante.
+- Cliquer en dehors du popover le ferme sans créer de réservation.
+- `POST /reservations` envoyé avec `notes` ; l'état local est mis à jour immédiatement et le Gantt est re-rendu.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — HTML `#ganttQuickPopover`, fonctions `handleGanttTrackClick`, `ganttQuickCreate`, `ganttQuickSave` ; `renderReservationTimeline` modifié pour montrer tous les véhicules et ajouter `onclick` sur chaque `.timeline-track`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026
