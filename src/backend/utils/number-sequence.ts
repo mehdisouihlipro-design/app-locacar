@@ -48,3 +48,46 @@ export async function resyncSequence(sequenceId: string): Promise<number> {
     return 0;
   }
 }
+
+// Mapping séquence → table/colonne pour la libération après suppression
+const SEQ_TABLE_MAP: Record<string, { table: string; col: string }> = {
+  invoices:  { table: 'invoices',  col: 'invoice_number' },
+  contracts: { table: 'contracts', col: 'contract_number' },
+  quotes:    { table: 'quotes',    col: 'quote_number' },
+};
+
+// Après suppression d'un enregistrement, recalcule last_number = MAX des numéros restants.
+// Permet de réutiliser le numéro libéré au prochain enregistrement créé.
+export async function releaseSequenceOnDelete(sequenceId: string): Promise<void> {
+  // 1. Essai via RPC (plus fiable, géré côté base)
+  try {
+    await global.db.post('/rpc/resync_sequence', { p_sequence_id: sequenceId });
+    return;
+  } catch (_) {
+    console.warn(`[sequence] RPC resync_sequence indisponible pour "${sequenceId}", fallback REST.`);
+  }
+
+  // 2. Fallback REST : lit tous les numéros restants, extrait la partie numérique, prend le max
+  const target = SEQ_TABLE_MAP[sequenceId];
+  if (!target) return;
+
+  try {
+    const records = await global.db.get(`/${target.table}?${target.col}=not.is.null&select=${target.col}&limit=2000`);
+    const nums: number[] = (records.data || [])
+      .map((r: any) => {
+        const m = String(r[target.col] || '').match(/(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+      .filter((n: number) => n > 0);
+    const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
+
+    await global.db.patch(
+      `/number_sequences?id=eq.${sequenceId}`,
+      { last_number: maxNum, updated_at: new Date().toISOString() },
+      { headers: { Prefer: 'return=minimal' } }
+    );
+    console.log(`[sequence] Souche "${sequenceId}" libérée → last_number=${maxNum}`);
+  } catch (err: any) {
+    console.warn(`[sequence] releaseSequenceOnDelete fallback échoué pour "${sequenceId}":`, err?.message);
+  }
+}

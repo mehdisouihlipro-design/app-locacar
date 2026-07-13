@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -6527,14 +6527,17 @@
           totalLineDays,
           lineCount: usedLines.length,
         };
-        contractsLabel = usedLines.map((l) => l.contractId || "-").join(", ");
+        contractsLabel = [...new Set(usedLines.map((l) => {
+          const lc = state.contracts.find(c => String(c.id) === String(l.contractId || ''));
+          return lc ? (lc.contractNumber || lc.id) : (l.contractId || '-');
+        }))].join(', ');
         lineRowsHtml = usedLines.map((line) => {
           const lineContract = state.contracts.find((c) => String(c.id) === String(line.contractId || ""));
           const lineCar = lineContract ? state.cars.find((c) => String(c.id) === String(lineContract.carId || "")) : null;
           const lineDesignation = safe((lineCar && lineCar.model) || line.designation || "Vehicule");
           const linePlate = safe((lineCar && lineCar.plate) || line.carPlate || "-");
           return `<tr>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(line.contractId || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(lineContract ? (lineContract.contractNumber || lineContract.id) : (line.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(line.periodStart || "-")}</td>
@@ -6550,11 +6553,12 @@
         breakdown = invoice.amountHt
           ? computeTtcFromHt(Number(invoice.amountHt), days)
           : computeHtFromTtc(amountTtcFallback, days);
-        contractsLabel = invoice.contractId || "-";
+        const fallbackContract = state.contracts.find(c => String(c.id) === String(invoice.contractId || ''));
+        contractsLabel = fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || '-');
         const designation = car ? safe(car.model || "Vehicule") : "Vehicule";
         const plate = car ? safe(car.plate || "-") : "-";
         lineRowsHtml = `<tr>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.contractId || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodStart || "-")}</td>
@@ -6622,7 +6626,7 @@
       </td>
       <td style="vertical-align:top;text-align:right;">
         <h2 style="font-size:14px;color:#1540c8;">FACTURE</h2>
-        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(invoice.id)}</strong></p>
+        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(invoice.invoiceNumber || invoice.id)}</strong></p>
         <p style="font-size:10px;">Contrat(s)&nbsp;: <strong>${safe(contractsLabel)}</strong></p>
         <p style="font-size:10px;">Date&nbsp;: <strong>${safe(invoice.dueDate || new Date().toISOString().slice(0, 10))}</strong></p>
       </td>
@@ -12935,13 +12939,15 @@
       if (!hdr) return;
       const editBtn = byId("ieEditHeaderBtn");
       const cancelBtn = byId("ieCancelEditBtn");
+      const _invContract = state.contracts.find(c => String(c.id) === String(invoice.contractId || ""));
+      const _invContractLabel = _invContract ? (_invContract.contractNumber || _invContract.id) : (invoice.contractId || "-");
 
       if (!editMode) {
         const balance = Number(invoice.dueAmountTnd || 0);
         const statusLabel = { en_attente: "En attente", non_payee: "Non payee", payee: "Payee", partiel: "Partiellement payee" }[invoice.status] || invoice.status;
         hdr.innerHTML = `
           <div><span class="label-small">Client</span><div style="font-weight:600;">${safe(invoice.customerName || "-")}</div></div>
-          <div><span class="label-small">Contrat</span><div>${safe(invoice.contractId || "-")}</div></div>
+          <div><span class="label-small">Contrat</span><div>${safe(_invContractLabel)}</div></div>
           <div><span class="label-small">Libelle</span><div>${safe(invoice.label || "-")}</div></div>
           <div><span class="label-small">Echeance</span><div>${safe(invoice.dueDate || "-")}</div></div>
           <div><span class="label-small">Statut</span><div>${statusLabel}</div></div>
@@ -12962,7 +12968,7 @@
         const ribSelHtml = ribOpts.map(o => `<option value="${safe(o.value)}"${invoice.rib === o.value ? " selected" : ""}>${safe(o.label)}</option>`).join("");
         hdr.innerHTML = `
           <div><span class="label-small">Client</span><div style="color:var(--muted);">${safe(invoice.customerName || "-")}</div></div>
-          <div><span class="label-small">Contrat</span><div style="color:var(--muted);">${safe(invoice.contractId || "-")}</div></div>
+          <div><span class="label-small">Contrat</span><div style="color:var(--muted);">${safe(_invContractLabel)}</div></div>
           <div><span class="label-small">Libelle</span><input id="ieELabel" style="width:100%;" value="${safe(invoice.label || "")}" /></div>
           <div><span class="label-small">Echeance</span><input id="ieEDueDate" type="date" style="width:100%;" value="${safe(invoice.dueDate || "")}" /></div>
           <div><span class="label-small">Statut</span>
@@ -16957,3 +16963,8 @@
   </script>
 </body>
 </html>
+
+
+
+
+

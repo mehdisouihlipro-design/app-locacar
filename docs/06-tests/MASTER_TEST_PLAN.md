@@ -910,6 +910,18 @@
 
 ---
 
+### UC-SEQ-7 : Libération automatique de la souche à la suppression
+**En tant qu'utilisateur**, je veux que la suppression d'un contrat ou d'un devis libère son numéro de souche, afin que le prochain enregistrement créé réutilise ce numéro plutôt qu'en consommer un nouveau.
+
+- [ ] **Scénario nominal** : créer un contrat (n° CTR-2026-0003) → le supprimer → créer un nouveau contrat → son numéro est CTR-2026-0003 (réutilisé)
+- [ ] **Dernier enregistrement supprimé** : si le seul contrat existant est supprimé → créer un contrat → numéro repart à 0001
+- [ ] **Suppression non-terminale** : CTR-0001, CTR-0002, CTR-0003 → supprimer CTR-0003 → créer → CTR-0003 réutilisé ; CTR-0001 et CTR-0002 toujours présents et intacts
+- [ ] **Devis** : même comportement pour les devis (QUO-*)
+- [ ] **Persistance** : F5 après la suppression → l'onglet Paramètres/Souches affiche le `last_number` mis à jour
+- [ ] **Erreur backend** : si la resynchronisation échoue (RPC et fallback REST), la suppression réussit quand même (`.catch(() => {})` non bloquant)
+
+---
+
 ### UC-CUST-5 : Créer un client sans téléphone
 **En tant que commercial**, je veux créer une fiche client avec uniquement le nom, sans être bloqué par l'absence de numéro de téléphone.
 
@@ -973,5 +985,5 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10).*  
+*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

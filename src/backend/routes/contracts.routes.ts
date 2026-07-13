@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { stampCreate, stampUpdate } from '../utils/audit';
-import { nextSequenceNumber } from '../utils/number-sequence';
+import { nextSequenceNumber, releaseSequenceOnDelete } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -63,6 +63,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     await global.db.delete(`/contracts?id=eq.${req.params.id}`);
+    releaseSequenceOnDelete('contracts').catch(() => {});
     res.json({ success: true, message: 'Contrat supprimé.' });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
@@ -319,11 +320,15 @@ function daysOverlap(startA: string, endA: string, startB: string, endB: string)
   return s > e ? 0 : Math.round((e - s) / 86400000) + 1;
 }
 
-// Nombre de mois calendaires entre deux dates ISO (inclusif des deux extrémités)
+// Nombre de périodes de facturation entre deux dates ISO (même logique que la boucle de génération).
+// end.day >= start.day → une période complète de plus dans le dernier mois.
 function countCalendarMonths(start: string, end: string): number {
   const s = new Date(`${start}T00:00:00`);
   const e = new Date(`${end}T00:00:00`);
-  return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1);
+  const yearDiff  = e.getFullYear() - s.getFullYear();
+  const monthDiff = e.getMonth()    - s.getMonth();
+  const dayDiff   = e.getDate()     - s.getDate();
+  return Math.max(1, yearDiff * 12 + monthDiff + (dayDiff >= 0 ? 1 : 0));
 }
 
 function formatMonthLabel(isoDate: string): string {

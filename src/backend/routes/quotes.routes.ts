@@ -2,7 +2,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { stampCreate, stampUpdate } from '../utils/audit';
-import { nextSequenceNumber } from '../utils/number-sequence';
+import { nextSequenceNumber, releaseSequenceOnDelete } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -124,7 +124,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const check = await global.db.get(`/quotes?id=eq.${req.params.id}&select=id`);
+    if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Devis introuvable.' });
     await global.db.delete(`/quotes?id=eq.${req.params.id}`);
+    releaseSequenceOnDelete('quotes').catch(() => {});
     res.json({ success: true, message: 'Devis supprimé.' });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });

@@ -1699,6 +1699,30 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.27 ✅ Implémenté (2026-07) — Libération automatique de la souche à la suppression
+
+**Problème résolu** : supprimer un contrat ou un devis laissait `last_number` inchangé, consommant définitivement le numéro même si aucun document final ne le portait.
+
+**Implémentation** :
+- Nouvelle fonction exportée `releaseSequenceOnDelete(sequenceId)` dans `src/backend/utils/number-sequence.ts`.
+- Elle tente d'abord l'appel RPC `resync_sequence` (atomique côté base). En cas d'échec, elle lit toutes les valeurs du champ numéro dans la table cible, extrait la partie numérique via regex `(\d+)$`, calcule le MAX et met à jour `last_number` directement via REST (`PATCH /number_sequences?id=eq.{sequenceId}`).
+- Appelée de manière **non bloquante** (`.catch(() => {})`) après le `DELETE` réussi dans :
+  - `DELETE /contracts/:id` → `releaseSequenceOnDelete('contracts')`
+  - `DELETE /quotes/:id` → `releaseSequenceOnDelete('quotes')`
+- Les factures brouillon (seules supprimables) n'ont pas encore de numéro au moment de la suppression — aucun appel nécessaire.
+
+**Mapping interne** :
+- `contracts` → table `contracts`, colonne `contract_number`
+- `quotes` → table `quotes`, colonne `quote_number`
+- `invoices` → table `invoices`, colonne `invoice_number` (présent pour complétude)
+
+**Fichiers modifiés** :
+- `src/backend/utils/number-sequence.ts` — fonction `releaseSequenceOnDelete` + constante `SEQ_TABLE_MAP`
+- `src/backend/routes/contracts.routes.ts` — import + appel après `DELETE`
+- `src/backend/routes/quotes.routes.ts` — import + appel après `DELETE`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026
