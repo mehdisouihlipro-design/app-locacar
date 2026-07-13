@@ -16313,7 +16313,9 @@
         } else if (s.status === "brouillon" && s.invoiceId) {
           actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">Voir brouillon →</a>`;
         } else if (s.status === "confirme" && s.invoiceId) {
-          actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">${s.invoiceId}</a>`;
+          const _schedInv = state.invoices.find(i => String(i.id) === String(s.invoiceId));
+          const _schedInvLabel = _schedInv ? (_schedInv.invoiceNumber || s.invoiceId) : s.invoiceId;
+          actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">${safe(_schedInvLabel)}</a>`;
         }
         return `<tr style="border-bottom:1px solid #e2e8f0;">
           <td style="padding:7px 8px;">${safe(s.periodStart)} → ${safe(s.periodEnd)}</td>
