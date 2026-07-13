@@ -10813,14 +10813,43 @@
       const actualCarId = isEdit ? String(reservation.carId) : String(carId);
       const car = state.cars.find((c) => String(c.id) === actualCarId);
 
-      // Mode (create vs edit)
+      // Vérifier si la réservation est liée à un contrat (non modifiable depuis le Gantt)
+      let linkedContractLine = null;
+      if (isEdit) {
+        linkedContractLine = (state.contractLines || []).find((cl) => cl.reservationId && String(cl.reservationId) === String(reservation.id)) || null;
+      }
+      const isReadOnly = !!linkedContractLine;
+
       byId("gqpResId").value = isEdit ? reservation.id : "";
       byId("gqpCarId").value = actualCarId;
       byId("gqpCarLabel").textContent = car ? `${car.plate} — ${car.model}` : actualCarId;
-      byId("gqpTitle").textContent = isEdit ? "✎ Modifier la réservation" : "⚡ Nouvelle réservation";
-      byId("gqpSaveBtn").textContent = isEdit ? "💾 Enregistrer" : "⚡ Créer";
-      byId("gqpDeleteBtn").style.display = isEdit ? "inline-block" : "none";
 
+      if (isReadOnly) {
+        // Mode lecture seule — réservation liée à un contrat
+        const contract = linkedContractLine ? (state.contracts || []).find((c) => String(c.id) === String(linkedContractLine.contractId)) : null;
+        byId("gqpTitle").textContent = "🔒 Réservation liée à un contrat";
+        byId("gqpSaveBtn").style.display = "none";
+        byId("gqpDeleteBtn").style.display = "none";
+        // Afficher l'info dans la zone erreur (réutilisée comme zone info)
+        const errEl = byId("gqpError");
+        const contractLabel = contract ? (contract.contractNumber || contract.id) : (linkedContractLine.contractId || "?");
+        errEl.style.display = "block";
+        errEl.style.background = "#eff6ff";
+        errEl.style.color = "#1d4ed8";
+        errEl.innerHTML = `Modifiable uniquement via le contrat <strong>${safe(contractLabel)}</strong>.<br><a href="#" onclick="byId('ganttQuickPopover').style.display='none';openContractDetail('${safe(linkedContractLine.contractId)}');return false;" style="color:#1d4ed8;">→ Ouvrir le contrat</a>`;
+      } else {
+        byId("gqpTitle").textContent = isEdit ? "✎ Modifier la réservation" : "⚡ Nouvelle réservation";
+        byId("gqpSaveBtn").style.display = "inline-block";
+        byId("gqpSaveBtn").textContent = isEdit ? "💾 Enregistrer" : "⚡ Créer";
+        byId("gqpDeleteBtn").style.display = isEdit ? "inline-block" : "none";
+        const errEl = byId("gqpError");
+        errEl.style.display = "none";
+        errEl.style.background = "#fff5f5";
+        errEl.style.color = "#c53030";
+        errEl.innerHTML = "";
+      }
+
+      // Remplir les champs (toujours, même en lecture seule pour affichage)
       if (isEdit) {
         byId("gqpStartDate").value = reservation.startDate || "";
         byId("gqpStartTime").value = reservation.startTime || "09:00";
@@ -10837,18 +10866,21 @@
         byId("gqpNote").value = "";
       }
 
-      const errEl = byId("gqpError");
-      if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+      // Rendre les champs en lecture seule si lié à un contrat
+      ["gqpStartDate","gqpStartTime","gqpEndDate","gqpEndTime","gqpNote"].forEach((id) => {
+        const el = byId(id);
+        if (el) el.readOnly = isReadOnly;
+      });
 
       const pop = byId("ganttQuickPopover");
       pop.style.display = "block";
       let top = anchorRect ? anchorRect.bottom + 8 : window.innerHeight / 2 - 160;
       let left = anchorRect ? anchorRect.left : window.innerWidth / 2 - 145;
-      if (top + 360 > window.innerHeight) top = (anchorRect ? anchorRect.top : window.innerHeight / 2 + 160) - 360;
+      if (top + 380 > window.innerHeight) top = (anchorRect ? anchorRect.top : window.innerHeight / 2 + 160) - 380;
       if (left + 295 > window.innerWidth) left = window.innerWidth - 305;
       pop.style.top = `${Math.max(8, top)}px`;
       pop.style.left = `${Math.max(8, left)}px`;
-      setTimeout(() => byId("gqpEndDate").focus(), 60);
+      if (!isReadOnly) setTimeout(() => byId("gqpEndDate").focus(), 60);
     }
 
     // Alias conservé pour compatibilité avec appels existants
@@ -10858,6 +10890,8 @@
 
     async function ganttQuickSave() {
       const resId = byId("gqpResId").value;
+      // Bloquer si la réservation est liée à un contrat
+      if (resId && (state.contractLines || []).some((cl) => cl.reservationId && String(cl.reservationId) === String(resId))) return;
       const isEdit = !!resId;
       const carId = byId("gqpCarId").value;
       const startDate = byId("gqpStartDate").value;
@@ -10940,6 +10974,8 @@
     async function ganttQuickDelete() {
       const resId = byId("gqpResId").value;
       if (!resId) return;
+      // Bloquer si liée à un contrat
+      if ((state.contractLines || []).some((cl) => cl.reservationId && String(cl.reservationId) === String(resId))) return;
       const r = state.reservations.find((x) => String(x.id) === String(resId));
       const label = r ? `${r.carPlate || "?"} · ${r.startDate} → ${r.endDate}` : resId;
       if (!confirm(`Supprimer la réservation ?\n${label}\n\nCette action est irréversible.`)) return;
