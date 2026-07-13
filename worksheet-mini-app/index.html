@@ -10856,23 +10856,40 @@
       const resId = uid("RES");
       const btn = byId("gqpSaveBtn");
       if (btn) btn.disabled = true;
-      const savedRes = await apiPost("/reservations", {
-        id: resId,
-        car_id: carId,
-        car_plate: car ? car.plate : "",
-        start_date: startDate,
-        start_time: startTime,
-        end_date: endDate,
-        end_time: endTime,
-        status: "en_attente",
-        notes: note || null,
-      });
-      if (btn) btn.disabled = false;
-      if (!savedRes) {
-        errEl.textContent = "Erreur lors de la création. Réessayez.";
+      // Fetch direct pour récupérer le message d'erreur réel du backend
+      let savedRes = null;
+      try {
+        const token = localStorage.getItem("locacar-jwt");
+        const resp = await fetch(`${API_URL}/reservations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            id: resId,
+            car_id: carId,
+            car_plate: car ? car.plate : "",
+            start_date: startDate,
+            start_time: startTime,
+            end_date: endDate,
+            end_time: endTime,
+            status: "en_attente",
+            notes: note || null,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.success) {
+          if (btn) btn.disabled = false;
+          errEl.textContent = data.error || data.message || `Erreur ${resp.status}`;
+          errEl.style.display = "block";
+          return;
+        }
+        savedRes = data.data;
+      } catch (fetchErr) {
+        if (btn) btn.disabled = false;
+        errEl.textContent = "Erreur réseau : " + String(fetchErr);
         errEl.style.display = "block";
         return;
       }
+      if (btn) btn.disabled = false;
       const actualId = (savedRes && savedRes.id) ? savedRes.id : resId;
       state.reservations.push({
         id: actualId,
