@@ -12,6 +12,23 @@ function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
+function calcMonthlyAmountFn(monthlyRate: number, periodStart: string, periodEnd: string): number {
+  if (!periodStart || !periodEnd || periodEnd < periodStart) return 0;
+  const s = new Date(`${periodStart}T00:00:00`);
+  const e = new Date(`${periodEnd}T00:00:00`);
+  let fullMonths = 0;
+  let cur = new Date(s);
+  while (true) {
+    const nxt = new Date(cur); nxt.setMonth(nxt.getMonth() + 1);
+    if (nxt > e) break;
+    fullMonths++; cur = nxt;
+  }
+  const nxt = new Date(cur); nxt.setMonth(nxt.getMonth() + 1);
+  const remainingMs = e.getTime() - cur.getTime() + 86400000;
+  const fullPeriodMs = nxt.getTime() - cur.getTime();
+  return Math.round(monthlyRate * (fullMonths + remainingMs / fullPeriodMs) * 100) / 100;
+}
+
 async function recalcQuoteTotals(quoteId: string): Promise<void> {
   const linesRes = await global.db.get(`/quote_lines?quote_id=eq.${quoteId}&select=amount_ht,vat_amount,amount_ttc`);
   const lines: any[] = linesRes.data || [];
@@ -153,6 +170,14 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       if (conflict) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: conflict });
     }
 
+    // Lire le taux de TVA pour les recalculs mensuel
+    let vatRate = 0.19;
+    try {
+      const s = (await global.db.get('/settings?id=eq.1&select=vat_rate')).data?.[0];
+      const vr = Number(s?.vat_rate);
+      if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
+    } catch (_) {}
+
     // Créer le contrat entête
     const contractId = uid('CTR');
     const contractDate = new Date().toISOString().split('T')[0];
@@ -184,6 +209,15 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     try {
       for (const ql of quoteLines) {
         const lineId = uid('CL');
+        // Pour les devis mensuels, recalculer amount_ht = tarif × mois (avec prorata dernier mois)
+        let lineAmountHt  = Number(ql.amount_ht  || 0);
+        let lineVatAmount = Number(ql.vat_amount  || 0);
+        let lineAmountTtc = Number(ql.amount_ttc  || 0);
+        if (quote.rate_type === 'monthly' && ql.rate && ql.period_start && ql.period_end) {
+          lineAmountHt  = calcMonthlyAmountFn(Number(ql.rate), ql.period_start, ql.period_end);
+          lineVatAmount = Math.round(lineAmountHt * vatRate * 1000) / 1000;
+          lineAmountTtc = Math.round((lineAmountHt + lineVatAmount) * 1000) / 1000;
+        }
         const lineBody = stampCreate({
           id: lineId,
           contract_id: contractId,
@@ -191,8 +225,8 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
           period_start: ql.period_start, period_end: ql.period_end,
           days: ql.days || 0, months: ql.months || 0,
           rate: ql.rate || 0, rate_currency: ql.rate_currency || 'TND',
-          amount_ht: ql.amount_ht || 0, vat_amount: ql.vat_amount || 0,
-          amount_ttc: ql.amount_ttc || 0, amount_tnd: ql.amount_tnd || 0,
+          amount_ht: lineAmountHt, vat_amount: lineVatAmount,
+          amount_ttc: lineAmountTtc, amount_tnd: lineAmountTtc,
           status: 'active',
         }, req);
         await global.db.post('/contract_lines', lineBody, { headers: { Prefer: 'return=minimal' } });

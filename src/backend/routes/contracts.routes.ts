@@ -226,9 +226,8 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
     // Pré-calcul des taux par ligne selon le mode de négociation
     const linesWithRate = lines.map((l: any) => {
       if (rateType === 'monthly') {
-        // Mensuel : mensualité fixe = amount_ht / nombre de mois calendaires couverts par la ligne
-        const lineMonths = countCalendarMonths(l.period_start, l.period_end);
-        return { ...l, monthlyRate: Number(l.amount_ht || 0) / Math.max(lineMonths, 1) };
+        // Mensuel : tarif mensuel stocké directement dans l.rate
+        return { ...l, monthlyRate: Number(l.rate || 0) };
       } else {
         // Journalier : taux journalier = amount_ht / durée en jours
         const lineDays = daysOverlap(l.period_start, l.period_end, l.period_start, l.period_end);
@@ -252,11 +251,16 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
 
       let monthlyAmountHt: number;
       if (rateType === 'monthly') {
-        // Mensualité fixe : chaque ligne active ce mois contribue sa mensualité entière
+        // Mensuel : plein tarif si mois complet, prorata si mois partiel (dernier mois)
+        const pDays = daysOverlap(periodStart, periodEnd, periodStart, periodEnd);
+        const curD = new Date(`${periodStart}T00:00:00`);
+        const nxtD = new Date(curD); nxtD.setMonth(nxtD.getMonth() + 1);
+        const fullPD = Math.round((nxtD.getTime() - curD.getTime()) / 86400000);
+        const prorata = Math.min(1, pDays / fullPD);
         monthlyAmountHt = Math.round(
           linesWithRate.reduce((sum: number, l: any) => {
             const overlap = daysOverlap(periodStart, periodEnd, l.period_start, l.period_end);
-            return sum + (overlap > 0 ? (l as any).monthlyRate : 0);
+            return sum + (overlap > 0 ? (l as any).monthlyRate * prorata : 0);
           }, 0) * 1000
         ) / 1000;
       } else {
@@ -308,6 +312,24 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
     res.status(201).json({ success: true, count: entries.length, data: entries });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
+
+// Montant HT pour un tarif mensuel sur une période : mois complets + prorata dernier mois
+function calcMonthlyAmountFn(monthlyRate: number, periodStart: string, periodEnd: string): number {
+  if (!periodStart || !periodEnd || periodEnd < periodStart) return 0;
+  const s = new Date(`${periodStart}T00:00:00`);
+  const e = new Date(`${periodEnd}T00:00:00`);
+  let fullMonths = 0;
+  let cur = new Date(s);
+  while (true) {
+    const nxt = new Date(cur); nxt.setMonth(nxt.getMonth() + 1);
+    if (nxt > e) break;
+    fullMonths++; cur = nxt;
+  }
+  const nxt = new Date(cur); nxt.setMonth(nxt.getMonth() + 1);
+  const remainingMs = e.getTime() - cur.getTime() + 86400000;
+  const fullPeriodMs = nxt.getTime() - cur.getTime();
+  return Math.round(monthlyRate * (fullMonths + remainingMs / fullPeriodMs) * 100) / 100;
+}
 
 function toIso(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -383,6 +405,53 @@ router.post('/with-lines', async (req: AuthRequest, res: Response) => {
     }
     res.status(500).json({ success: false, error: String(err) });
   }
+});
+
+// Mise à jour du type de négociation + recalcul des montants de toutes les lignes
+router.put('/:id/update-rates', async (req: AuthRequest, res: Response) => {
+  try {
+    const contractRes = await global.db.get(`/contracts?id=eq.${req.params.id}&select=*`);
+    const contract = contractRes.data?.[0];
+    if (!contract) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
+
+    const { rate_type, rate } = req.body;
+    if (!rate_type || !['daily', 'monthly'].includes(rate_type))
+      return res.status(400).json({ success: false, message: 'rate_type invalide (daily ou monthly).' });
+    if (!rate || Number(rate) <= 0)
+      return res.status(400).json({ success: false, message: 'Tarif requis et doit être > 0.' });
+
+    let vatRate = 0.19;
+    try {
+      const s = (await global.db.get('/settings?id=eq.1&select=vat_rate')).data?.[0];
+      const vr = Number(s?.vat_rate);
+      if (!isNaN(vr) && vr >= 0) vatRate = vr / 100;
+    } catch (_) {}
+
+    await global.db.patch(`/contracts?id=eq.${req.params.id}`, stampUpdate({ rate_type }, req), { headers: { Prefer: 'return=minimal' } });
+
+    const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${req.params.id}&status=neq.annule&select=*`);
+    const lines: any[] = linesRes.data || [];
+    const updatedLines: any[] = [];
+
+    for (const l of lines) {
+      let amountHt: number;
+      if (rate_type === 'monthly') {
+        amountHt = calcMonthlyAmountFn(Number(rate), l.period_start, l.period_end);
+      } else {
+        const days = daysOverlap(l.period_start, l.period_end, l.period_start, l.period_end);
+        amountHt = Math.round(Number(rate) * days * 100) / 100;
+      }
+      const vatAmount  = Math.round(amountHt * vatRate * 1000) / 1000;
+      const amountTtc  = Math.round((amountHt + vatAmount) * 1000) / 1000;
+      await global.db.patch(`/contract_lines?id=eq.${l.id}`, stampUpdate({
+        rate: Number(rate), rate_currency: 'TND',
+        amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+      }, req), { headers: { Prefer: 'return=minimal' } });
+      updatedLines.push({ id: l.id, amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc });
+    }
+
+    res.json({ success: true, updatedLines });
+  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
 export default router;
