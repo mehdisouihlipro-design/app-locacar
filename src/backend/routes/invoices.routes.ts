@@ -83,8 +83,17 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=id,status`);
     const inv = check.data?.[0];
     if (!inv) return res.status(404).json({ success: false, message: 'Invoice not found' });
-    if (inv.status !== 'brouillon')
-      return res.status(422).json({ success: false, message: 'Seules les factures en brouillon peuvent être supprimées.' });
+    if (['payee', 'partiel'].includes(inv.status))
+      return res.status(422).json({ success: false, message: 'Impossible de supprimer une facture partiellement ou totalement payée.' });
+    // Vérifier qu'il n'y a pas de paiements confirmés liés
+    const payCheck = await global.db.get(`/payments?invoice_id=eq.${req.params.id}&select=id&limit=1`);
+    if ((payCheck.data || []).length > 0)
+      return res.status(422).json({ success: false, message: 'Impossible de supprimer cette facture : des paiements y sont associés.' });
+    // Remettre l'entrée d'échéancier liée en statut planifié
+    const schedCheck = await global.db.get(`/invoice_schedule?invoice_id=eq.${req.params.id}&select=id`);
+    for (const s of schedCheck.data || []) {
+      await global.db.patch(`/invoice_schedule?id=eq.${s.id}`, { status: 'planifie', invoice_id: null }, { headers: { Prefer: 'return=minimal' } });
+    }
     await global.db.delete(`/invoices?id=eq.${req.params.id}`);
     res.json({ success: true, message: 'Invoice deleted', data: { id: req.params.id } });
   } catch (err) {

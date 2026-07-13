@@ -3185,6 +3185,7 @@
           <button id="cdlCancelEditBtn" class="secondary" style="display:none;">✗ Annuler</button>
           <button id="cdlConfirmBtn" style="display:none;background:var(--success,#22c55e);color:#fff;font-weight:600;">✓ Confirmer le contrat</button>
           <button id="cdlAddLineToggleBtn">+ Ajouter une ligne</button>
+          <button id="cdlUnlockBtn" class="secondary" style="display:none;border-color:#d97706;color:#d97706;">🔓 Débloquer l'édition</button>
           <button id="cdlCreateInvoiceBtn" class="secondary" style="margin-left:auto;">📄 Créer une facture</button>
           <button id="cdlPdfBtn" class="secondary">🖨 PDF</button>
         </div>
@@ -12819,7 +12820,9 @@
       };
     }
 
+    const _unlockedContracts = new Set();
     function isContractFactured(contractId) {
+      if (_unlockedContracts.has(contractId)) return false;
       return (state.invoices || []).some(inv => inv.contractId === contractId && inv.status !== "brouillon");
     }
 
@@ -13497,6 +13500,7 @@
         ieDeleteBtn.style.cssText = "color:#c53030;border-color:#c53030;";
         byId("ieAddLineBtn").parentNode.insertBefore(ieDeleteBtn, byId("ieAddLineBtn"));
       }
+      const isPaid = invoice.status === "payee" || invoice.status === "partiel";
       if (invoice.status === "brouillon") {
         ieConfirmBtn.style.display = "";
         ieConfirmBtn.textContent = "✓ Confirmer la facture";
@@ -13523,23 +13527,28 @@
           renderInvoices();
           if (invoice.contractId) renderContractSchedule(invoice.contractId);
         };
+      } else {
+        ieConfirmBtn.style.display = "none";
+      }
+      if (!isPaid) {
         ieDeleteBtn.style.display = "";
         ieDeleteBtn.textContent = "🗑 Supprimer";
         ieDeleteBtn.onclick = async () => {
-          if (!confirm("Supprimer définitivement cette facture brouillon ?")) return;
+          const msg = invoice.status === "brouillon"
+            ? "Supprimer définitivement cette facture brouillon ?"
+            : "Supprimer définitivement cette facture ? L'échéancier lié sera remis en statut planifié.";
+          if (!confirm(msg)) return;
           const res = await apiDeleteWithError(`/invoices/${invoice.id}`);
           if (!res || !res.ok) { alert((res && res.errorMsg) || "Erreur lors de la suppression."); return; }
           state.invoices = state.invoices.filter(i => String(i.id) !== String(invoice.id));
-          if (invoice.scheduleId) {
-            const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
-            if (sIdx >= 0) { state.invoiceSchedule[sIdx].status = "planifie"; state.invoiceSchedule[sIdx].invoiceId = null; await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "planifie", invoice_id: null }); }
-          }
+          // Le backend remet l'échéancier en planifié — mettre à jour l'état local aussi
+          const schedEntry = (state.invoiceSchedule || []).find(s => s.invoiceId === invoice.id || s.id === invoice.scheduleId);
+          if (schedEntry) { schedEntry.status = "planifie"; schedEntry.invoiceId = null; }
           byId("invoiceEditModal").style.display = "none";
           renderInvoices();
           if (invoice.contractId) renderContractSchedule(invoice.contractId);
         };
       } else {
-        ieConfirmBtn.style.display = "none";
         ieDeleteBtn.style.display = "none";
       }
 
@@ -16079,6 +16088,17 @@
       byId("cdlAddLineToggleBtn").onclick = () => appendInlineLineRow(contractId);
       byId("cdlCreateInvoiceBtn").style.display = isLockedContract ? "none" : "";
       byId("cdlCreateInvoiceBtn").onclick = () => createInvoiceFromContract(contractId);
+      // Bouton Débloquer : visible uniquement si le contrat est verrouillé et pas encore débloqué
+      const unlockBtn = byId("cdlUnlockBtn");
+      unlockBtn.style.display = (isLockedContract && !_unlockedContracts.has(contractId)) ? "" : "none";
+      unlockBtn.onclick = () => {
+        if (!confirm("Débloquer l'édition des lignes de ce contrat ?\n\nAttention : ce contrat a des factures existantes. Modifier les lignes peut créer des incohérences.")) return;
+        _unlockedContracts.add(contractId);
+        unlockBtn.style.display = "none";
+        byId("cdlAddLineToggleBtn").style.display = "";
+        byId("cdlCreateInvoiceBtn").style.display = "";
+        renderContractDetailLines(contractId);
+      };
       byId("cdlPdfBtn").onclick = () => generateContractPdf(contractId);
       renderContractDetailHeader(contractId, false);
       renderContractDetailLines(contractId);
