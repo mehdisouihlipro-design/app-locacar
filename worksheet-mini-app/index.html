@@ -1860,7 +1860,8 @@
             <thead>
               <tr>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Plaque</th>
-                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">D&eacute;signation</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">P&eacute;riode</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT/j</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif TTC/j</th>
@@ -6718,7 +6719,7 @@
       const lineRowsHtml = contractLines.length > 0
         ? contractLines.map(l => `<tr>
           <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate || "-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;">${safe((state.cars.find(c => String(c.id) === String(l.carId)) || {}).model || "-")}</td>
+          <td style="padding:6px;border:1px solid #c8daf9;">${safe((() => { const lcar = state.cars.find(c => String(c.id) === String(l.carId)); return l.designation || (lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()||"-") : "-"); })())}</td>
           <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart || "-")}</td>
           <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd || "-")}</td>
           <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days || "-"}</td>
@@ -6740,7 +6741,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Contrat ${safe(contractId)}</title>
+  <title>Contrat ${safe(contract.contractNumber || contractId)}</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #0d244a; margin: 0; padding: 24px 30px; line-height: 1.4; }
@@ -6779,7 +6780,7 @@
       </td>
       <td style="vertical-align:top;text-align:right;">
         <h2 style="font-size:14px;color:#1540c8;">CONTRAT DE LOCATION</h2>
-        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(contractId)}</strong></p>
+        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(contract.contractNumber || contractId)}</strong></p>
         <p style="font-size:10px;">Type&nbsp;: <strong>${safe(typeLabel)}</strong></p>
         <p style="font-size:10px;">Date&nbsp;: <strong>${contractDate}</strong></p>
         <p style="font-size:10px;">Statut&nbsp;: <strong>${statusLabel}</strong></p>
@@ -10366,7 +10367,7 @@
           <td><span class="pill ${typeClass}">${safe(r.type)}</span></td>
           <td>${safe(r.date || "-")} ${safe(r.time || "")}</td>
           <td>${safe(r.carPlate || "-")}</td>
-          <td>${safe(r.contractId || "-")}</td>
+          <td>${(() => { const _ic = state.contracts.find(c => c.id === r.contractId); return safe(_ic ? (_ic.contractNumber || _ic.id) : (r.contractId || "-")); })()}</td>
           <td>${Number(r.odometerKm || 0).toLocaleString("fr-FR")} km</td>
           <td>${safe(r.fuelLevel || "-")}</td>
           <td>${safe(r.conditionNote || "-")} <span class="small">(${score.toFixed(2)}/5)</span></td>
@@ -11115,8 +11116,8 @@
       payments: [
         { key: "id",           label: "Réf.",       render: r => safe(r.id) },
         { key: "customerName", label: "Client",     render: r => safe(r.customerName || "-") },
-        { key: "contractId",   label: "Contrat",    render: r => safe(r.contractId || "-") },
-        { key: "invoiceId",    label: "Facture",    render: r => safe(r.invoiceId || "-") },
+        { key: "contractId",   label: "Contrat",    render: r => { const _c = state.contracts.find(c => c.id === r.contractId); return safe(_c ? (_c.contractNumber || _c.id) : (r.contractId || "-")); } },
+        { key: "invoiceId",    label: "Facture",    render: r => { const _i = state.invoices.find(i => i.id === r.invoiceId); return safe(_i ? (_i.invoiceNumber || _i.id) : (r.invoiceId || "-")); } },
         { key: "date",         label: "Date",        render: r => safe(r.date || "-") },
         { key: "amount",       label: "Montant",     render: r => `${Number(r.amount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
         { key: "amountTnd",    label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
@@ -11165,7 +11166,7 @@
         { key: "id",           label: "N° Contrat",    render: c => safe(c.contractNumber || c.id) },
         { key: "type",         label: "Type",           render: c => safe(c.type) },
         { key: "customerName", label: "Client",         render: c => safe(c.customerName || "-") },
-        { key: "quoteId",      label: "Devis origine",  render: c => safe(c.quoteId || "—") },
+        { key: "quoteId",      label: "Devis origine",  render: c => { const _q = state.quotes.find(q => q.id === c.quoteId); return safe(_q ? (_q.quoteNumber || _q.id) : (c.quoteId || "—")); } },
         { key: "periodStart",  label: "Date début",     render: () => "—" },
         { key: "periodEnd",    label: "Date fin",       render: () => "—" },
         { key: "lignes",       label: "Lignes",         render: () => "—" },
@@ -11183,7 +11184,7 @@
       ],
       invoices: [
         { key: "id",           label: "N° Facture",    render: i => safe(i.invoiceNumber || i.id) },
-        { key: "contractId",   label: "Contrat",       render: i => safe(i.contractId || "-") },
+        { key: "contractId",   label: "Contrat",       render: i => { const _c = state.contracts.find(c => c.id === i.contractId); return safe(_c ? (_c.contractNumber || _c.id) : (i.contractId || "-")); } },
         { key: "customerName", label: "Client",        render: i => safe(i.customerName || "-") },
         { key: "lignes",       label: "Lignes",        render: () => "—" },
         { key: "dueDate",      label: "Échéance",      render: i => safe(i.dueDate || "-") },
@@ -13028,7 +13029,7 @@
         const tr = document.createElement("tr");
         tr.dataset.lineId = line.id || "";
         tr.innerHTML = `
-          <td style="padding:6px 8px;">${safe(line.contractId || "-")} &mdash; ${safe(line.carPlate || "-")} <span style="color:var(--muted);">${safe(line.designation || "")}</span></td>
+          <td style="padding:6px 8px;">${(() => { const _lc = state.contracts.find(c => c.id === line.contractId); return safe(_lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-")); })()} &mdash; ${safe(line.carPlate || "-")} <span style="color:var(--muted);">${safe(line.designation || "")}</span></td>
           <td style="padding:6px 8px;">${safe(line.periodStart || "-")}</td>
           <td style="padding:6px 8px;text-align:right;">${line.days || 0}</td>
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.amountHt || 0)}</td>
@@ -15404,6 +15405,7 @@
         const canTerminate = !isContractLockedForLine && displayStatus === "active";
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
+          <td style="color:var(--muted);font-size:12px;">${(() => { const lcar = state.cars.find(c => c.id === l.carId); return safe(l.designation || (lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()||"") : "")); })()}</td>
           <td style="white-space:nowrap;">${periodLabel}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
@@ -15448,6 +15450,7 @@
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:4px;"><select id="cleCar" style="width:100%;min-width:100px;font-size:12px;">${carOptions}</select></td>
+        <td style="padding:4px;"><input id="cleDesig" type="text" placeholder="Désignation (auto)" value="${safe(line.designation || (() => { const lcar = state.cars.find(c => c.id === line.carId); return lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()) : ""; })())}" style="width:130px;font-size:12px;" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <input id="cleStart" type="date" value="${line.periodStart||""}" style="width:105px;font-size:12px;" />
           → <input id="cleEnd" type="date" value="${line.periodEnd||""}" style="width:105px;font-size:12px;" />
@@ -15488,7 +15491,8 @@
       tr.querySelector("#cleTtc").oninput   = () => { recomputeTtc(); clearCleError(); };
       tr.querySelector("#cleStart").oninput = () => { updateDur(); clearCleError(); };
       tr.querySelector("#cleEnd").oninput   = () => { updateDur(); clearCleError(); };
-      tr.querySelector("#cleCar").onchange  = clearCleError;
+      tr.querySelector("#cleCar").onchange  = () => { clearCleError(); const sc = state.cars.find(c => c.id === tr.querySelector("#cleCar").value); if (sc) { const dInput = tr.querySelector("#cleDesig"); if (dInput && !dInput.dataset.edited) dInput.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); } };
+      tr.querySelector("#cleDesig")?.addEventListener("input", () => { if (tr.querySelector("#cleDesig")) tr.querySelector("#cleDesig").dataset.edited = "1"; });
       tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
       tr.querySelector("#cleCancelBtn").onclick = () => renderContractDetailLines(contractId);
       tr.querySelector("#cleCar").focus();
@@ -15496,6 +15500,7 @@
 
     async function saveContractLineEdit(contractId, lineId, tr) {
       const carId = tr.querySelector("#cleCar").value;
+      const designation = (tr.querySelector("#cleDesig") ? tr.querySelector("#cleDesig").value : "") || "";
       const periodStart = tr.querySelector("#cleStart").value;
       const periodEnd   = tr.querySelector("#cleEnd").value;
       const rate        = Number(tr.querySelector("#cleRate").value || 0);
@@ -15511,7 +15516,7 @@
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(periodStart, periodEnd);
       const result = await apiPutWithError(`/contract-lines/${lineId}`, {
-        car_id: carId, car_plate: car ? car.plate : "",
+        car_id: carId, car_plate: car ? car.plate : "", designation,
         period_start: periodStart, period_end: periodEnd, days, months,
         rate, amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
       });
@@ -15526,7 +15531,7 @@
         const prevLine = state.contractLines[idx];
         const datesChanged = periodStart !== prevLine.periodStart || periodEnd !== prevLine.periodEnd;
         Object.assign(state.contractLines[idx], {
-          carId, carPlate: car ? car.plate : "", periodStart, periodEnd, days, months,
+          carId, carPlate: car ? car.plate : "", designation, periodStart, periodEnd, days, months,
           rate, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
         });
         // Sync reservation dates in state if period changed
@@ -15648,6 +15653,7 @@
             ${carOptions}
           </select>
         </td>
+        <td style="padding:6px 4px;"><input id="ilDesig" type="text" placeholder="Désignation (auto)" style="width:130px;font-size:12px;" /></td>
         <td style="padding:6px 4px;white-space:nowrap;">
           <input id="ilStart" type="date" style="width:108px;font-size:12px;" />
           ${isShortTerm ? `<input id="ilPickup" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de sortie" />` : ""}
@@ -15717,7 +15723,8 @@
       const clearIlError = () => { byId("ilError").style.display = "none"; tr.style.outline = ""; };
       byId("ilStart").oninput = () => { updateDuration(); clearIlError(); };
       byId("ilEnd").oninput = () => { updateDuration(); clearIlError(); };
-      byId("ilCar").onchange = clearIlError;
+      byId("ilCar").onchange = () => { clearIlError(); const sc = state.cars.find(c => c.id === byId("ilCar").value); const di = byId("ilDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
+      byId("ilDesig")?.addEventListener("input", () => { if (byId("ilDesig")) byId("ilDesig").dataset.edited = "1"; });
       if (isShortTerm && byId("ilPickup")) byId("ilPickup").oninput = clearIlError;
       if (isShortTerm && byId("ilReturn")) byId("ilReturn").oninput = clearIlError;
       byId("ilRate").oninput = () => {
@@ -15750,6 +15757,7 @@
 
     async function submitInlineContractLine(contractId, tr) {
       const carId = byId("ilCar").value;
+      const designation = (byId("ilDesig") ? byId("ilDesig").value : "") || "";
       const startStr = byId("ilStart").value;
       const endStr = byId("ilEnd").value;
       const amountHt = Number(byId("ilAmtHt").value || 0);
@@ -15776,7 +15784,7 @@
       const returnTime = byId("ilReturn") ? (byId("ilReturn").value || null) : null;
 
       const result = await apiPostWithError("/contract-lines", {
-        contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "",
+        contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "", designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
         period_start: startStr, period_end: endStr, days, months,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
@@ -15799,7 +15807,7 @@
 
       state.contractLines.push({
         id: lineData?.id || uid("CL"),
-        contractId, carId, carPlate: car ? car.plate : "",
+        contractId, carId, carPlate: car ? car.plate : "", designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
         periodStart: startStr, periodEnd: endStr,
         pickupTime: pickupTime || null, returnTime: returnTime || null,
         days, months, rate, rateCurrency: "TND",
@@ -16965,6 +16973,11 @@
   </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
