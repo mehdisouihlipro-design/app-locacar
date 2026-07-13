@@ -220,11 +220,19 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
       }
     } catch (_) { /* fallback */ }
 
-    // Taux journalier par ligne = amount_ht / durée en jours de la ligne.
-    // Indépendant de la sémantique de `rate` (journalier ou mensuel selon la source du contrat).
-    const linesDailyRates = lines.map((l: any) => {
-      const lineDays = daysOverlap(l.period_start, l.period_end, l.period_start, l.period_end);
-      return { ...l, dailyRate: Number(l.amount_ht || 0) / Math.max(lineDays, 1) };
+    const rateType: string = contract.rate_type || 'daily';
+
+    // Pré-calcul des taux par ligne selon le mode de négociation
+    const linesWithRate = lines.map((l: any) => {
+      if (rateType === 'monthly') {
+        // Mensuel : mensualité fixe = amount_ht / nombre de mois calendaires couverts par la ligne
+        const lineMonths = countCalendarMonths(l.period_start, l.period_end);
+        return { ...l, monthlyRate: Number(l.amount_ht || 0) / Math.max(lineMonths, 1) };
+      } else {
+        // Journalier : taux journalier = amount_ht / durée en jours
+        const lineDays = daysOverlap(l.period_start, l.period_end, l.period_start, l.period_end);
+        return { ...l, dailyRate: Number(l.amount_ht || 0) / Math.max(lineDays, 1) };
+      }
     });
 
     // Générer une entrée par mois entre globalStart et globalEnd
@@ -241,19 +249,30 @@ router.post('/:id/generate-schedule', async (req: AuthRequest, res: Response) =>
       // Ne pas dépasser globalEnd
       const periodEnd = toIso(nextMonth > end ? end : new Date(nextMonth.getTime() - 86400000));
 
-      // Montant HT de ce mois = somme sur chaque ligne du (taux journalier × jours chevauchant ce mois)
-      const monthlyAmountHt = Math.round(
-        linesDailyRates.reduce((sum: number, l: any) => {
-          const overlap = daysOverlap(periodStart, periodEnd, l.period_start, l.period_end);
-          return sum + l.dailyRate * overlap;
-        }, 0) * 1000
-      ) / 1000;
+      let monthlyAmountHt: number;
+      if (rateType === 'monthly') {
+        // Mensualité fixe : chaque ligne active ce mois contribue sa mensualité entière
+        monthlyAmountHt = Math.round(
+          linesWithRate.reduce((sum: number, l: any) => {
+            const overlap = daysOverlap(periodStart, periodEnd, l.period_start, l.period_end);
+            return sum + (overlap > 0 ? (l as any).monthlyRate : 0);
+          }, 0) * 1000
+        ) / 1000;
+      } else {
+        // Journalier : taux journalier × jours chevauchant ce mois
+        monthlyAmountHt = Math.round(
+          linesWithRate.reduce((sum: number, l: any) => {
+            const overlap = daysOverlap(periodStart, periodEnd, l.period_start, l.period_end);
+            return sum + (l as any).dailyRate * overlap;
+          }, 0) * 1000
+        ) / 1000;
+      }
 
       const vatAmount = Math.round(monthlyAmountHt * vatRate * 1000) / 1000;
 
       // Taxe journalière : dailyTaxTnd × jours de la période × nombre de lignes chevauchant ce mois
       const periodDays = daysOverlap(periodStart, periodEnd, globalStart, globalEnd);
-      const overlappingLinesCount = linesDailyRates.filter(
+      const overlappingLinesCount = linesWithRate.filter(
         (l: any) => daysOverlap(periodStart, periodEnd, l.period_start, l.period_end) > 0
       ).length;
       const dailyTaxAmount = Math.round(dailyTaxTnd * periodDays * overlappingLinesCount * 1000) / 1000;
@@ -298,6 +317,13 @@ function daysOverlap(startA: string, endA: string, startB: string, endB: string)
   const s = Math.max(new Date(`${startA}T00:00:00`).getTime(), new Date(`${startB}T00:00:00`).getTime());
   const e = Math.min(new Date(`${endA}T00:00:00`).getTime(),   new Date(`${endB}T00:00:00`).getTime());
   return s > e ? 0 : Math.round((e - s) / 86400000) + 1;
+}
+
+// Nombre de mois calendaires entre deux dates ISO (inclusif des deux extrémités)
+function countCalendarMonths(start: string, end: string): number {
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
+  return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1);
 }
 
 function formatMonthLabel(isoDate: string): string {

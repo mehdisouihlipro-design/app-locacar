@@ -166,6 +166,7 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       car_id: null, car_plate: '',
       contract_date: contractDate,
       type: contractType,
+      rate_type: quote.rate_type || 'daily',
       days: 0, months: 0, rate: 0, rate_currency: 'TND',
       quotient: 0, quotient_currency: 'TND', quotient_tnd: 0,
       total_amount_original: 0, total_amount_tnd: 0,

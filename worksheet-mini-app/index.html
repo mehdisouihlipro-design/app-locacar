@@ -1778,6 +1778,13 @@
             </select>
           </div>
           <div>
+            <label>Négociation</label>
+            <select id="quoteRateType">
+              <option value="daily">Journalier</option>
+              <option value="monthly">Mensuel (mensualité fixe)</option>
+            </select>
+          </div>
+          <div>
             <label>Date du devis</label>
             <input id="quoteDate" type="date" />
           </div>
@@ -5669,7 +5676,7 @@
       if (contracts) state.contracts = contracts.map(c => ({
         id: c.id, contractNumber: c.contract_number || null, customerId: c.customer_id, carId: c.car_id,
         customerName: c.customer_name || "", carPlate: c.car_plate || "",
-        contractDate: c.contract_date, type: c.type || "court",
+        contractDate: c.contract_date, type: c.type || "court", rateType: c.rate_type || "daily",
         days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
         quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND",
@@ -5700,7 +5707,7 @@
         id: q.id, quoteNumber: q.quote_number || null, customerId: q.customer_id, customerName: q.customer_name || "",
         quoteDate: q.quote_date || "", validityDate: q.validity_date || "",
         status: q.status || "brouillon", notes: q.notes || "",
-        type: q.type || "court",
+        type: q.type || "court", rateType: q.rate_type || "daily",
         totalAmountHt: q.total_amount_ht || 0, totalVatAmount: q.total_vat_amount || 0,
         totalAmountTtc: q.total_amount_ttc || 0,
         convertedContractId: q.converted_contract_id || null,
@@ -11979,6 +11986,7 @@
           <div><span class="label-small">Début</span><br>${qp.start || "-"}</div>
           <div><span class="label-small">Fin</span><br>${qp.end || "-"}</div>
           <div><span class="label-small">Statut</span><br>${displayStatus}</div>
+          <div><span class="label-small">Négociation</span><br>${q.rateType === "monthly" ? "Mensuel (fixe)" : "Journalier"}</div>
           <div><span class="label-small">Notes</span><br>${safe(q.notes || "—")}</div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
@@ -12014,6 +12022,12 @@
               <option value="refuse"${q.status==="refuse"?" selected":""}>refusé</option>
             </select>
           </div>
+          <div><label class="label-small">Négociation</label>
+            <select id="qdERateType" style="width:100%;">
+              <option value="daily"${(q.rateType||"daily")==="daily"?" selected":""}>Journalier</option>
+              <option value="monthly"${q.rateType==="monthly"?" selected":""}>Mensuel (fixe)</option>
+            </select>
+          </div>
           <div><label class="label-small">Notes</label><input id="qdENotes" value="${safe(q.notes||"")}" style="width:100%;" /></div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
@@ -12024,14 +12038,17 @@
         editBtn.onclick = async () => {
           const customerId = byId("qdEClient").value;
           const customer = state.customers.find(c => c.id === customerId);
+          const newRateType = byId("qdERateType").value || "daily";
           await apiPut(`/quotes/${quoteId}`, {
             customer_id: customerId, customer_name: customer ? customer.name : q.customerName,
             status: byId("qdEStatus").value, notes: byId("qdENotes").value,
+            rate_type: newRateType,
           });
           const idx = state.quotes.findIndex(x => x.id === quoteId);
           if (idx >= 0) Object.assign(state.quotes[idx], {
             customerId, customerName: customer ? customer.name : q.customerName,
             status: byId("qdEStatus").value, notes: byId("qdENotes").value,
+            rateType: newRateType,
           });
           renderQuoteDetailHeader(quoteId, false);
           renderQuotes();
@@ -12392,7 +12409,8 @@
         id: c.id, contractNumber: c.contract_number || null,
         customerId: c.customer_id, customerName: c.customer_name || "",
         carId: c.car_id, carPlate: c.car_plate || "", contractDate: c.contract_date || "",
-        type: c.type || "court", days: c.days || 0, months: c.months || 0,
+        type: c.type || "court", rateType: c.rate_type || "daily",
+        days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
         quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND", quotientTnd: c.quotient_tnd || 0,
         totalAmountOriginal: c.total_amount_original || 0, totalAmountTnd: c.total_amount_tnd || 0,
@@ -12699,6 +12717,7 @@
       byId("addQuoteBtn").addEventListener("click", async () => {
         const customerId = byId("quoteCustomer").value;
         const quoteType = byId("quoteType").value || "court";
+        const quoteRateType = byId("quoteRateType").value || "daily";
         const quoteDate = byId("quoteDate").value;
         const validityDate = byId("quoteValidityDate").value;
         const notes = byId("quoteNotes").value.trim();
@@ -12711,11 +12730,11 @@
           id: quoteId, quote_number: quoteNumber, customer_id: customerId,
           customer_name: customer ? customer.name : "",
           quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
-          type: quoteType,
+          type: quoteType, rate_type: quoteRateType,
         });
         state.quotes.push({
           id: quoteId, quoteNumber, customerId, customerName: customer ? customer.name : "",
-          quoteDate, validityDate, status: "brouillon", notes, type: quoteType,
+          quoteDate, validityDate, status: "brouillon", notes, type: quoteType, rateType: quoteRateType,
           totalAmountHt: 0, totalVatAmount: 0, totalAmountTtc: 0, convertedContractId: null,
         });
         byId("quoteLegacyForm").style.display = "none";
@@ -15188,6 +15207,7 @@
         byId("cdlHeader").innerHTML = `
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
+          <div><span class="label-small">Négociation</span><br>${contract.rateType === "monthly" ? "Mensuel (fixe)" : "Journalier"}</div>
           <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
           <div><span class="label-small">Statut</span><br><span style="${statusStyle}">${isBrouillon ? "⚠ brouillon" : safe(contract.status || "-")}</span></div>
@@ -15252,6 +15272,13 @@
             </select>
           </div>
           <div>
+            <label class="label-small">Négociation</label>
+            <select id="cdlERateType" style="width:100%;">
+              <option value="daily"${(contract.rateType||"daily") === "daily" ? " selected" : ""}>Journalier</option>
+              <option value="monthly"${contract.rateType === "monthly" ? " selected" : ""}>Mensuel (fixe)</option>
+            </select>
+          </div>
+          <div>
             <label class="label-small">Date signature</label>
             <input id="cdlEDate" type="date" value="${contract.contractDate || ""}" style="width:100%;" />
           </div>
@@ -15303,6 +15330,7 @@
           const contractDate = byId("cdlEDate").value;
           const paymentMoment = byId("cdlEPayment").value;
           const status = byId("cdlEStatus").value;
+          const rateType = byId("cdlERateType").value || "daily";
           const rate = Number(byId("cdlERate").value || 0);
           const rateCurrency = byId("cdlERateCurrency").value;
           const quotient = Number(byId("cdlEQuotient").value || 0);
@@ -15314,7 +15342,7 @@
           await apiPut(`/contracts/${contractId}`, {
             customer_id: customerId,
             customer_name: customer ? customer.name : contract.customerName,
-            type, contract_date: contractDate,
+            type, rate_type: rateType, contract_date: contractDate,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
             rate, rate_currency: rateCurrency,
             quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd,
@@ -15323,7 +15351,7 @@
           if (idx >= 0) {
             Object.assign(state.contracts[idx], {
               customerId, customerName: customer ? customer.name : contract.customerName,
-              type, contractDate, paymentMoment, paymentPlan, status,
+              type, rateType, contractDate, paymentMoment, paymentPlan, status,
               rate, rateCurrency, quotient, quotientCurrency, quotientTnd,
             });
           }
