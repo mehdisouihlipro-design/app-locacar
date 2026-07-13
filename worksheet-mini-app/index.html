@@ -11004,6 +11004,7 @@
         return;
       }
 
+      if (btn) btn.disabled = false;
       state.reservations = state.reservations.filter((x) => String(x.id) !== String(resId));
       byId("ganttQuickPopover").style.display = "none";
       saveAndRender();
