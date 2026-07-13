@@ -15617,7 +15617,7 @@
       const car = state.cars.find(c => c.id === carId);
       const { days, months } = calcLineDuration(periodStart, periodEnd);
       const result = await apiPutWithError(`/contract-lines/${lineId}`, {
-        car_id: carId, car_plate: car ? car.plate : "", designation,
+        car_id: carId, car_plate: car ? car.plate : "",
         period_start: periodStart, period_end: periodEnd, days, months,
         rate, amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
       });
