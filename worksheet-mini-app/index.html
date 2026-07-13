@@ -15202,11 +15202,13 @@
         const periodLabel = periodStart ? `${periodStart} → ${periodEnd}` : "—";
         const isBrouillon = contract.status === "brouillon";
         const statusStyle = isBrouillon ? "color:#d97706;font-weight:600;" : "";
+        const linkedQuote = contract.quoteId ? (state.quotes || []).find(q => q.id === contract.quoteId) : null;
+        const quoteLabel = linkedQuote ? (linkedQuote.quoteNumber || linkedQuote.id) : (contract.quoteId || "—");
         const quoteLink = contract.quoteId
-          ? `<a class="xref" data-open-quote="${safe(contract.quoteId)}" href="#" style="font-family:monospace;">${safe(contract.quoteId)}</a>`
+          ? `<a class="xref" data-open-quote="${safe(contract.quoteId)}" href="#" style="font-family:monospace;">${safe(quoteLabel)}</a>`
           : "—";
         const invoiceLink = linkedInvoice
-          ? `<a href="#" data-open-invoice="${safe(linkedInvoice.id)}" style="font-family:monospace;">${safe(linkedInvoice.id)}</a>`
+          ? `<a href="#" data-open-invoice="${safe(linkedInvoice.id)}" style="font-family:monospace;">${safe(linkedInvoice.invoiceNumber || linkedInvoice.id)}</a>`
           : "";
         const rateLabel = contract.rate ? `${Number(contract.rate).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${contract.rateCurrency || "TND"}` : "—";
         const quotientLabel = contract.quotient ? `${Number(contract.quotient).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${contract.quotientCurrency || "TND"}` : "—";
