@@ -5712,6 +5712,44 @@
         paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
         status: c.status || "active",
         quoteId: c.quote_id || null,
+        // Groupe 2 — financier
+        franchiseAmount: c.franchise_amount != null ? Number(c.franchise_amount) : null,
+        insuranceRcAmount: c.insurance_rc_amount != null ? Number(c.insurance_rc_amount) : null,
+        insurancePassengersAmount: c.insurance_passengers_amount != null ? Number(c.insurance_passengers_amount) : null,
+        // Groupe 3 — état véhicule
+        mileageStart: c.mileage_start != null ? Number(c.mileage_start) : null,
+        mileageEnd: c.mileage_end != null ? Number(c.mileage_end) : null,
+        fuelLevelStart: c.fuel_level_start || null,
+        fuelLevelEnd: c.fuel_level_end || null,
+        // Groupe 4 — accessoires
+        hasSpareTire: Boolean(c.has_spare_tire),
+        hasJackTools: Boolean(c.has_jack_tools),
+        hasRadio: Boolean(c.has_radio),
+        hasHubcaps: Boolean(c.has_hubcaps),
+        hasMirrors: Boolean(c.has_mirrors),
+        hasAc: Boolean(c.has_ac),
+        // Groupe 5 — locataire complémentaire
+        customerDob: c.customer_dob || null,
+        customerNationality: c.customer_nationality || "",
+        customerEntryDateTn: c.customer_entry_date_tn || null,
+        customerIdIssuedDate: c.customer_id_issued_date || null,
+        customerIdIssuedAt: c.customer_id_issued_at || "",
+        customerLicenseNumber: c.customer_license_number || "",
+        customerLicenseIssuedDate: c.customer_license_issued_date || null,
+        customerLicenseIssuedAt: c.customer_license_issued_at || "",
+        customerLocalAddress: c.customer_local_address || "",
+        customerStayReason: c.customer_stay_reason || "",
+        // Groupe 6 — 2ème conducteur
+        driver2Name: c.driver2_name || "",
+        driver2IdNumber: c.driver2_id_number || "",
+        driver2IdIssuedDate: c.driver2_id_issued_date || null,
+        driver2IdIssuedAt: c.driver2_id_issued_at || "",
+        driver2LicenseNumber: c.driver2_license_number || "",
+        driver2LicenseIssuedDate: c.driver2_license_issued_date || null,
+        driver2LicenseIssuedAt: c.driver2_license_issued_at || "",
+        // Groupe 7 — changement de voiture
+        replacementCarModel: c.replacement_car_model || "",
+        replacementCarPlate: c.replacement_car_plate || "",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
@@ -6728,6 +6766,9 @@
       const contract = state.contracts.find(c => String(c.id) === String(contractId));
       if (!contract) { alert("Contrat introuvable."); return; }
 
+      // Contrats long terme → PDF générique (pas le template officiel court terme)
+      if (contract.type !== "court") { return generateContractPdfGeneric(contractId); }
+
       let branding = {};
       try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
       const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
@@ -6735,31 +6776,43 @@
       const settings = state.settings || {};
 
       const customer = state.customers.find(c => String(c.id) === String(contract.customerId));
-      const clientName = safe(contract.customerName || (customer && customer.name) || "-");
-      const clientInfo = customer ? [customer.address, customer.phone].filter(Boolean).join(" · ") : "";
-
       const contractLines = (state.contractLines || []).filter(l => String(l.contractId) === String(contractId));
-      const totalHt = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
+      const firstLine = contractLines[0] || {};
+      const firstCar  = firstLine.carId ? state.cars.find(c => String(c.id) === String(firstLine.carId)) : null;
+
+      const totalHt  = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
       const totalVat = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
       const totalTtc = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
+      const stampVal = Number(settings.stampDuty || settings.stamp || 0);
+      const totalLoc = totalHt; // Location HT avant TVA et timbre
 
-      const lineRowsHtml = contractLines.length > 0
-        ? contractLines.map(l => `<tr>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate || "-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;">${safe((() => { const lcar = state.cars.find(c => String(c.id) === String(l.carId)); return l.designation || (lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()||"-") : "-"); })())}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart || "-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd || "-")}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days || "-"}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.rate)}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
-          <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
-        </tr>`).join("")
-        : `<tr><td colspan="9" style="padding:10px;text-align:center;color:#888;">Aucune ligne</td></tr>`;
+      // Helpers
+      const f = v => safe(v || "");
+      const fd = v => v ? safe(String(v)) : "";
+      const fuelBar = (val) => {
+        const levels = ["Vide","1/4","1/2","3/4","Plein"];
+        return levels.map(l => `<td style="border:1px solid #333;padding:1px 4px;font-size:8px;text-align:center;background:${val===l?"#333":"#fff"};color:${val===l?"#fff":"#333"};min-width:20px;">${l}</td>`).join("");
+      };
+      const chk = (v, label) => `<tr><td style="padding:1px 4px;font-size:8px;border:1px solid #333;">${label}</td><td style="border:1px solid #333;padding:1px 4px;font-size:8px;text-align:center;">${v?"X":""}</td><td style="border:1px solid #333;padding:1px 4px;font-size:8px;text-align:center;">${v?"":"X"}</td></tr>`;
+      const field = (label, val, opts={}) => `
+        <tr><td colspan="${opts.span||1}" style="padding:1px 3px;">
+          <div style="font-size:7.5px;color:#555;margin-bottom:1px;">${label}</div>
+          <div style="font-size:8.5px;border-bottom:1px solid #666;min-height:13px;padding-bottom:1px;">${f(val)}</div>
+        </td></tr>`;
 
-      const typeLabel = contract.type === "long" ? "Contrat longue durée" : "Contrat courte durée";
-      const statusLabel = safe(contract.status || "-");
-      const contractDate = safe(contract.contractDate || contract.startDate || "-");
+      // Car diagram simplified (top view)
+      const carDiagram = `<svg viewBox="0 0 80 130" width="70" height="115" style="display:block;margin:0 auto;">
+        <rect x="15" y="10" width="50" height="110" rx="8" fill="none" stroke="#333" stroke-width="1.5"/>
+        <rect x="20" y="25" width="40" height="40" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <rect x="20" y="75" width="40" height="35" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <rect x="12" y="15" width="8" height="20" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <rect x="60" y="15" width="8" height="20" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <rect x="12" y="88" width="8" height="20" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <rect x="60" y="88" width="8" height="20" rx="3" fill="none" stroke="#333" stroke-width="1"/>
+        <line x1="25" y1="65" x2="55" y2="65" stroke="#333" stroke-width="0.8"/>
+        <text x="40" y="50" text-anchor="middle" font-size="5" fill="#666">AVT</text>
+        <text x="40" y="96" text-anchor="middle" font-size="5" fill="#666">ARR</text>
+      </svg>`;
 
       const win = window.open("", "_blank");
       if (!win) { alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur."); return; }
@@ -6770,108 +6823,272 @@
   <meta charset="UTF-8">
   <title>Contrat ${safe(contract.contractNumber || contractId)}</title>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #0d244a; margin: 0; padding: 24px 30px; line-height: 1.4; }
-    h1, h2, h3, p { margin: 0; padding: 0; }
-    table { border-collapse: collapse; }
-    .print-btn { display:block; margin-bottom:16px; text-align:right; }
-    .print-btn button { background:#0d244a; color:#fff; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; }
-    .print-btn button:hover { background:#1540c8; }
-    @media print {
-      @page { margin: 12mm; size: A4 portrait; }
-      body { padding: 0; }
-      .print-btn { display: none; }
-    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:Arial,Helvetica,sans-serif; font-size:8.5px; color:#111; background:#fff; }
+    table { border-collapse:collapse; width:100%; }
+    td { vertical-align:top; }
+    .page { width:210mm; min-height:297mm; padding:6mm 6mm 4mm 6mm; }
+    .border-box { border:1px solid #333; }
+    .section-title { font-size:8px; font-weight:bold; text-align:center; background:#ddd; padding:2px; border:1px solid #333; margin-bottom:0; }
+    .field-label { font-size:7px; color:#444; }
+    .field-value { font-size:8.5px; border-bottom:1px solid #555; min-height:12px; padding-bottom:1px; margin-bottom:3px; }
+    .print-btn { text-align:right; padding:6px 10px; background:#f5f5f5; border-bottom:1px solid #ccc; }
+    .print-btn button { background:#0d244a; color:#fff; border:none; padding:6px 18px; border-radius:3px; cursor:pointer; font-size:12px; }
+    @media print { @page { margin:5mm; size:A4 portrait; } .print-btn { display:none; } .page { padding:3mm; } }
   </style>
 </head>
 <body>
-  <div class="print-btn">
-    <button onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
-  </div>
+<div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
+<div class="page">
 
-  <table width="100%" style="margin-bottom:14px;border-bottom:2px solid #0d244a;padding-bottom:10px;">
+  <!-- ══ EN-TÊTE ══════════════════════════════════════════════════════ -->
+  <table style="margin-bottom:3px;">
     <tr>
-      <td style="vertical-align:middle;">
-        <table><tr>
-          <td style="padding-right:12px;vertical-align:middle;">
-            <img src="${safe(logoUrl)}" style="max-width:70px;max-height:70px;" />
-          </td>
-          <td style="vertical-align:middle;">
-            <h1 style="font-size:16px;color:#0d244a;">${safe(companyName)}</h1>
-            <p style="font-size:9px;color:#4d6a97;margin-top:2px;">LOCATION DE VOITURES</p>
-            ${settings.companyAddress ? `<p style="font-size:9px;color:#4d6a97;">${safe(settings.companyAddress)}</p>` : ""}
-            ${settings.companyPhone ? `<p style="font-size:9px;color:#4d6a97;">Tél: ${safe(settings.companyPhone)}</p>` : ""}
-            ${settings.companyTaxId ? `<p style="font-size:9px;color:#4d6a97;">Matricule fiscal: ${safe(settings.companyTaxId)}</p>` : ""}
-          </td>
-        </tr></table>
+      <td style="width:110px;vertical-align:middle;">
+        <div style="border:1px solid #333;padding:3px;font-size:7px;line-height:1.4;">
+          <strong>IMPORTANT</strong><br>
+          L'assurance ne couvre pas les dégâts occasionnés aux pneumatiques bris de glace et optiques avant et arrières et les accessoires qui sont exclusivement à la charge du locataire.
+        </div>
       </td>
-      <td style="vertical-align:top;text-align:right;">
-        <h2 style="font-size:14px;color:#1540c8;">CONTRAT DE LOCATION</h2>
-        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(contract.contractNumber || contractId)}</strong></p>
-        <p style="font-size:10px;">Type&nbsp;: <strong>${safe(typeLabel)}</strong></p>
-        <p style="font-size:10px;">Date&nbsp;: <strong>${contractDate}</strong></p>
-        <p style="font-size:10px;">Statut&nbsp;: <strong>${statusLabel}</strong></p>
+      <td style="text-align:center;vertical-align:top;padding:0 8px;">
+        <div style="font-size:16px;font-weight:900;letter-spacing:1px;">CONTRAT DE LOCATION</div>
+        <div style="font-size:11px;font-weight:bold;letter-spacing:2px;">عـقـد كـراء</div>
+        <div style="font-size:13px;font-weight:bold;margin-top:3px;">N&deg; ${safe(contract.contractNumber || contractId)}</div>
+      </td>
+      <td style="width:130px;text-align:right;vertical-align:top;">
+        <div style="font-weight:bold;font-size:13px;">${safe(companyName)}</div>
+        <div style="font-size:7px;line-height:1.5;">
+          ${settings.companyAddress ? safe(settings.companyAddress)+"<br>" : ""}
+          ${settings.companyEmail ? safe(settings.companyEmail)+"<br>" : ""}
+          ${settings.companyPhone ? safe(settings.companyPhone)+"<br>" : ""}
+          ${settings.companyTaxId ? "MF: "+safe(settings.companyTaxId) : ""}
+        </div>
       </td>
     </tr>
   </table>
 
-  <div style="margin-bottom:14px;border:1px solid #c8daf9;padding:8px 10px;background:#f5f7ff;">
-    <p style="font-size:10px;color:#1540c8;font-weight:bold;margin-bottom:4px;">Client</p>
-    <p style="font-size:10px;"><strong>${clientName}</strong></p>
-    ${clientInfo ? `<p style="font-size:9px;color:#4d6a97;">${safe(clientInfo)}</p>` : ""}
-  </div>
-
-  <table width="100%" style="font-size:9px;margin-bottom:14px;">
-    <thead>
-      <tr style="background:#0d244a;color:#fff;">
-        <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
-        <th style="padding:6px;border:1px solid #0d244a;">Modèle</th>
-        <th style="padding:6px;border:1px solid #0d244a;">DU</th>
-        <th style="padding:6px;border:1px solid #0d244a;">AU</th>
-        <th style="padding:6px;border:1px solid #0d244a;">Nb.j</th>
-        <th style="padding:6px;border:1px solid #0d244a;">Tarif/j HT</th>
-        <th style="padding:6px;border:1px solid #0d244a;">Montant HT</th>
-        <th style="padding:6px;border:1px solid #0d244a;">TVA</th>
-        <th style="padding:6px;border:1px solid #0d244a;">Total TTC</th>
-      </tr>
-    </thead>
-    <tbody>${lineRowsHtml}</tbody>
-  </table>
-
-  <table width="100%" style="font-size:10px;margin-bottom:10px;">
+  <!-- ══ CORPS PRINCIPAL (3 colonnes) ══════════════════════════════════ -->
+  <table style="border:1px solid #333;">
     <tr>
-      <td></td>
-      <td width="280">
-        <table width="100%">
-          <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(totalHt)}</td></tr>
-          <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 0)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(totalVat)}</td></tr>
-          <tr style="font-weight:bold;border-top:2px solid #0d244a;">
-            <td style="padding:6px 8px;">Total T.T.C</td>
-            <td style="padding:6px 8px;text-align:right;">${formatTnd(totalTtc)}</td>
-          </tr>
+      <!-- COL 1 : Identification locataire -->
+      <td style="width:33%;border-right:1px solid #333;padding:3px;vertical-align:top;">
+        <div class="section-title">I- IDENTIFICATION DU LOCATAIRE<br><span style="font-size:7px;">السائق الأول</span></div>
+        <table style="width:100%;margin-top:2px;">
+          ${field("Sté / شركة", customer?.type === "entreprise" ? safe(customer.name) : "")}
+          ${field("Nom / الإسم", customer ? safe(customer.name?.split(" ")[0] || "") : "")}
+          ${field("Prénom / اللقب", customer ? safe(customer.name?.split(" ").slice(1).join(" ") || "") : "")}
+          ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
+          ${field("Nationalité / الجنسية", f(contract.customerNationality))}
+          ${field("Date d'Entrée en Tunisie / تاريخ الدخول إلى تونس", fd(contract.customerEntryDateTn))}
+          ${field("Pièce d'Identité N° / ب.ت. وطنية عند", customer ? safe(customer.idNumber||"") : "")}
+          ${field("Etabli le / المسلمة في", fd(contract.customerIdIssuedDate)+" à "+f(contract.customerIdIssuedAt))}
+          ${field("Permis N° / رخصة سياقة عند", f(contract.customerLicenseNumber))}
+          ${field("Etabli le / المسلمة في", fd(contract.customerLicenseIssuedDate)+" à "+f(contract.customerLicenseIssuedAt))}
+          ${field("Adresse Locale en Tunisie / العنوان بتونس", f(contract.customerLocalAddress) || safe(customer?.address||""))}
+          <tr><td style="padding:2px 3px;">
+            <div class="field-label">Motif de Séjour / سبب الإقامة بتونس</div>
+            <div style="display:flex;gap:6px;font-size:8px;margin-top:1px;">
+              ${["Tourisme","Affaire","Visite","Autre"].map(m=>`<label><input type="checkbox" disabled ${contract.customerStayReason===m?"checked":""}> ${m}</label>`).join("")}
+            </div>
+          </td></tr>
+          ${field("Tél.", safe(customer?.phone||""))}
+        </table>
+        <div style="border:1px solid #333;margin-top:4px;padding:3px;">
+          <div style="font-size:7.5px;font-weight:bold;">MONTANT DE FRANCHISE / التسوية على التأمين</div>
+          <div style="font-size:9px;border-bottom:1px solid #555;min-height:14px;margin-top:2px;">${contract.franchiseAmount!=null?Number(contract.franchiseAmount).toLocaleString("fr-FR",{maximumFractionDigits:2})+" TND":""}</div>
+        </div>
+      </td>
+
+      <!-- COL 2 : 2ème conducteur + Identification véhicule -->
+      <td style="width:33%;border-right:1px solid #333;padding:3px;vertical-align:top;">
+        <div class="section-title">II- 2<sup>ème</sup> CONDUCTEUR</div>
+        <table style="width:100%;margin-top:2px;">
+          ${field("Nom et Prénom / الإسم واللقب", f(contract.driver2Name))}
+          ${field("Pièce d'Identité / ب.ت. وطنية عند", f(contract.driver2IdNumber))}
+          ${field("Etabli le / المسلمة في", fd(contract.driver2IdIssuedDate)+" à "+f(contract.driver2IdIssuedAt))}
+          ${field("Permis N° / رخصة سياقة عند", f(contract.driver2LicenseNumber))}
+          ${field("Etabli le / المسلمة في", fd(contract.driver2LicenseIssuedDate)+" à "+f(contract.driver2LicenseIssuedAt))}
+        </table>
+
+        <div class="section-title" style="margin-top:6px;">IV- IDENTIFICATION DU VEHICULE<br><span style="font-size:7px;">نوعية السيارة</span></div>
+        <table style="width:100%;margin-top:2px;">
+          ${field("Modèle / النوع", firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||""))}
+          ${field("Immatriculation / الرقم", safe(firstLine.carPlate||""))}
+          <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم دخول — Kms départ</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null?contract.mileageStart:""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم رجوع — Kms retour</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageEnd!=null?contract.mileageEnd:""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">الفارق — Kms parcours</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null&&contract.mileageEnd!=null?Number(contract.mileageEnd)-Number(contract.mileageStart):""}</div></td></tr>
+          ${contract.replacementCarModel || contract.replacementCarPlate ? `
+          <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;font-weight:bold;">Changement de Voiture :</div></td></tr>
+          ${field("Model", f(contract.replacementCarModel))}
+          ${field("Matricul", f(contract.replacementCarPlate))}` : ""}
+          ${field("Type de carburant", firstCar ? safe(firstCar.fuelType||"") : "")}
+          <tr><td style="padding:2px 3px;">
+            <div class="field-label">Niv. de carburant Départ / البنزين عند الخروج</div>
+            <table style="margin-top:2px;width:auto;"><tr>${fuelBar(contract.fuelLevelStart)}</tr></table>
+          </td></tr>
+          <tr><td style="padding:2px 3px;">
+            <div class="field-label">Niv. de carburant Arrivée / البنزين عند الدخول</div>
+            <table style="margin-top:2px;width:auto;"><tr>${fuelBar(contract.fuelLevelEnd)}</tr></table>
+          </td></tr>
+        </table>
+      </td>
+
+      <!-- COL 3 : Renseignements location -->
+      <td style="width:33%;padding:3px;vertical-align:top;">
+        <div class="section-title">III- RENSEIGNEMENT SUR LA LOCATION<br><span style="font-size:7px;">مدة الكراء</span></div>
+        <table style="width:100%;margin-top:2px;">
+          ${field("Date de départ / تاريخ الخروج", fd(firstLine.periodStart||contract.contractDate))}
+          ${field("Heure / الساعة", firstLine.pickupTime||"")}
+          ${field("Date de Retour / تاريخ الدخول", fd(firstLine.periodEnd||""))}
+          ${field("Heure / الساعة", firstLine.returnTime||"")}
+        </table>
+        <div style="border:1px solid #333;padding:2px;margin:3px 0;">
+          <div style="font-size:7.5px;font-weight:bold;text-align:center;">PROLONGATIONS / الإضافات</div>
+          <table style="width:100%;">
+            <tr><td style="font-size:7.5px;padding:1px 3px;">Du :</td><td style="border-bottom:1px solid #999;min-width:50px;">&nbsp;</td><td style="font-size:7.5px;padding:1px 3px;">à</td><td style="border-bottom:1px solid #999;min-width:50px;">&nbsp;</td></tr>
+            <tr><td style="font-size:7.5px;padding:1px 3px;">Au :</td><td style="border-bottom:1px solid #999;">&nbsp;</td><td></td><td style="border-bottom:1px solid #999;">&nbsp;</td></tr>
+            <tr style="border-top:1px solid #ccc;"><td style="font-size:7.5px;padding:1px 3px;">Du :</td><td style="border-bottom:1px solid #999;">&nbsp;</td><td style="font-size:7.5px;padding:1px 3px;">à</td><td style="border-bottom:1px solid #999;">&nbsp;</td></tr>
+            <tr><td style="font-size:7.5px;padding:1px 3px;">Au :</td><td style="border-bottom:1px solid #999;">&nbsp;</td><td></td><td style="border-bottom:1px solid #999;">&nbsp;</td></tr>
+          </table>
+        </div>
+        <table style="width:100%;margin-top:2px;">
+          <tr><td style="padding:1px 3px;"><div class="field-label">Durée de la Location / مـدة الكـراء</div><div class="field-value">${firstLine.days||contract.days||""} jour(s)</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${totalHt > 0 ? totalHt.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance R.C.</div><div class="field-value">${contract.insuranceRcAmount!=null?Number(contract.insuranceRcAmount).toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND":""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND":""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A. (${Number(settings.vatRate||19)} %)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur État</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalTtc + stampVal).toLocaleString("fr-FR",{maximumFractionDigits:3})} TND</div></td></tr>
         </table>
       </td>
     </tr>
   </table>
 
-  <div style="border-top:1px dashed #c8daf9;padding-top:8px;margin-bottom:24px;font-size:10px;font-style:italic;">
-    Arrêté le présent contrat à la somme de&nbsp;: <strong>${amountToFrenchWords(totalTtc)}</strong>.
-  </div>
+  <!-- ══ BAS DE PAGE : ACCESSOIRES + SIGNATURE + ÉTAT VOITURE ══════════ -->
+  <table style="border:1px solid #333;border-top:none;margin-top:0;">
+    <tr>
+      <!-- Accessoires -->
+      <td style="width:22%;border-right:1px solid #333;padding:3px;vertical-align:top;">
+        <div style="font-size:8px;font-weight:bold;text-align:center;margin-bottom:3px;">NOMBRE DE CROIX SUR LE CROQUI</div>
+        <table style="width:100%;border:1px solid #333;">
+          <tr>
+            <th style="font-size:7.5px;border:1px solid #333;padding:1px 3px;"></th>
+            <th style="font-size:7.5px;border:1px solid #333;padding:1px 3px;text-align:center;">OUI</th>
+            <th style="font-size:7.5px;border:1px solid #333;padding:1px 3px;text-align:center;">NON</th>
+          </tr>
+          ${chk(contract.hasSpareTire, "Roue de Secours")}
+          ${chk(contract.hasJackTools, "Cric-Outils")}
+          ${chk(contract.hasRadio, "Radio et Antenne")}
+          ${chk(contract.hasHubcaps, "Enjoliveurs")}
+          ${chk(contract.hasMirrors, "Rétroviseurs")}
+          ${chk(contract.hasAc, "Climatiseur en Marche")}
+        </table>
+      </td>
 
-  <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:10px;">
-    <div style="text-align:center;width:200px;">
-      <div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:6px;">Signature du loueur</div>
-    </div>
-    <div style="text-align:center;width:200px;">
-      <div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:6px;">Signature du locataire</div>
-    </div>
-  </div>
+      <!-- Signature -->
+      <td style="width:56%;border-right:1px solid #333;padding:3px;vertical-align:top;text-align:center;">
+        <div style="font-size:7.5px;text-align:left;margin-bottom:4px;line-height:1.5;">
+          Le locataire soussigné accepte sans réserve les conditions générales de location figurant au verso dont il a pris connaissance et s'engage à restituer le véhicule en bon état à l'endroit et à la date prévus ci-dessus indiqués.
+        </div>
+        <div style="border:1px solid #333;padding:3px;font-size:7.5px;margin-bottom:6px;">
+          Le Présent Véhicule n'est pas autorisé de franchir les frontières Tunisiennes sauf autorisation spéciale.
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:10px;">
+          <div style="text-align:center;width:45%;">
+            <div style="font-size:8px;margin-bottom:2px;">à : ......................... le ..................</div>
+            <div style="border-top:1px solid #333;margin-top:35px;padding-top:4px;font-size:7.5px;font-style:italic;">Dommages identifiés et acceptés<br>Signature du Client(e)</div>
+          </div>
+          <div style="text-align:center;width:45%;">
+            <div style="font-size:8px;margin-bottom:2px;">&nbsp;</div>
+            <div style="border-top:1px solid #333;margin-top:35px;padding-top:4px;font-size:7.5px;font-style:italic;">Nom &amp; Signature de l'Agent</div>
+          </div>
+        </div>
+      </td>
 
-  <div style="border-top:1px solid #c8daf9;padding-top:6px;font-size:8px;color:#4d6a97;text-align:center;margin-top:24px;">
-    ${safe(companyName)}${settings.companyAddress ? " &middot; " + safe(settings.companyAddress) : ""}${settings.companyPhone ? " &middot; Tél: " + safe(settings.companyPhone) : ""}${settings.companyTaxId ? " &middot; Matricule fiscal: " + safe(settings.companyTaxId) : ""}
-  </div>
+      <!-- État de la voiture -->
+      <td style="width:22%;padding:3px;vertical-align:top;">
+        <div style="font-size:8px;font-weight:bold;text-align:center;margin-bottom:2px;">ETAT DE LA VOITURE</div>
+        ${carDiagram}
+        <div style="font-size:6.5px;line-height:1.6;margin-top:3px;columns:2;column-gap:4px;">
+          <div>01 Vitres</div><div>02 Pare-brise</div><div>03 Lunette arrière</div>
+          <div>04 Rétroviseur</div><div>05 Feu avant D</div><div>06 Feu avant G</div>
+          <div>07 Feu arrière D</div><div>08 Feu arrière G</div><div>09 Clignotant avant</div>
+          <div>10 Clignotant arrière</div><div>11 Cinq roues</div><div>12 Cric</div>
+          <div>13 Clé de roues</div><div>14 Mise en marche</div><div>15 Essuie-glaces</div>
+          <div>16 Contrôle voyante</div><div>17 Radio</div><div>18 Appuie tête</div>
+          <div>19 Tapis</div><div>20 Plafonnier</div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+</div>
 </body>
 </html>`);
+      win.document.close();
+    }
+
+    // PDF générique (contrats long terme ou autre type)
+    function generateContractPdfGeneric(contractId) {
+      const contract = state.contracts.find(c => String(c.id) === String(contractId));
+      if (!contract) { alert("Contrat introuvable."); return; }
+      let branding = {};
+      try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
+      const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
+      const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
+      const settings = state.settings || {};
+      const customer = state.customers.find(c => String(c.id) === String(contract.customerId));
+      const contractLines = (state.contractLines || []).filter(l => String(l.contractId) === String(contractId));
+      const totalHt = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
+      const totalVat = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
+      const totalTtc = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
+      const lineRowsHtml = contractLines.length > 0
+        ? contractLines.map(l => {
+            const lcar = state.cars.find(c => String(c.id) === String(l.carId));
+            return `<tr>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate||"-")}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;">${safe(l.designation||(lcar?(((lcar.brand||"")+" "+(lcar.model||"")).trim()||"-"):"-"))}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart||"-")}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd||"-")}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${l.days||"-"}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.rate)}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
+            </tr>`;
+          }).join("")
+        : `<tr><td colspan="9" style="padding:10px;text-align:center;color:#888;">Aucune ligne</td></tr>`;
+      const win = window.open("", "_blank");
+      if (!win) { alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur."); return; }
+      win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Contrat ${safe(contract.contractNumber||contractId)}</title>
+<style>*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#0d244a;margin:0;padding:24px 30px;}table{border-collapse:collapse;}.print-btn{text-align:right;margin-bottom:12px;}.print-btn button{background:#0d244a;color:#fff;border:none;padding:7px 18px;border-radius:4px;cursor:pointer;}@media print{@page{margin:12mm;size:A4;}.print-btn{display:none;}}</style>
+</head><body>
+<div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
+<table width="100%" style="margin-bottom:12px;border-bottom:2px solid #0d244a;padding-bottom:8px;"><tr>
+  <td><img src="${safe(logoUrl)}" style="max-height:60px;margin-right:10px;vertical-align:middle;"><strong style="font-size:14px;">${safe(companyName)}</strong>${settings.companyPhone?`<br><span style="font-size:9px;">Tél: ${safe(settings.companyPhone)}</span>`:""}${settings.companyTaxId?`<br><span style="font-size:9px;">MF: ${safe(settings.companyTaxId)}</span>`:""}
+  </td>
+  <td style="text-align:right;"><h2 style="font-size:14px;">CONTRAT DE LOCATION</h2><p>N° <strong>${safe(contract.contractNumber||contractId)}</strong> — ${safe(contract.contractDate||"")} — ${safe(contract.type||"")}</p><p>Client : <strong>${safe(contract.customerName||"-")}</strong></p></td>
+</tr></table>
+<table width="100%" style="font-size:9px;margin-bottom:12px;"><thead><tr style="background:#0d244a;color:#fff;">
+  <th style="padding:5px;border:1px solid #0d244a;">Immatriculation</th><th style="padding:5px;border:1px solid #0d244a;">Modèle</th>
+  <th style="padding:5px;border:1px solid #0d244a;">Du</th><th style="padding:5px;border:1px solid #0d244a;">Au</th>
+  <th style="padding:5px;border:1px solid #0d244a;">Jours</th><th style="padding:5px;border:1px solid #0d244a;">Tarif HT</th>
+  <th style="padding:5px;border:1px solid #0d244a;">Montant HT</th><th style="padding:5px;border:1px solid #0d244a;">TVA</th>
+  <th style="padding:5px;border:1px solid #0d244a;">TTC</th>
+</tr></thead><tbody>${lineRowsHtml}</tbody></table>
+<table style="width:260px;margin-left:auto;font-size:10px;">
+  <tr><td style="padding:3px 6px;">Total H.T.</td><td style="padding:3px 6px;text-align:right;">${formatTnd(totalHt)}</td></tr>
+  <tr><td style="padding:3px 6px;">TVA (${Number(settings.vatRate||0)}%)</td><td style="padding:3px 6px;text-align:right;">${formatTnd(totalVat)}</td></tr>
+  <tr style="font-weight:bold;border-top:2px solid #0d244a;"><td style="padding:5px 6px;">Total T.T.C.</td><td style="padding:5px 6px;text-align:right;">${formatTnd(totalTtc)}</td></tr>
+</table>
+<div style="margin-top:8px;font-size:10px;font-style:italic;">Arrêté à : <strong>${amountToFrenchWords(totalTtc)}</strong></div>
+<div style="margin-top:40px;display:flex;justify-content:space-between;font-size:10px;">
+  <div style="text-align:center;width:200px;"><div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:5px;">Signature du loueur</div></div>
+  <div style="text-align:center;width:200px;"><div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:5px;">Signature du locataire</div></div>
+</div>
+</body></html>`);
       win.document.close();
     }
 
@@ -12480,8 +12697,27 @@
         quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND", quotientTnd: c.quotient_tnd || 0,
         totalAmountOriginal: c.total_amount_original || 0, totalAmountTnd: c.total_amount_tnd || 0,
         paymentMoment: c.payment_moment || "", paymentPlan: c.payment_plan || "",
-        status: c.status || "active",
-        quoteId: c.quote_id || null,
+        status: c.status || "active", quoteId: c.quote_id || null,
+        franchiseAmount: c.franchise_amount != null ? Number(c.franchise_amount) : null,
+        insuranceRcAmount: c.insurance_rc_amount != null ? Number(c.insurance_rc_amount) : null,
+        insurancePassengersAmount: c.insurance_passengers_amount != null ? Number(c.insurance_passengers_amount) : null,
+        mileageStart: c.mileage_start != null ? Number(c.mileage_start) : null,
+        mileageEnd: c.mileage_end != null ? Number(c.mileage_end) : null,
+        fuelLevelStart: c.fuel_level_start || null, fuelLevelEnd: c.fuel_level_end || null,
+        hasSpareTire: Boolean(c.has_spare_tire), hasJackTools: Boolean(c.has_jack_tools),
+        hasRadio: Boolean(c.has_radio), hasHubcaps: Boolean(c.has_hubcaps),
+        hasMirrors: Boolean(c.has_mirrors), hasAc: Boolean(c.has_ac),
+        customerDob: c.customer_dob || null, customerNationality: c.customer_nationality || "",
+        customerEntryDateTn: c.customer_entry_date_tn || null,
+        customerIdIssuedDate: c.customer_id_issued_date || null, customerIdIssuedAt: c.customer_id_issued_at || "",
+        customerLicenseNumber: c.customer_license_number || "",
+        customerLicenseIssuedDate: c.customer_license_issued_date || null, customerLicenseIssuedAt: c.customer_license_issued_at || "",
+        customerLocalAddress: c.customer_local_address || "", customerStayReason: c.customer_stay_reason || "",
+        driver2Name: c.driver2_name || "", driver2IdNumber: c.driver2_id_number || "",
+        driver2IdIssuedDate: c.driver2_id_issued_date || null, driver2IdIssuedAt: c.driver2_id_issued_at || "",
+        driver2LicenseNumber: c.driver2_license_number || "",
+        driver2LicenseIssuedDate: c.driver2_license_issued_date || null, driver2LicenseIssuedAt: c.driver2_license_issued_at || "",
+        replacementCarModel: c.replacement_car_model || "", replacementCarPlate: c.replacement_car_plate || "",
       }));
       if (newLinesRaw) state.contractLines = newLinesRaw.map(l => ({
         id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
@@ -15335,6 +15571,7 @@
         ).join("");
         const CURRENCIES = ["TND","EUR","SAR","CAD","AED","USD","JPY","KWD","CHF","BHD","CNY","OMR","GBP"];
         const currOpts = (sel) => CURRENCIES.map(c => `<option value="${c}"${c === sel ? " selected" : ""}>${c}</option>`).join("");
+        const fuelOpts = (sel) => ["","Vide","1/4","1/2","3/4","Plein"].map(v => `<option value="${v}"${(sel||"")=== v?" selected":""}>${v||"—"}</option>`).join("");
         byId("cdlHeader").innerHTML = `
           <div>
             <label class="label-small">Client</label>
@@ -15376,27 +15613,83 @@
             </select>
           </div>
           <div style="display:flex;gap:6px;align-items:flex-end;">
-            <div style="flex:1;">
-              <label class="label-small">Tarif</label>
-              <input id="cdlERate" type="number" step="0.01" min="0" value="${contract.rate || 0}" style="width:100%;" />
-            </div>
-            <div style="flex:0 0 80px;">
-              <label class="label-small">Devise</label>
-              <select id="cdlERateCurrency" style="width:100%;">${currOpts(contract.rateCurrency || "TND")}</select>
-            </div>
+            <div style="flex:1;"><label class="label-small">Tarif</label><input id="cdlERate" type="number" step="0.01" min="0" value="${contract.rate || 0}" style="width:100%;" /></div>
+            <div style="flex:0 0 80px;"><label class="label-small">Devise</label><select id="cdlERateCurrency" style="width:100%;">${currOpts(contract.rateCurrency || "TND")}</select></div>
           </div>
           <div style="display:flex;gap:6px;align-items:flex-end;">
-            <div style="flex:1;">
-              <label class="label-small">Caution</label>
-              <input id="cdlEQuotient" type="number" step="0.01" min="0" value="${contract.quotient || 0}" style="width:100%;" />
-            </div>
-            <div style="flex:0 0 80px;">
-              <label class="label-small">Devise</label>
-              <select id="cdlEQuotientCurrency" style="width:100%;">${currOpts(contract.quotientCurrency || "TND")}</select>
-            </div>
+            <div style="flex:1;"><label class="label-small">Caution</label><input id="cdlEQuotient" type="number" step="0.01" min="0" value="${contract.quotient || 0}" style="width:100%;" /></div>
+            <div style="flex:0 0 80px;"><label class="label-small">Devise</label><select id="cdlEQuotientCurrency" style="width:100%;">${currOpts(contract.quotientCurrency || "TND")}</select></div>
           </div>
           <div><span class="label-small">Total HT</span><br><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
           <div><span class="label-small">Total TTC</span><br><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></div>
+
+          <!-- I — Identification locataire complémentaire -->
+          <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">I — IDENTIFICATION LOCATAIRE</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              <div><label class="label-small">Date de naissance</label><input id="cdlEDob" type="date" value="${contract.customerDob||""}" style="width:100%;" /></div>
+              <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality)}" style="width:100%;" /></div>
+              <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||""}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt)}" style="width:100%;" /></div>
+              <div><label class="label-small">Motif de séjour</label>
+                <select id="cdlEStayReason" style="width:100%;">
+                  ${["","Tourisme","Affaire","Visite","Autre"].map(v=>`<option value="${v}"${(contract.customerStayReason||"")===v?" selected":""}>${v||"—"}</option>`).join("")}
+                </select>
+              </div>
+              <div><label class="label-small">N° Permis de conduire</label><input id="cdlELicenseNo" type="text" value="${safe(contract.customerLicenseNumber)}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi le</label><input id="cdlELicenseDate" type="date" value="${contract.customerLicenseIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi à</label><input id="cdlELicenseAt" type="text" value="${safe(contract.customerLicenseIssuedAt)}" style="width:100%;" /></div>
+              <div style="grid-column:span 3;"><label class="label-small">Adresse locale en Tunisie</label><input id="cdlELocalAddr" type="text" value="${safe(contract.customerLocalAddress)}" style="width:100%;" /></div>
+            </div>
+          </div>
+
+          <!-- II — 2ème conducteur -->
+          <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">II — 2ÈME CONDUCTEUR</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              <div style="grid-column:span 2;"><label class="label-small">Nom & Prénom</label><input id="cdlEDriver2Name" type="text" value="${safe(contract.driver2Name)}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Pièce d'identité</label><input id="cdlEDriver2IdNo" type="text" value="${safe(contract.driver2IdNumber)}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEDriver2IdDate" type="date" value="${contract.driver2IdIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEDriver2IdAt" type="text" value="${safe(contract.driver2IdIssuedAt)}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Permis</label><input id="cdlEDriver2LicenseNo" type="text" value="${safe(contract.driver2LicenseNumber)}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi le</label><input id="cdlEDriver2LicenseDate" type="date" value="${contract.driver2LicenseIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi à</label><input id="cdlEDriver2LicenseAt" type="text" value="${safe(contract.driver2LicenseIssuedAt)}" style="width:100%;" /></div>
+            </div>
+          </div>
+
+          <!-- IV — État véhicule -->
+          <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">IV — ÉTAT DU VÉHICULE</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+              <div><label class="label-small">Km départ</label><input id="cdlEKmStart" type="number" min="0" value="${contract.mileageStart!=null?contract.mileageStart:""}" style="width:100%;" /></div>
+              <div><label class="label-small">Km retour</label><input id="cdlEKmEnd" type="number" min="0" value="${contract.mileageEnd!=null?contract.mileageEnd:""}" style="width:100%;" /></div>
+              <div><label class="label-small">Carburant départ</label><select id="cdlEFuelStart" style="width:100%;">${fuelOpts(contract.fuelLevelStart)}</select></div>
+              <div><label class="label-small">Carburant retour</label><select id="cdlEFuelEnd" style="width:100%;">${fuelOpts(contract.fuelLevelEnd)}</select></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;">
+              ${[["hasSpareTire","cdlESpareTire","Roue de secours"],["hasJackTools","cdlEJack","Cric-Outils"],["hasRadio","cdlERadio","Radio/Antenne"],["hasHubcaps","cdlEHubcaps","Enjoliveurs"],["hasMirrors","cdlEMirrors","Rétroviseurs"],["hasAc","cdlEAc","Climatiseur en marche"]].map(([k,id,lbl])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="${id}"${contract[k]?" checked":""}> ${lbl}</label>`).join("")}
+            </div>
+          </div>
+
+          <!-- Financier contrat -->
+          <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">FINANCIER CONTRAT</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              <div><label class="label-small">Franchise assurance (TND)</label><input id="cdlEFranchise" type="number" step="0.01" min="0" value="${contract.franchiseAmount!=null?contract.franchiseAmount:""}" style="width:100%;" /></div>
+              <div><label class="label-small">Assurance R.C. (TND)</label><input id="cdlEInsRc" type="number" step="0.01" min="0" value="${contract.insuranceRcAmount!=null?contract.insuranceRcAmount:""}" style="width:100%;" /></div>
+              <div><label class="label-small">Assurance pers. transportées (TND)</label><input id="cdlEInsPax" type="number" step="0.01" min="0" value="${contract.insurancePassengersAmount!=null?contract.insurancePassengersAmount:""}" style="width:100%;" /></div>
+            </div>
+          </div>
+
+          <!-- Changement de voiture -->
+          <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">CHANGEMENT DE VOITURE (si applicable)</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+              <div><label class="label-small">Modèle de remplacement</label><input id="cdlEReplModel" type="text" value="${safe(contract.replacementCarModel)}" style="width:100%;" /></div>
+              <div><label class="label-small">Matricule de remplacement</label><input id="cdlEReplPlate" type="text" value="${safe(contract.replacementCarPlate)}" style="width:100%;" /></div>
+            </div>
+          </div>
         `;
         editBtn.textContent = "✓ Enregistrer";
         cancelBtn.style.display = "";
@@ -15416,13 +15709,37 @@
           const paymentPlan = type === "long" ? "mensualite" : `paiement client ${paymentMoment}`;
           const eurToTnd = state.settings.eurToTnd || 3.4;
           const quotientTnd = quotientCurrency === "TND" ? quotient : quotientCurrency === "EUR" ? quotient * eurToTnd : quotient;
+          const v = id => byId(id)?.value || null;
+          const vn = id => { const val = byId(id)?.value; return val !== "" && val != null ? Number(val) : null; };
+          const vb = id => byId(id)?.checked || false;
           await apiPut(`/contracts/${contractId}`, {
-            customer_id: customerId,
-            customer_name: customer ? customer.name : contract.customerName,
+            customer_id: customerId, customer_name: customer ? customer.name : contract.customerName,
             type, rate_type: rateType, contract_date: contractDate,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
             rate, rate_currency: rateCurrency,
             quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd,
+            // Groupe 2 — financier
+            franchise_amount: vn("cdlEFranchise"), insurance_rc_amount: vn("cdlEInsRc"), insurance_passengers_amount: vn("cdlEInsPax"),
+            // Groupe 3 — état véhicule
+            mileage_start: vn("cdlEKmStart"), mileage_end: vn("cdlEKmEnd"),
+            fuel_level_start: v("cdlEFuelStart") || null, fuel_level_end: v("cdlEFuelEnd") || null,
+            // Groupe 4 — accessoires
+            has_spare_tire: vb("cdlESpareTire"), has_jack_tools: vb("cdlEJack"), has_radio: vb("cdlERadio"),
+            has_hubcaps: vb("cdlEHubcaps"), has_mirrors: vb("cdlEMirrors"), has_ac: vb("cdlEAc"),
+            // Groupe 5 — locataire
+            customer_dob: v("cdlEDob") || null, customer_nationality: v("cdlENationality"),
+            customer_entry_date_tn: v("cdlEEntryDate") || null,
+            customer_id_issued_date: v("cdlEIdDate") || null, customer_id_issued_at: v("cdlEIdAt"),
+            customer_license_number: v("cdlELicenseNo"), customer_license_issued_date: v("cdlELicenseDate") || null,
+            customer_license_issued_at: v("cdlELicenseAt"), customer_local_address: v("cdlELocalAddr"),
+            customer_stay_reason: v("cdlEStayReason") || null,
+            // Groupe 6 — 2ème conducteur
+            driver2_name: v("cdlEDriver2Name"), driver2_id_number: v("cdlEDriver2IdNo"),
+            driver2_id_issued_date: v("cdlEDriver2IdDate") || null, driver2_id_issued_at: v("cdlEDriver2IdAt"),
+            driver2_license_number: v("cdlEDriver2LicenseNo"),
+            driver2_license_issued_date: v("cdlEDriver2LicenseDate") || null, driver2_license_issued_at: v("cdlEDriver2LicenseAt"),
+            // Groupe 7 — changement voiture
+            replacement_car_model: v("cdlEReplModel"), replacement_car_plate: v("cdlEReplPlate"),
           });
           const idx = state.contracts.findIndex(c => c.id === contractId);
           if (idx >= 0) {
@@ -15430,6 +15747,22 @@
               customerId, customerName: customer ? customer.name : contract.customerName,
               type, rateType, contractDate, paymentMoment, paymentPlan, status,
               rate, rateCurrency, quotient, quotientCurrency, quotientTnd,
+              franchiseAmount: vn("cdlEFranchise"), insuranceRcAmount: vn("cdlEInsRc"), insurancePassengersAmount: vn("cdlEInsPax"),
+              mileageStart: vn("cdlEKmStart"), mileageEnd: vn("cdlEKmEnd"),
+              fuelLevelStart: v("cdlEFuelStart")||null, fuelLevelEnd: v("cdlEFuelEnd")||null,
+              hasSpareTire: vb("cdlESpareTire"), hasJackTools: vb("cdlEJack"), hasRadio: vb("cdlERadio"),
+              hasHubcaps: vb("cdlEHubcaps"), hasMirrors: vb("cdlEMirrors"), hasAc: vb("cdlEAc"),
+              customerDob: v("cdlEDob")||null, customerNationality: v("cdlENationality")||"",
+              customerEntryDateTn: v("cdlEEntryDate")||null,
+              customerIdIssuedDate: v("cdlEIdDate")||null, customerIdIssuedAt: v("cdlEIdAt")||"",
+              customerLicenseNumber: v("cdlELicenseNo")||"", customerLicenseIssuedDate: v("cdlELicenseDate")||null,
+              customerLicenseIssuedAt: v("cdlELicenseAt")||"", customerLocalAddress: v("cdlELocalAddr")||"",
+              customerStayReason: v("cdlEStayReason")||"",
+              driver2Name: v("cdlEDriver2Name")||"", driver2IdNumber: v("cdlEDriver2IdNo")||"",
+              driver2IdIssuedDate: v("cdlEDriver2IdDate")||null, driver2IdIssuedAt: v("cdlEDriver2IdAt")||"",
+              driver2LicenseNumber: v("cdlEDriver2LicenseNo")||"",
+              driver2LicenseIssuedDate: v("cdlEDriver2LicenseDate")||null, driver2LicenseIssuedAt: v("cdlEDriver2LicenseAt")||"",
+              replacementCarModel: v("cdlEReplModel")||"", replacementCarPlate: v("cdlEReplPlate")||"",
             });
           }
           renderContractDetailHeader(contractId, false);

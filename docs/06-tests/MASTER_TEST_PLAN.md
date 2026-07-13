@@ -1016,7 +1016,36 @@
 - [ ] **Entrées facturées conservées** : les entrées au statut `brouillon`/`confirme` ne sont pas supprimées lors de la régénération
 - [ ] **Persistance** : F5 → les nouveaux tarifs et l'échéancier régénéré sont toujours présents
 
+### UC-CTR-16 : Renseigner les champs court terme du contrat
+
+**En tant que gestionnaire**, je veux saisir les informations complémentaires d'un contrat court terme (identification locataire, 2ème conducteur, état véhicule, accessoires, changement de voiture).
+
+- [ ] **Formulaire d'édition étendu** : ouvrir le modal d'un contrat court terme → mode édition → les 4 nouvelles sections sont visibles (Identification locataire, 2ème conducteur, État du véhicule / Accessoires, Changement de voiture)
+- [ ] **Champs locataire** : saisir date de naissance, nationalité, date d'entrée en Tunisie, pièce d'identité (N° + établi le/à), permis (N° + établi le/à), adresse locale, motif de séjour → enregistrement OK
+- [ ] **2ème conducteur** : saisir nom/prénom, pièce d'identité (N° + établi le/à), permis (N° + établi le/à) → enregistrement OK
+- [ ] **État véhicule** : saisir km départ, km retour, niveau carburant départ et retour (select Vide/1/4/1/2/3/4/Plein) → enregistrement OK
+- [ ] **Accessoires** : cocher/décocher Roue de secours, Cric-Outils, Radio, Enjoliveurs, Rétroviseurs, Climatiseur → enregistrement OK
+- [ ] **Changement de voiture** : saisir modèle et plaque du véhicule de remplacement → enregistrement OK
+- [ ] **Montants financiers** : saisir montant franchise, assurance R.C., assurance pers. transportées → enregistrement OK
+- [ ] **Persistance** : F5 après enregistrement → tous les champs conservés, relecture depuis l'API
+- [ ] **Erreur backend** : si 400/500 → message d'erreur affiché
+
+### UC-CTR-17 : Générer le PDF court terme (template officiel)
+
+**En tant que gestionnaire**, je veux générer un PDF de contrat court terme qui reproduit exactement le template officiel Emergent Drive.
+
+- [ ] **Bouton PDF visible** : ouvrir le modal d'un contrat de type `court` → bouton PDF présent
+- [ ] **Popup ouverte** : cliquer → une fenêtre s'ouvre avec le template officiel (en-tête 3 colonnes, sections I/II/III/IV, accessoires, croquis)
+- [ ] **Section I — Locataire** : Sté, Nom, Prénom, D. naissance, Nationalité, Date entrée TN, Pièce d'identité, Permis, Adresse locale, Motif séjour, Tél., Montant de franchise — tous renseignés avec les données du contrat
+- [ ] **Section II — 2ème conducteur** : Nom & Prénom, Pièce d'identité, Permis — renseignés si saisis
+- [ ] **Section III — Location** : Dates/heures départ-retour, Prolongations (vide), Durée, Location HT, Assurance R.C., Assurance pers., Total location, TVA, Timbre (depuis paramètres), Total TTC
+- [ ] **Section IV — Véhicule** : Modèle, Immatriculation, Km départ/retour/parcours, Changement de voiture, Type carburant, jauge carburant départ/arrivée (cases Vide/1/4/1/2/3/4/Plein avec case sélectionnée en noir)
+- [ ] **Accessoires** : tableau OUI/NON avec case cochée selon l'état enregistré (Roue de secours, Cric-Outils, Radio, Enjoliveurs, Rétroviseurs, Climatiseur)
+- [ ] **Croquis véhicule** : dessin SVG du véhicule (vue de dessus) avec légende des 20 zones
+- [ ] **Zone signature** : mention conditions générales + zones signature client et agent
+- [ ] **Contrats long terme** : cliquer PDF sur un contrat `long` → PDF générique (tableau de lignes) — pas le template court terme
+
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15).*  
+*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*
