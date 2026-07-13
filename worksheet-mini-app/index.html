@@ -3048,14 +3048,15 @@
       </div>
     </div>
 
-    <!-- ── Gantt quick-create popover ── -->
+    <!-- ── Gantt quick-create / edit popover ── -->
     <div id="ganttQuickPopover" style="display:none;position:fixed;z-index:4500;background:#fff;border:1px solid #d1d5db;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:18px 20px;min-width:290px;max-width:310px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <strong style="font-size:14px;">⚡ Nouvelle réservation</strong>
+        <strong id="gqpTitle" style="font-size:14px;">⚡ Nouvelle réservation</strong>
         <button onclick="byId('ganttQuickPopover').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 2px;">✕</button>
       </div>
       <div id="gqpCarLabel" style="font-size:12px;color:#4b5563;background:#f3f4f6;border-radius:6px;padding:5px 10px;margin-bottom:12px;font-weight:600;"></div>
       <input type="hidden" id="gqpCarId">
+      <input type="hidden" id="gqpResId">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
           <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Début</label>
@@ -3078,6 +3079,7 @@
       <div id="gqpError" style="display:none;color:#c53030;font-size:12px;margin-bottom:8px;background:#fff5f5;border-radius:5px;padding:5px 8px;"></div>
       <div style="display:flex;gap:8px;">
         <button id="gqpSaveBtn" onclick="ganttQuickSave()" style="flex:1;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">⚡ Créer</button>
+        <button id="gqpDeleteBtn" onclick="ganttQuickDelete()" style="display:none;padding:9px 12px;border:1px solid #c53030;border-radius:7px;background:#fff5f5;color:#c53030;font-size:13px;cursor:pointer;" title="Supprimer la réservation">🗑</button>
         <button onclick="byId('ganttQuickPopover').style.display='none'" style="padding:9px 14px;border:1px solid #d1d5db;border-radius:7px;background:#f9fafb;font-size:13px;cursor:pointer;">Annuler</button>
       </div>
     </div>
@@ -10754,9 +10756,9 @@
 
               const startTimeText = r.startTime || "00:00";
               const endTimeText = r.endTime || "23:59";
-              const label = `${r.customerName || "Client"} (${r.startDate} ${startTimeText} -> ${r.endDate} ${endTimeText})${conflict ? " [CONFLIT]" : ""}`;
-              const barText = `${startTimeText}-${endTimeText}`;
-              return `<span class="timeline-bar ${safe(r.status)} ${conflictClass}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;" title="${safe(label)}">${safe(barText)}</span>`;
+              const label = `${r.customerName || "—"} (${r.startDate} ${startTimeText} → ${r.endDate} ${endTimeText})${conflict ? " [CONFLIT]" : ""}`;
+              const barText = r.customerName ? `${r.customerName} ${startTimeText}-${endTimeText}` : `${startTimeText}-${endTimeText}`;
+              return `<span class="timeline-bar ${safe(r.status)} ${conflictClass}" data-res-id="${safe(r.id)}" onclick="handleGanttBarClick(event,this)" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;cursor:pointer;" title="${safe(label)}">${safe(barText)}</span>`;
             })
             .join("");
 
@@ -10784,7 +10786,7 @@
     // ── Gantt quick-create ────────────────────────────────────────────────────────
 
     function handleGanttTrackClick(e, trackEl) {
-      // Ignorer les clics sur les barres existantes
+      // Ignorer les clics sur les barres existantes (gérés par handleGanttBarClick)
       if (e.target && e.target.classList && e.target.classList.contains("timeline-bar")) return;
       const carId = trackEl.dataset.carId;
       const tsStart = Number(trackEl.dataset.tsStart);
@@ -10794,37 +10796,69 @@
       const clickedTs = tsStart + pct * tsDur;
       const d = new Date(clickedTs);
       const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-      ganttQuickCreate(carId, iso, rect);
+      ganttOpenPopover({ carId, dateIso: iso, anchorRect: rect });
     }
 
-    function ganttQuickCreate(carId, dateIso, anchorRect) {
-      const car = state.cars.find((c) => String(c.id) === String(carId));
-      if (!car) return;
-      byId("gqpCarId").value = carId;
-      byId("gqpCarLabel").textContent = `${car.plate} — ${car.model}`;
-      byId("gqpStartDate").value = dateIso;
-      byId("gqpStartTime").value = "09:00";
-      const nd = new Date(`${dateIso}T00:00:00`);
-      nd.setDate(nd.getDate() + 1);
-      const endIso = `${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,"0")}-${String(nd.getDate()).padStart(2,"0")}`;
-      byId("gqpEndDate").value = endIso;
-      byId("gqpEndTime").value = "18:00";
-      byId("gqpNote").value = "";
+    function handleGanttBarClick(e, barEl) {
+      e.stopPropagation();
+      const resId = barEl.dataset.resId;
+      const r = state.reservations.find((x) => String(x.id) === String(resId));
+      if (!r) return;
+      const rect = barEl.getBoundingClientRect();
+      ganttOpenPopover({ reservation: r, anchorRect: rect });
+    }
+
+    function ganttOpenPopover({ carId, dateIso, reservation, anchorRect }) {
+      const isEdit = !!reservation;
+      const actualCarId = isEdit ? String(reservation.carId) : String(carId);
+      const car = state.cars.find((c) => String(c.id) === actualCarId);
+
+      // Mode (create vs edit)
+      byId("gqpResId").value = isEdit ? reservation.id : "";
+      byId("gqpCarId").value = actualCarId;
+      byId("gqpCarLabel").textContent = car ? `${car.plate} — ${car.model}` : actualCarId;
+      byId("gqpTitle").textContent = isEdit ? "✎ Modifier la réservation" : "⚡ Nouvelle réservation";
+      byId("gqpSaveBtn").textContent = isEdit ? "💾 Enregistrer" : "⚡ Créer";
+      byId("gqpDeleteBtn").style.display = isEdit ? "inline-block" : "none";
+
+      if (isEdit) {
+        byId("gqpStartDate").value = reservation.startDate || "";
+        byId("gqpStartTime").value = reservation.startTime || "09:00";
+        byId("gqpEndDate").value = reservation.endDate || "";
+        byId("gqpEndTime").value = reservation.endTime || "18:00";
+        byId("gqpNote").value = reservation.notes || "";
+      } else {
+        byId("gqpStartDate").value = dateIso;
+        byId("gqpStartTime").value = "09:00";
+        const nd = new Date(`${dateIso}T00:00:00`);
+        nd.setDate(nd.getDate() + 1);
+        byId("gqpEndDate").value = `${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,"0")}-${String(nd.getDate()).padStart(2,"0")}`;
+        byId("gqpEndTime").value = "18:00";
+        byId("gqpNote").value = "";
+      }
+
       const errEl = byId("gqpError");
       if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+
       const pop = byId("ganttQuickPopover");
       pop.style.display = "block";
-      // Positionner près du clic
       let top = anchorRect ? anchorRect.bottom + 8 : window.innerHeight / 2 - 160;
       let left = anchorRect ? anchorRect.left : window.innerWidth / 2 - 145;
-      if (top + 340 > window.innerHeight) top = (anchorRect ? anchorRect.top : window.innerHeight / 2 + 160) - 340;
+      if (top + 360 > window.innerHeight) top = (anchorRect ? anchorRect.top : window.innerHeight / 2 + 160) - 360;
       if (left + 295 > window.innerWidth) left = window.innerWidth - 305;
       pop.style.top = `${Math.max(8, top)}px`;
       pop.style.left = `${Math.max(8, left)}px`;
       setTimeout(() => byId("gqpEndDate").focus(), 60);
     }
 
+    // Alias conservé pour compatibilité avec appels existants
+    function ganttQuickCreate(carId, dateIso, anchorRect) {
+      ganttOpenPopover({ carId, dateIso, anchorRect });
+    }
+
     async function ganttQuickSave() {
+      const resId = byId("gqpResId").value;
+      const isEdit = !!resId;
       const carId = byId("gqpCarId").value;
       const startDate = byId("gqpStartDate").value;
       const startTime = byId("gqpStartTime").value || "09:00";
@@ -10846,34 +10880,30 @@
         errEl.style.display = "block";
         return;
       }
-      const conflict = findReservationConflict({ id: "", carId, startDate, startTime, endDate, endTime, status: "en_attente" });
+      // Vérifier les conflits en excluant la réservation en cours d'édition
+      const conflict = findReservationConflict({ id: isEdit ? resId : "", carId, startDate, startTime, endDate, endTime, status: "en_attente" });
       if (conflict) {
         errEl.textContent = `Conflit : déjà réservé du ${conflict.startDate} ${conflict.startTime||"00:00"} au ${conflict.endDate} ${conflict.endTime||"23:59"}.`;
         errEl.style.display = "block";
         return;
       }
+
       const car = state.cars.find((c) => String(c.id) === String(carId));
-      const resId = uid("RES");
       const btn = byId("gqpSaveBtn");
       if (btn) btn.disabled = true;
-      // Fetch direct pour récupérer le message d'erreur réel du backend
-      let savedRes = null;
+
       try {
         const token = localStorage.getItem("locacar-jwt");
-        const resp = await fetch(`${API_URL}/reservations`, {
-          method: "POST",
+        const url = isEdit ? `${API_URL}/reservations/${resId}` : `${API_URL}/reservations`;
+        const method = isEdit ? "PUT" : "POST";
+        const body = isEdit
+          ? { car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, notes: note || null }
+          : { id: uid("RES"), car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status: "en_attente", notes: note || null };
+
+        const resp = await fetch(url, {
+          method,
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            id: resId,
-            car_id: carId,
-            car_plate: car ? car.plate : "",
-            start_date: startDate,
-            start_time: startTime,
-            end_date: endDate,
-            end_time: endTime,
-            status: "en_attente",
-            notes: note || null,
-          }),
+          body: JSON.stringify(body),
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || !data.success) {
@@ -10882,28 +10912,63 @@
           errEl.style.display = "block";
           return;
         }
-        savedRes = data.data;
+
+        if (isEdit) {
+          // Mettre à jour l'entrée dans state
+          const idx = state.reservations.findIndex((x) => String(x.id) === String(resId));
+          if (idx !== -1) {
+            state.reservations[idx] = { ...state.reservations[idx], carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, notes: note || null };
+          }
+        } else {
+          const saved = data.data;
+          const actualId = (saved && saved.id) ? saved.id : body.id;
+          state.reservations.push({ id: actualId, customerId: null, customerName: "", carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, status: "en_attente", notes: note || null });
+        }
       } catch (fetchErr) {
         if (btn) btn.disabled = false;
         errEl.textContent = "Erreur réseau : " + String(fetchErr);
         errEl.style.display = "block";
         return;
       }
+
       if (btn) btn.disabled = false;
-      const actualId = (savedRes && savedRes.id) ? savedRes.id : resId;
-      state.reservations.push({
-        id: actualId,
-        customerId: null,
-        customerName: "",
-        carId,
-        carPlate: car ? car.plate : "",
-        startDate,
-        startTime,
-        endDate,
-        endTime,
-        status: "en_attente",
-        notes: note || null,
-      });
+      byId("ganttQuickPopover").style.display = "none";
+      saveAndRender();
+      renderReservationTimeline(homeGanttOpts());
+    }
+
+    async function ganttQuickDelete() {
+      const resId = byId("gqpResId").value;
+      if (!resId) return;
+      const r = state.reservations.find((x) => String(x.id) === String(resId));
+      const label = r ? `${r.carPlate || "?"} · ${r.startDate} → ${r.endDate}` : resId;
+      if (!confirm(`Supprimer la réservation ?\n${label}\n\nCette action est irréversible.`)) return;
+
+      const btn = byId("gqpDeleteBtn");
+      if (btn) btn.disabled = true;
+      try {
+        const token = localStorage.getItem("locacar-jwt");
+        const resp = await fetch(`${API_URL}/reservations/${resId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.success) {
+          if (btn) btn.disabled = false;
+          const errEl = byId("gqpError");
+          errEl.textContent = data.error || data.message || `Erreur ${resp.status}`;
+          errEl.style.display = "block";
+          return;
+        }
+      } catch (fetchErr) {
+        if (btn) btn.disabled = false;
+        const errEl = byId("gqpError");
+        errEl.textContent = "Erreur réseau : " + String(fetchErr);
+        errEl.style.display = "block";
+        return;
+      }
+
+      state.reservations = state.reservations.filter((x) => String(x.id) !== String(resId));
       byId("ganttQuickPopover").style.display = "none";
       saveAndRender();
       renderReservationTimeline(homeGanttOpts());
