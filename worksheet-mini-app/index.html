@@ -3197,6 +3197,7 @@
             <thead>
               <tr>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Plaque</th>
+                <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Désignation</th>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
@@ -5692,7 +5693,7 @@
       }));
 
       if (contractLinesRaw) state.contractLines = contractLinesRaw.map(l => ({
-        id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "",
+        id: l.id, contractId: l.contract_id, carId: l.car_id, carPlate: l.car_plate || "", designation: l.designation || "",
         periodStart: l.period_start || "", periodEnd: l.period_end || "",
         pickupTime: l.pickup_time || null, returnTime: l.return_time || null,
         days: l.days || 0, months: l.months || 0,
@@ -6534,9 +6535,11 @@
         }))].join(', ');
         lineRowsHtml = usedLines.map((line) => {
           const lineContract = state.contracts.find((c) => String(c.id) === String(line.contractId || ""));
-          const lineCar = lineContract ? state.cars.find((c) => String(c.id) === String(lineContract.carId || "")) : null;
-          const lineDesignation = safe((lineCar && lineCar.model) || line.designation || "Vehicule");
-          const linePlate = safe((lineCar && lineCar.plate) || line.carPlate || "-");
+          const contractLine = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null;
+          const lineCarId = (contractLine && contractLine.carId) || (lineContract && lineContract.carId) || null;
+          const lineCar = lineCarId ? state.cars.find((c) => String(c.id) === String(lineCarId)) : null;
+          const lineDesignation = lineCar ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule") : (safe(contractLine && contractLine.designation) || "Véhicule");
+          const linePlate = safe((lineCar && lineCar.plate) || (contractLine && contractLine.carPlate) || line.carPlate || "-");
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(lineContract ? (lineContract.contractNumber || lineContract.id) : (line.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
@@ -6556,7 +6559,7 @@
           : computeHtFromTtc(amountTtcFallback, days);
         const fallbackContract = state.contracts.find(c => String(c.id) === String(invoice.contractId || ''));
         contractsLabel = fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || '-');
-        const designation = car ? safe(car.model || "Vehicule") : "Vehicule";
+        const designation = car ? safe((((car.brand||"")+" "+(car.model||"")).trim()) || "Véhicule") : "Véhicule";
         const plate = car ? safe(car.plate || "-") : "-";
         lineRowsHtml = `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || "-"))}</td>
@@ -13029,7 +13032,7 @@
         const tr = document.createElement("tr");
         tr.dataset.lineId = line.id || "";
         tr.innerHTML = `
-          <td style="padding:6px 8px;">${(() => { const _lc = state.contracts.find(c => c.id === line.contractId); return safe(_lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-")); })()} &mdash; ${safe(line.carPlate || "-")} <span style="color:var(--muted);">${safe(line.designation || "")}</span></td>
+          <td style="padding:6px 8px;">${(() => { const _lc = state.contracts.find(c => c.id === line.contractId); const cLabel = _lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-"); const _cl = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null; const _car = _cl ? state.cars.find(c => c.id === _cl.carId) : null; const desig = _car ? ((((_car.brand||"")+" "+(_car.model||"")).trim()) || "") : (_cl && _cl.designation && _cl.designation !== line.carPlate ? _cl.designation : ""); return `${safe(cLabel)} &mdash; ${safe(line.carPlate || "-")}${desig ? ` <span style="color:var(--muted);font-size:11px;">${safe(desig)}</span>` : ""}`; })()}</td>
           <td style="padding:6px 8px;">${safe(line.periodStart || "-")}</td>
           <td style="padding:6px 8px;text-align:right;">${line.days || 0}</td>
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.amountHt || 0)}</td>
@@ -13671,7 +13674,7 @@
             <a href="#" class="xref" data-open-invoice="${safe(invoice.id)}">${safe(invoice.invoiceNumber || invoice.id)}</a>
             ${invoice.status === "brouillon" ? '<div class="small" style="color:#854d0e;">brouillon — non confirmé</div>' : `<div class="small">${safe(invoice.label || "")}</div>`}
           </td>
-          <td data-col="contractId"><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe(invoice.contractId || "-")}</a></td>
+          <td data-col="contractId"><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe((() => { const _c = state.contracts.find(c => c.id === invoice.contractId); return _c ? (_c.contractNumber || _c.id) : (invoice.contractId || "-"); })())}</a></td>
           <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
           <td data-col="lignes"><a href="#" class="badge-lignes" data-open-invoice="${safe(invoice.id)}">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
           <td data-col="dueDate">${safe(invoice.dueDate || "-")}</td>
