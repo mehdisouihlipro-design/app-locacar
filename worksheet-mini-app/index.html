@@ -15512,6 +15512,9 @@
     function editContractLine(contractId, lineId, tr) {
       const line = (state.contractLines || []).find(l => l.id === lineId);
       if (!line) return;
+      const ctr = state.contracts.find(c => c.id === contractId);
+      const rateType = ctr?.rateType || "daily";
+      const rateUnit = rateType === "monthly" ? "TND/mois" : "TND/j";
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand || c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
@@ -15524,7 +15527,10 @@
           → <input id="cleEnd" type="date" value="${line.periodEnd||""}" style="width:105px;font-size:12px;" />
         </td>
         <td id="cleDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
-        <td style="padding:4px;"><input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;">
+          <input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit}</div>
+        </td>
         <td style="padding:4px;"><input id="cleHt" type="number" step="0.01" value="${line.amountHt||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
         <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
         <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
@@ -15535,26 +15541,53 @@
           <div id="cleError" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
         </td>
       `;
+      // ── Recalculs bidirectionnels ────────────────────────────────────
+      const getDurData = () => {
+        const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
+        if (!s || !e || e < s) return { days: 0, mult: 1 };
+        const { days } = calcLineDuration(s, e);
+        const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
+        return { days, mult };
+      };
+      // Tarif → HT → VAT → TTC
+      const recomputeFromRate = () => {
+        const rate = Number(tr.querySelector("#cleRate").value || 0);
+        if (rate <= 0) return;
+        const { mult } = getDurData();
+        const ht = rateType === "monthly" ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value) : Math.round(rate * mult * 100) / 100;
+        const { vatAmount, amountTtc } = computeContractLineTtc(Math.round(ht * 100) / 100);
+        tr.querySelector("#cleHt").value  = (Math.round(ht * 100) / 100).toFixed(2);
+        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
+        tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
+      };
+      // HT modifié → MAJ VAT, TTC, puis tarif
       const recomputeHt = () => {
         const { vatAmount, amountTtc } = computeContractLineTtc(Number(tr.querySelector("#cleHt").value || 0));
         tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
         tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
+        const ht = Number(tr.querySelector("#cleHt").value || 0);
+        const { mult } = getDurData();
+        if (ht > 0 && mult > 0) tr.querySelector("#cleRate").value = (Math.round(ht / mult * 100) / 100).toFixed(2);
       };
+      // TTC modifié → MAJ HT, VAT, puis tarif
       const recomputeTtc = () => {
         const { amountHt, vatAmount } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0));
-        tr.querySelector("#cleHt").value = amountHt.toFixed(2);
+        tr.querySelector("#cleHt").value  = amountHt.toFixed(2);
         tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
+        const { mult } = getDurData();
+        if (amountHt > 0 && mult > 0) tr.querySelector("#cleRate").value = (Math.round(amountHt / mult * 100) / 100).toFixed(2);
       };
+      // Dates changées → MAJ durée, recalcul depuis tarif si renseigné
       const updateDur = () => {
         const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
         if (s && e && e >= s) {
           const { days } = calcLineDuration(s, e);
           tr.querySelector("#cleDur").textContent = days + "j";
-          const rate = Number(tr.querySelector("#cleRate").value || 0);
-          if (rate > 0) { tr.querySelector("#cleHt").value = (rate * days).toFixed(2); recomputeHt(); }
+          if (Number(tr.querySelector("#cleRate").value || 0) > 0) recomputeFromRate();
         } else { tr.querySelector("#cleDur").textContent = "—"; }
       };
       const clearCleError = () => { tr.querySelector("#cleError").style.display = "none"; };
+      tr.querySelector("#cleRate").oninput  = () => { recomputeFromRate(); clearCleError(); };
       tr.querySelector("#cleHt").oninput    = () => { recomputeHt(); clearCleError(); };
       tr.querySelector("#cleTtc").oninput   = () => { recomputeTtc(); clearCleError(); };
       tr.querySelector("#cleStart").oninput = () => { updateDur(); clearCleError(); };

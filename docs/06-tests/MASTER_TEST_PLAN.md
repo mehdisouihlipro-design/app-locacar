@@ -174,7 +174,12 @@
 
 ### UC-CTR-4 : Édition inline d'une ligne
 - [ ] **Bouton ✎ (edit)** : sur une ligne `active` dans le modal de détail → champs deviennent éditables inline
-- [ ] **Modification** : modifier le tarif → HT/TTC recalculés → cliquer ✓ → `PUT /contract-lines/:id` → ligne mise à jour
+- [ ] **Tarif → TTC (contrat journalier)** : modifier le tarif/j → HT = tarif × jours, TVA recalculée, TTC mis à jour → ✓ → `PUT /contract-lines/:id` → ligne mise à jour
+- [ ] **Tarif → TTC (contrat mensuel)** : modifier le tarif mensuel → HT calculé via formule mensuelle (mois complets + prorata dernier mois), TVA, TTC mis à jour
+- [ ] **TTC → Tarif** : modifier le TTC directement → HT recalculé (HT = TTC / (1 + TVA)), puis tarif = HT / (jours ou mois selon type de contrat)
+- [ ] **HT → Tarif** : modifier le HT directement → TVA et TTC recalculés, puis tarif = HT / durée
+- [ ] **Dates → recalcul automatique** : modifier la date de début ou fin → durée recalculée, si tarif renseigné → HT/TTC recalculés depuis le tarif
+- [ ] **Unité affichée** : le libellé sous le champ tarif affiche "TND/j" pour contrat journalier et "TND/mois" pour contrat mensuel
 - [ ] **409 sur modification** : modifier les dates d'une ligne de façon à créer un chevauchement → message rouge inline, modification annulée
 
 ### UC-CTR-5 : Résiliation anticipée d'une ligne (BR26)
@@ -985,5 +990,33 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7).*  
+---
+
+### UC-CTR-14 : Débloquer l'édition d'un contrat facturé
+**En tant que gestionnaire**, je veux pouvoir débloquer temporairement l'édition des lignes d'un contrat facturé pour corriger une erreur, sans modifier le statut en base.
+
+- [ ] **Bouton visible** : ouvrir le modal d'un contrat qui a au moins une facture non-brouillon → bouton "🔓 Débloquer l'édition" (orange) apparaît
+- [ ] **Confirmation** : cliquer le bouton → une fenêtre de confirmation s'affiche → annuler → contrat reste verrouillé
+- [ ] **Déblocage session** : confirmer → le bouton disparaît, les boutons ✎/⏹/🗑 deviennent visibles sur les lignes, le bouton "+ Ajouter une ligne" réapparaît
+- [ ] **Édition possible** : modifier une ligne → `PUT /contract-lines/:id` réussi, ligne mise à jour
+- [ ] **Rétablissement au rechargement** : fermer et rouvrir le modal → le contrat est de nouveau verrouillé (le déblocage est uniquement pour la session en cours, non persisté)
+- [ ] **Persistance** : F5 → contrat retrouve son état verrouillé normal
+
+---
+
+### UC-CTR-15 : Modifier les montants et régénérer l'échéancier
+**En tant que gestionnaire**, je veux pouvoir changer le type de tarification (journalier/mensuel) et le tarif d'un contrat long terme, puis régénérer l'échéancier pour refléter les nouveaux montants.
+
+- [ ] **Bouton visible** : ouvrir le modal d'un contrat long terme → onglet Échéancier → bouton "📊 Modifier les montants" présent
+- [ ] **Panneau de saisie** : cliquer → panneau inline s'ouvre avec sélecteur Type (Journalier/Mensuel) et champ Tarif
+- [ ] **Annuler** : cliquer "Annuler" → le panneau se referme sans modification
+- [ ] **Mise à jour et régénération** : saisir un nouveau type et tarif → "Mettre à jour & Régénérer" → `PUT /contracts/:id/update-rates` puis `POST /contracts/:id/generate-schedule` avec `override:true` → les lignes de contrat sont recalculées aux nouveaux montants et l'échéancier est régénéré
+- [ ] **Lignes recalculées** : après mise à jour, les montants des lignes dans le tableau reflètent le nouveau tarif (journalier ou mensuel avec prorata)
+- [ ] **Nouvelles entrées d'échéancier** : les entrées `planifie` de l'ancien échéancier sont supprimées et remplacées par les nouvelles avec les bons montants
+- [ ] **Entrées facturées conservées** : les entrées au statut `brouillon`/`confirme` ne sont pas supprimées lors de la régénération
+- [ ] **Persistance** : F5 → les nouveaux tarifs et l'échéancier régénéré sont toujours présents
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*
