@@ -3207,7 +3207,7 @@
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Réservation</th>
-                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Actions</th>
+                <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);position:sticky;right:0;z-index:2;box-shadow:-2px 0 4px rgba(0,0,0,.06);">Actions</th>
               </tr>
             </thead>
             <tbody id="cdlLinesBody"></tbody>
@@ -15482,7 +15482,7 @@
           <td style="text-align:right;">${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:center;">${statusBadge}</td>
           <td style="text-align:center;">${rsvBadge}</td>
-          <td class="cl-actions-cell" style="text-align:center;white-space:nowrap;">
+          <td class="cl-actions-cell" style="text-align:center;white-space:nowrap;position:sticky;right:0;background:#fff;box-shadow:-2px 0 4px rgba(0,0,0,.06);">
             ${canEdit      ? `<button class="cl-edit-btn secondary" style="padding:2px 6px;font-size:12px;" title="Modifier">✎</button>` : ""}
             ${canTerminate ? `<button class="cl-terminate-btn secondary" style="padding:2px 6px;font-size:12px;color:#c53030;" title="Résilier">⏹</button>` : ""}
             ${!isContractLockedForLine ? `<button class="cl-delete-btn secondary" style="padding:2px 6px;font-size:12px;" title="Supprimer">🗑</button>` : ""}
