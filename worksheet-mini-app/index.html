@@ -829,14 +829,29 @@
       font-size: 12px;
       border: 1px solid #d1d5db;
       background: #f9fafb;
+      color: #374151;
       cursor: pointer;
       border-radius: 4px;
     }
 
     .zoom-buttons button.active {
       background: #3b82f6;
-      color: white;
+      color: #ffffff;
       border-color: #3b82f6;
+    }
+
+    #ganttDateTooltip {
+      position: fixed;
+      z-index: 4400;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 5px;
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
     }
 
     .timeline-empty {
@@ -3048,11 +3063,14 @@
       </div>
     </div>
 
+    <!-- ── Gantt date hover tooltip ── -->
+    <div id="ganttDateTooltip"></div>
+
     <!-- ── Gantt quick-create / edit popover ── -->
     <div id="ganttQuickPopover" style="display:none;position:fixed;z-index:4500;background:#fff;border:1px solid #d1d5db;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:18px 20px;min-width:290px;max-width:310px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <strong id="gqpTitle" style="font-size:14px;">⚡ Nouvelle réservation</strong>
-        <button onclick="byId('ganttQuickPopover').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 2px;">✕</button>
+        <button onclick="byId('ganttQuickPopover').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 2px;font-weight:400;">✕</button>
       </div>
       <div id="gqpCarLabel" style="font-size:12px;color:#4b5563;background:#f3f4f6;border-radius:6px;padding:5px 10px;margin-bottom:12px;font-weight:600;"></div>
       <input type="hidden" id="gqpCarId">
@@ -3080,7 +3098,7 @@
       <div style="display:flex;gap:8px;">
         <button id="gqpSaveBtn" onclick="ganttQuickSave()" style="flex:1;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">⚡ Créer</button>
         <button id="gqpDeleteBtn" onclick="ganttQuickDelete()" style="display:none;padding:9px 12px;border:1px solid #c53030;border-radius:7px;background:#fff5f5;color:#c53030;font-size:13px;cursor:pointer;" title="Supprimer la réservation">🗑</button>
-        <button onclick="byId('ganttQuickPopover').style.display='none'" style="padding:9px 14px;border:1px solid #d1d5db;border-radius:7px;background:#f9fafb;font-size:13px;cursor:pointer;">Annuler</button>
+        <button onclick="byId('ganttQuickPopover').style.display='none'" style="padding:9px 14px;border:1px solid #d1d5db;border-radius:7px;background:#f9fafb;color:#374151;font-size:13px;cursor:pointer;">Annuler</button>
       </div>
     </div>
 
@@ -10766,7 +10784,7 @@
             <div class="timeline-row">
               <div class="timeline-car">${safe(row.carLabel)}</div>
               <div>
-                <div class="timeline-track" data-car-id="${safe(row.carId)}" data-ts-start="${tsStart}" data-ts-dur="${tsDur}" onclick="handleGanttTrackClick(event,this)" style="cursor:crosshair;" title="Cliquer pour créer une réservation">${bars}</div>
+                <div class="timeline-track" data-car-id="${safe(row.carId)}" data-ts-start="${tsStart}" data-ts-dur="${tsDur}" onclick="handleGanttTrackClick(event,this)" onmousemove="handleGanttTrackHover(event,this)" onmouseleave="handleGanttTrackLeave()" style="cursor:crosshair;">${bars}</div>
               </div>
             </div>`;
         })
@@ -10784,6 +10802,28 @@
     }
 
     // ── Gantt quick-create ────────────────────────────────────────────────────────
+
+    function handleGanttTrackHover(e, trackEl) {
+      if (e.target && e.target.classList && e.target.classList.contains("timeline-bar")) {
+        handleGanttTrackLeave(); return;
+      }
+      const tsStart = Number(trackEl.dataset.tsStart);
+      const tsDur = Number(trackEl.dataset.tsDur);
+      const rect = trackEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const d = new Date(tsStart + pct * tsDur);
+      const label = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+      const tip = byId("ganttDateTooltip");
+      tip.textContent = label;
+      tip.style.display = "block";
+      tip.style.top = `${e.clientY - 32}px`;
+      tip.style.left = `${Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8)}px`;
+    }
+
+    function handleGanttTrackLeave() {
+      const tip = byId("ganttDateTooltip");
+      if (tip) tip.style.display = "none";
+    }
 
     function handleGanttTrackClick(e, trackEl) {
       // Ignorer les clics sur les barres existantes (gérés par handleGanttBarClick)
@@ -10872,6 +10912,7 @@
         if (el) el.readOnly = isReadOnly;
       });
 
+      handleGanttTrackLeave(); // cacher le tooltip de date
       const pop = byId("ganttQuickPopover");
       pop.style.display = "block";
       let top = anchorRect ? anchorRect.bottom + 8 : window.innerHeight / 2 - 160;
