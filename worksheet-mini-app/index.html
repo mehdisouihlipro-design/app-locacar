@@ -1599,9 +1599,9 @@
           <label>Prénom</label>
           <input id="custLastName" placeholder="Mohamed" oninput="updateCustFullName()" />
         </div>
-        <div id="custFullNamePreview" style="display:none;">
-          <label>Nom complet</label>
-          <input id="custFullName" readonly style="background:#f1f5f9;color:var(--muted);" tabindex="-1" />
+        <div id="custFullNamePreview">
+          <label>Nom complet (auto)</label>
+          <input id="custFullName" readonly placeholder="calculé automatiquement" style="background:#f1f5f9;color:var(--muted);" tabindex="-1" />
         </div>
         <div id="custEntrepriseFields" style="display:none;">
           <label>Raison sociale</label>
@@ -7669,7 +7669,6 @@
       const nom    = byId("custFirstName")?.value.trim() || "";
       const full   = [prenom, nom].filter(Boolean).join(" ");
       if (byId("custFullName")) byId("custFullName").value = full;
-      if (byId("custFullNamePreview")) byId("custFullNamePreview").style.display = full ? "" : "none";
     }
 
     function toggleCustNameFields() {
@@ -7677,7 +7676,7 @@
       const isEnt = type === "entreprise";
       if (byId("custParticulierFields"))       byId("custParticulierFields").style.display       = isEnt ? "none" : "";
       if (byId("custParticulierFieldsPrenom")) byId("custParticulierFieldsPrenom").style.display = isEnt ? "none" : "";
-      if (byId("custFullNamePreview"))         byId("custFullNamePreview").style.display         = "none";
+      if (byId("custFullNamePreview"))         byId("custFullNamePreview").style.display         = isEnt ? "none" : "";
       if (byId("custEntrepriseFields"))        byId("custEntrepriseFields").style.display        = isEnt ? "" : "none";
       if (isEnt && byId("custFirstName"))  byId("custFirstName").value = "";
       if (isEnt && byId("custLastName"))   byId("custLastName").value  = "";
@@ -7699,6 +7698,7 @@
             byId("custTaxId").value = "";
             byId("custType").value = "particulier";
             toggleCustNameFields();
+            updateCustFullName();
             byId("custFirstName")?.focus();
           }
         }
