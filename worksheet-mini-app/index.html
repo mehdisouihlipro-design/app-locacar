@@ -16312,12 +16312,23 @@
         <td id="ilDur" style="text-align:right;padding:6px 4px;font-size:12px;color:var(--muted);">—</td>
         <td style="padding:6px 4px;text-align:right;">
           <input id="ilRate" type="number" step="0.01" min="0" placeholder="tarif/j" style="width:75px;font-size:12px;text-align:right;" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">HT/j</div>
+          <input id="ilRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:75px;font-size:12px;text-align:right;margin-top:2px;" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">TTC/j</div>
         </td>
         <td style="padding:6px 4px;text-align:right;">
-          <input id="ilAmtHt" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
+          <input id="ilSubtotal" type="number" step="0.01" min="0" placeholder="HT+TVA" style="width:85px;font-size:12px;text-align:right;" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">HT+TVA</div>
+          <input id="ilHt" type="hidden" value="0" />
         </td>
-        <td style="padding:6px 4px;text-align:right;">
-          <input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:75px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+        <td style="padding:6px 4px;">
+          <input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
+            Taxe/j <input id="ilDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
+            Timbre <input id="ilStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          </div>
         </td>
         <td style="padding:6px 4px;text-align:right;">
           <input id="ilAmtTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
@@ -16332,30 +16343,46 @@
       `;
       tbody.appendChild(tr);
 
-      function recomputeHt() {
-        const ht = Number(byId("ilAmtHt").value || 0);
-        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
-        byId("ilVat").value = vatAmount.toFixed(2);
-        byId("ilAmtTtc").value = amountTtc.toFixed(2);
+      // Helpers inline form
+      function ilGetDays() {
+        const s = byId("ilStart").value, e = byId("ilEnd").value;
+        if (!s || !e || e < s) return 0;
+        const pt = isShortTerm ? (byId("ilPickup")?.value || null) : null;
+        const rt = isShortTerm ? (byId("ilReturn")?.value || null) : null;
+        return calcLineDuration(s, e, pt, rt).days;
+      }
+      function ilSyncFromHt(ht, days) {
+        const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
+        const htR = Math.round(ht * 100) / 100;
+        byId("ilHt").value       = htR.toFixed(2);
+        byId("ilSubtotal").value = (Math.round((htR + vatAmount) * 100) / 100).toFixed(2);
+        byId("ilVat").value      = vatAmount.toFixed(2);
+        byId("ilDaily").value    = dailyTaxAmount.toFixed(2);
+        byId("ilStamp").value    = stampAmount.toFixed(2);
+        byId("ilAmtTtc").value   = amountTtc.toFixed(2);
+      }
+      function ilRateFromHt(ht, days) {
+        if (days <= 0 || ht <= 0) return;
+        const vr = Number(state.settings.vatRate || 19);
+        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+        const rate = Math.round(ht / days * 100) / 100;
+        byId("ilRate").value    = rate.toFixed(2);
+        byId("ilRateTtc").value = (Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
       }
 
       function updateDuration() {
-        const s = byId("ilStart").value;
-        const e = byId("ilEnd").value;
+        const s = byId("ilStart").value, e = byId("ilEnd").value;
         if (s && e && e >= s) {
-          const { days } = calcLineDuration(s, e);
+          const days = ilGetDays();
           byId("ilDur").textContent = `${days}j`;
           const rate = Number(byId("ilRate").value || 0);
-          if (rate > 0) { byId("ilAmtHt").value = (rate * days).toFixed(2); recomputeHt(); }
-        } else {
-          byId("ilDur").textContent = "—";
-        }
+          if (rate > 0 && days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
+        } else { byId("ilDur").textContent = "—"; }
         updateCarConflicts();
       }
 
       function updateCarConflicts() {
-        const s = byId("ilStart").value;
-        const e = byId("ilEnd").value;
+        const s = byId("ilStart").value, e = byId("ilEnd").value;
         Array.from(byId("ilCar").options).forEach(opt => {
           if (!opt.value) return;
           const clean = opt.textContent.replace(/ ⚠ conflit$/, "");
@@ -16373,23 +16400,48 @@
       byId("ilEnd").oninput = () => { updateDuration(); clearIlError(); };
       byId("ilCar").onchange = () => { clearIlError(); const sc = state.cars.find(c => c.id === byId("ilCar").value); const di = byId("ilDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
       byId("ilDesig")?.addEventListener("input", () => { if (byId("ilDesig")) byId("ilDesig").dataset.edited = "1"; });
-      if (isShortTerm && byId("ilPickup")) byId("ilPickup").oninput = clearIlError;
-      if (isShortTerm && byId("ilReturn")) byId("ilReturn").oninput = clearIlError;
+      if (isShortTerm && byId("ilPickup")) {
+        ["input","change"].forEach(ev => byId("ilPickup").addEventListener(ev, () => { updateDuration(); clearIlError(); }));
+      }
+      if (isShortTerm && byId("ilReturn")) {
+        ["input","change"].forEach(ev => byId("ilReturn").addEventListener(ev, () => { updateDuration(); clearIlError(); }));
+      }
       byId("ilRate").oninput = () => {
-        const s = byId("ilStart").value, e = byId("ilEnd").value;
         const rate = Number(byId("ilRate").value || 0);
-        if (rate > 0 && s && e && e >= s) {
-          const { days } = calcLineDuration(s, e);
-          byId("ilAmtHt").value = (rate * days).toFixed(2);
-          recomputeHt();
+        const days = ilGetDays();
+        if (rate > 0 && days > 0) {
+          ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
+          const vr = Number(state.settings.vatRate || 19);
+          const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+          byId("ilRateTtc").value = (Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
         }
         clearIlError();
       };
-      byId("ilAmtHt").oninput = () => { recomputeHt(); clearIlError(); };
+      byId("ilRateTtc").oninput = () => {
+        const rateTtc = Number(byId("ilRateTtc").value || 0);
+        if (rateTtc <= 0) { clearIlError(); return; }
+        const vr = Number(state.settings.vatRate || 19);
+        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+        const rate = Math.round((rateTtc - dailyTax) / (1 + vr / 100) * 100) / 100;
+        byId("ilRate").value = rate.toFixed(2);
+        const days = ilGetDays();
+        if (days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
+        clearIlError();
+      };
+      byId("ilSubtotal").oninput = () => {
+        const subtotal = Number(byId("ilSubtotal").value || 0);
+        const vr = Number(state.settings.vatRate || 19);
+        const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
+        const days = ilGetDays();
+        ilSyncFromHt(ht, days);
+        ilRateFromHt(ht, days);
+        clearIlError();
+      };
       byId("ilAmtTtc").oninput = () => {
-        const r = computeContractLineHt(Number(byId("ilAmtTtc").value || 0));
-        byId("ilAmtHt").value = r.amountHt.toFixed(2);
-        byId("ilVat").value = r.vatAmount.toFixed(2);
+        const days = ilGetDays();
+        const { amountHt } = computeContractLineHt(Number(byId("ilAmtTtc").value || 0), days);
+        ilSyncFromHt(amountHt, days);
+        ilRateFromHt(amountHt, days);
         clearIlError();
       };
 
@@ -16408,7 +16460,6 @@
       const designation = (byId("ilDesig") ? byId("ilDesig").value : "") || "";
       const startStr = byId("ilStart").value;
       const endStr = byId("ilEnd").value;
-      const amountHt = Number(byId("ilAmtHt").value || 0);
       const rate = Number(byId("ilRate").value || 0);
       const errDiv = byId("ilError");
       errDiv.style.display = "none";
@@ -16417,19 +16468,26 @@
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; byId("ilCar").focus(); return; }
       if (!startStr || !endStr) { errDiv.textContent = "Dates requises"; errDiv.style.display = ""; return; }
       if (endStr < startStr) { errDiv.textContent = "Fin avant début"; errDiv.style.display = ""; return; }
-      if (amountHt <= 0) { errDiv.textContent = "Montant HT requis (> 0)"; errDiv.style.display = ""; byId("ilAmtHt").focus(); return; }
 
+      const pickupTime = byId("ilPickup") ? (byId("ilPickup").value || null) : null;
+      const returnTime = byId("ilReturn") ? (byId("ilReturn").value || null) : null;
       const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr);
-      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt);
+      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime);
+
+      let amountHt = Number(byId("ilHt").value || 0);
+      if (amountHt <= 0) {
+        const subtotal = Number(byId("ilSubtotal").value || 0);
+        if (subtotal > 0) amountHt = Math.round(subtotal / (1 + Number(state.settings.vatRate || 19) / 100) * 100) / 100;
+      }
+      if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; byId("ilSubtotal").focus(); return; }
+
+      const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(amountHt, days);
 
       const saveBtn = byId("ilSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
 
       const parentContract = state.contracts.find(c => c.id === contractId);
       const lineStatus = (parentContract && parentContract.status === "brouillon") ? "brouillon" : "active";
-      const pickupTime = byId("ilPickup") ? (byId("ilPickup").value || null) : null;
-      const returnTime = byId("ilReturn") ? (byId("ilReturn").value || null) : null;
 
       const result = await apiPostWithError("/contract-lines", {
         contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "", designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
