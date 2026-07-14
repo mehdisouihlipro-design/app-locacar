@@ -9120,16 +9120,25 @@
     }
 
     // BR18 : lignes de contrat — TVA seule (pas de taxe journalière ni timbre, ceux-ci sont invoice-only)
-    function computeContractLineTtc(amountHt) {
-      const vatRate = Number(state.settings.vatRate || 19);
+    function computeContractLineTtc(amountHt, days) {
+      const vatRate   = Number(state.settings.vatRate    || 19);
+      const dailyTax  = Number(state.settings.dailyTaxTnd || 0);
+      const stamp     = Number(state.settings.stampDutyTnd || 0);
       const ht = Math.round(Number(amountHt || 0) * 100) / 100;
-      const vatAmount = Math.round(ht * vatRate / 100 * 100) / 100;
-      return { amountHt: ht, vatAmount, amountTtc: Math.round((ht + vatAmount) * 100) / 100, vatRate };
+      const vatAmount      = Math.round(ht * vatRate / 100 * 100) / 100;
+      const dailyTaxAmount = Math.round((days || 0) * dailyTax * 100) / 100;
+      const stampAmount    = Math.round(stamp * 100) / 100;
+      return { amountHt: ht, vatAmount, dailyTaxAmount, stampAmount, amountTtc: Math.round((ht + vatAmount + dailyTaxAmount + stampAmount) * 100) / 100 };
     }
-    function computeContractLineHt(amountTtc) {
-      const vatRate = Number(state.settings.vatRate || 19);
-      const ht = Math.round(Number(amountTtc || 0) / (1 + vatRate / 100) * 100) / 100;
-      return computeContractLineTtc(ht);
+    function computeContractLineHt(amountTtc, days) {
+      const vatRate  = Number(state.settings.vatRate    || 19);
+      const dailyTax = Number(state.settings.dailyTaxTnd || 0);
+      const stamp    = Number(state.settings.stampDutyTnd || 0);
+      const d = days || 0;
+      const dailyTaxAmount = Math.round(d * dailyTax * 100) / 100;
+      const stampAmount    = Math.round(stamp * 100) / 100;
+      const ht = Math.round(Math.max(0, (Number(amountTtc || 0) - dailyTaxAmount - stampAmount) / (1 + vatRate / 100)) * 100) / 100;
+      return computeContractLineTtc(ht, days);
     }
     // Calcule { days, months } entre deux dates ISO (bornes incluses)
     function calcLineDuration(startStr, endStr, pickupTime, returnTime) {
@@ -15716,10 +15725,6 @@
             </select>
           </div>
           <div style="display:flex;gap:6px;align-items:flex-end;">
-            <div style="flex:1;"><label class="label-small">Tarif</label><input id="cdlERate" type="number" step="0.01" min="0" value="${contract.rate || 0}" style="width:100%;" /></div>
-            <div style="flex:0 0 80px;"><label class="label-small">Devise</label><select id="cdlERateCurrency" style="width:100%;">${currOpts(contract.rateCurrency || "TND")}</select></div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:flex-end;">
             <div style="flex:1;"><label class="label-small">Caution</label><input id="cdlEQuotient" type="number" step="0.01" min="0" value="${contract.quotient || 0}" style="width:100%;" /></div>
             <div style="flex:0 0 80px;"><label class="label-small">Devise</label><select id="cdlEQuotientCurrency" style="width:100%;">${currOpts(contract.quotientCurrency || "TND")}</select></div>
           </div>
@@ -15813,8 +15818,6 @@
           const paymentMoment = byId("cdlEPayment").value;
           const status = byId("cdlEStatus").value;
           const rateType = byId("cdlERateType").value || "daily";
-          const rate = Number(byId("cdlERate").value || 0);
-          const rateCurrency = byId("cdlERateCurrency").value;
           const quotient = Number(byId("cdlEQuotient").value || 0);
           const quotientCurrency = byId("cdlEQuotientCurrency").value;
           const customer = state.customers.find(c => c.id === customerId);
@@ -15830,7 +15833,6 @@
             customer_id: customerId, customer_name: customer ? customer.name : contract.customerName,
             type, rate_type: rateType, contract_date: contractDate,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
-            rate, rate_currency: rateCurrency,
             quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd,
             // Groupe 2 — financier
             franchise_amount: vn("cdlEFranchise"), insurance_rc_amount: vn("cdlEInsRc"), insurance_passengers_amount: vn("cdlEInsPax"),
@@ -15870,7 +15872,7 @@
             Object.assign(state.contracts[idx], {
               customerId, customerName: customer ? customer.name : contract.customerName,
               type, rateType, contractDate, paymentMoment, paymentPlan, status,
-              rate, rateCurrency, quotient, quotientCurrency, quotientTnd,
+              quotient, quotientCurrency, quotientTnd,
               franchiseAmount: vn("cdlEFranchise"), insuranceRcAmount: vn("cdlEInsRc"), insurancePassengersAmount: vn("cdlEInsPax"),
               mileageStart: vn("cdlEKmStart"), mileageEnd: vn("cdlEKmEnd"),
               fuelLevelStart: v("cdlEFuelStart")||null, fuelLevelEnd: v("cdlEFuelEnd")||null,
@@ -15977,8 +15979,17 @@
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand || c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
-      const vatRateCle = Number(state.settings.vatRate || 19);
-      const initRateTtc = line.rate ? (Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100).toFixed(2) : "";
+      const vatRateCle  = Number(state.settings.vatRate    || 19);
+      const dailyTaxCle = Number(state.settings.dailyTaxTnd || 0);
+      const stampCle    = Number(state.settings.stampDutyTnd || 0);
+      const initDailyAmt = ((line.days || 0) * dailyTaxCle).toFixed(2);
+      const initStampAmt = stampCle.toFixed(2);
+      const initRateTtc = line.rate
+        ? (rateType === "monthly"
+            ? Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100
+            : Math.round((line.rate * (1 + vatRateCle / 100) + dailyTaxCle) * 100) / 100
+          ).toFixed(2)
+        : "";
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:4px;"><select id="cleCar" style="width:100%;min-width:100px;font-size:12px;">${carOptions}</select></td>
@@ -15998,7 +16009,15 @@
           <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit} TTC</div>
         </td>
         <td style="padding:4px;"><input id="cleHt" type="number" step="0.01" value="${line.amountHt||""}" style="width:80px;font-size:12px;text-align:right;" title="Total HT" /></td>
-        <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;">
+          <input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
+            Taxe/j <input id="cleDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
+            Timbre <input id="cleStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          </div>
+        </td>
         <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" title="Total TTC" /></td>
         <td colspan="2"></td>
         <td style="padding:4px;white-space:nowrap;">
@@ -16018,50 +16037,75 @@
         const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
         return { days, mult };
       };
+      const getDailyTax = () => Number(state.settings.dailyTaxTnd || 0);
       // Tarif HT → Tarif TTC → Total HT → VAT → Total TTC
       const recomputeFromRate = () => {
         const rate = Number(tr.querySelector("#cleRate").value || 0);
         if (rate <= 0) return;
         const vr = getVatRate();
-        tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
-        const { mult } = getDurData();
+        const dailyTax = getDailyTax();
+        const { days, mult } = getDurData();
+        const rateTtc = rateType === "monthly"
+          ? Math.round(rate * (1 + vr / 100) * 100) / 100
+          : Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100;
+        tr.querySelector("#cleRateTtc").value = rateTtc.toFixed(2);
         const ht = rateType === "monthly" ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value) : Math.round(rate * mult * 100) / 100;
-        const { vatAmount, amountTtc } = computeContractLineTtc(Math.round(ht * 100) / 100);
-        tr.querySelector("#cleHt").value  = (Math.round(ht * 100) / 100).toFixed(2);
-        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
-        tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
+        const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(Math.round(ht * 100) / 100, days);
+        tr.querySelector("#cleHt").value    = (Math.round(ht * 100) / 100).toFixed(2);
+        tr.querySelector("#cleVat").value   = vatAmount.toFixed(2);
+        tr.querySelector("#cleDaily").value = dailyTaxAmount.toFixed(2);
+        tr.querySelector("#cleStamp").value = stampAmount.toFixed(2);
+        tr.querySelector("#cleTtc").value   = amountTtc.toFixed(2);
       };
       // Tarif TTC → Tarif HT → recalcul
       const recomputeFromRateTtc = () => {
         const rateTtc = Number(tr.querySelector("#cleRateTtc").value || 0);
         if (rateTtc <= 0) return;
-        const rate = Math.round(rateTtc / (1 + getVatRate() / 100) * 100) / 100;
+        const vr = getVatRate();
+        const dailyTax = getDailyTax();
+        const rate = rateType === "monthly"
+          ? Math.round(rateTtc / (1 + vr / 100) * 100) / 100
+          : Math.round((rateTtc - dailyTax) / (1 + vr / 100) * 100) / 100;
         tr.querySelector("#cleRate").value = rate.toFixed(2);
         recomputeFromRate();
       };
       // Total HT → MAJ VAT, Total TTC, Tarif HT, Tarif TTC
       const recomputeHt = () => {
         const ht = Number(tr.querySelector("#cleHt").value || 0);
-        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
-        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
-        tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
-        const { mult } = getDurData();
+        const { days, mult } = getDurData();
+        const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
+        tr.querySelector("#cleVat").value   = vatAmount.toFixed(2);
+        tr.querySelector("#cleDaily").value = dailyTaxAmount.toFixed(2);
+        tr.querySelector("#cleStamp").value = stampAmount.toFixed(2);
+        tr.querySelector("#cleTtc").value   = amountTtc.toFixed(2);
         if (ht > 0 && mult > 0) {
           const rate = Math.round(ht / mult * 100) / 100;
+          const vr = getVatRate();
+          const dailyTax = getDailyTax();
           tr.querySelector("#cleRate").value = rate.toFixed(2);
-          tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + getVatRate() / 100) * 100) / 100).toFixed(2);
+          const rateTtc = rateType === "monthly"
+            ? Math.round(rate * (1 + vr / 100) * 100) / 100
+            : Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100;
+          tr.querySelector("#cleRateTtc").value = rateTtc.toFixed(2);
         }
       };
       // Total TTC → MAJ Total HT, VAT, Tarif HT, Tarif TTC
       const recomputeTtc = () => {
-        const { amountHt, vatAmount } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0));
-        tr.querySelector("#cleHt").value  = amountHt.toFixed(2);
-        tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
-        const { mult } = getDurData();
+        const { days, mult } = getDurData();
+        const { amountHt, vatAmount, dailyTaxAmount, stampAmount } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0), days);
+        tr.querySelector("#cleHt").value    = amountHt.toFixed(2);
+        tr.querySelector("#cleVat").value   = vatAmount.toFixed(2);
+        tr.querySelector("#cleDaily").value = dailyTaxAmount.toFixed(2);
+        tr.querySelector("#cleStamp").value = stampAmount.toFixed(2);
         if (amountHt > 0 && mult > 0) {
           const rate = Math.round(amountHt / mult * 100) / 100;
+          const vr = getVatRate();
+          const dailyTax = getDailyTax();
           tr.querySelector("#cleRate").value = rate.toFixed(2);
-          tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + getVatRate() / 100) * 100) / 100).toFixed(2);
+          const rateTtc = rateType === "monthly"
+            ? Math.round(rate * (1 + vr / 100) * 100) / 100
+            : Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100;
+          tr.querySelector("#cleRateTtc").value = rateTtc.toFixed(2);
         }
       };
       // Dates changées → MAJ durée, recalcul depuis tarif si renseigné
