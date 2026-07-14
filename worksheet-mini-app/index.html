@@ -15940,9 +15940,7 @@
         const isContractLockedForLine = contractForLock ? isContractFactured(contractId) : false;
         const canEdit      = !isContractLockedForLine && displayStatus !== "annule" && displayStatus !== "resilie";
         const canTerminate = !isContractLockedForLine && displayStatus === "active";
-        const lRateTtc = l.rate ? (linesRateType === "monthly"
-          ? Math.round(l.rate * (1 + linesVatRate/100) * 100) / 100
-          : Math.round((l.rate * (1 + linesVatRate/100) + linesDailyTax) * 100) / 100) : 0;
+        const lRateTtc = l.rate ? Math.round(l.rate * (1 + linesVatRate/100) * 100) / 100 : 0;
         const lDailyTaxAmt = Math.round((l.days || 0) * linesDailyTax * 100) / 100;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
@@ -16000,10 +15998,7 @@
       const initDailyAmt = ((line.days || 0) * dailyTaxCle).toFixed(2);
       const initStampAmt = stampCle.toFixed(2);
       const initRateTtc = line.rate
-        ? (rateType === "monthly"
-            ? Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100
-            : Math.round((line.rate * (1 + vatRateCle / 100) + dailyTaxCle) * 100) / 100
-          ).toFixed(2)
+        ? (Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100).toFixed(2)
         : "";
       const initSubtotal = line.amountHt
         ? (Math.round(line.amountHt * (1 + vatRateCle / 100) * 100) / 100).toFixed(2)
@@ -16060,9 +16055,7 @@
           const rate = Math.round(htRounded / mult * 100) / 100;
           const vr = getVatRate(); const dailyTax = getDailyTax();
           tr.querySelector("#cleRate").value = rate.toFixed(2);
-          tr.querySelector("#cleRateTtc").value = (rateType === "monthly"
-            ? Math.round(rate * (1 + vr / 100) * 100) / 100
-            : Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
+          tr.querySelector("#cleRateTtc").value = Math.round(rate * (1 + vr / 100) * 100 / 100).toFixed(2);
         }
       };
       // Tarif HT → tous
@@ -16071,9 +16064,7 @@
         if (rate <= 0) return;
         const vr = getVatRate(); const dailyTax = getDailyTax();
         const { days, mult } = getDurData();
-        tr.querySelector("#cleRateTtc").value = (rateType === "monthly"
-          ? Math.round(rate * (1 + vr / 100) * 100) / 100
-          : Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
+        tr.querySelector("#cleRateTtc").value = Math.round(rate * (1 + vr / 100) * 100 / 100).toFixed(2);
         const ht = rateType === "monthly"
           ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value)
           : Math.round(rate * mult * 100) / 100;
@@ -16084,9 +16075,7 @@
         const rateTtc = Number(tr.querySelector("#cleRateTtc").value || 0);
         if (rateTtc <= 0) return;
         const vr = getVatRate(); const dailyTax = getDailyTax();
-        const rate = rateType === "monthly"
-          ? Math.round(rateTtc / (1 + vr / 100) * 100) / 100
-          : Math.round((rateTtc - dailyTax) / (1 + vr / 100) * 100) / 100;
+        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
         tr.querySelector("#cleRate").value = rate.toFixed(2);
         recomputeFromRate();
       };
@@ -16354,7 +16343,7 @@
         const dailyTax = Number(state.settings.dailyTaxTnd || 0);
         const rate = Math.round(ht / days * 100) / 100;
         byId("ilRate").value    = rate.toFixed(2);
-        byId("ilRateTtc").value = (Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
+        byId("ilRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
       }
 
       function updateDuration() {
@@ -16400,7 +16389,7 @@
           ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
           const vr = Number(state.settings.vatRate || 19);
           const dailyTax = Number(state.settings.dailyTaxTnd || 0);
-          byId("ilRateTtc").value = (Math.round((rate * (1 + vr / 100) + dailyTax) * 100) / 100).toFixed(2);
+          byId("ilRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
         }
         clearIlError();
       };
@@ -16409,7 +16398,7 @@
         if (rateTtc <= 0) { clearIlError(); return; }
         const vr = Number(state.settings.vatRate || 19);
         const dailyTax = Number(state.settings.dailyTaxTnd || 0);
-        const rate = Math.round((rateTtc - dailyTax) / (1 + vr / 100) * 100) / 100;
+        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
         byId("ilRate").value = rate.toFixed(2);
         const days = ilGetDays();
         if (days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
