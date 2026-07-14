@@ -6421,7 +6421,7 @@
 
       const header = `<div style="text-align: center; margin-bottom: 10px; border-bottom: 2px solid #0d244a; padding-bottom: 8px;">
         <h1 style="margin: 0; font-size: 16px; color: #0d244a;">E-Drive - Etat des Lieux</h1>
-        <p style="margin: 3px 0; font-size: 10px; color: #4d6a97;">Date: ${inspection.date} ${inspection.time || ""}</p>
+        <p style="margin: 3px 0; font-size: 10px; color: #4d6a97;">Date: ${fmtDate(inspection.date)} ${inspection.time || ""}</p>
       </div>`;
 
       const vehicleInfo = `<div style="margin-bottom: 10px; border: 1px solid #c8daf9; padding: 8px; background: #f5f7ff;">
@@ -6616,8 +6616,8 @@
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(lineContract ? (lineContract.contractNumber || lineContract.id) : (line.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(line.periodStart || "-")}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(line.periodEnd || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(line.periodStart) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(line.periodEnd) || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${line.days || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(line.amountHt)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(line.vatAmount)}</td>
@@ -6637,8 +6637,8 @@
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodStart || "-")}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(invoice.periodEnd || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(invoice.periodStart) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(invoice.periodEnd) || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${days || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountHt)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.vatAmount)}</td>
@@ -6704,7 +6704,7 @@
         <h2 style="font-size:14px;color:#1540c8;">FACTURE</h2>
         <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(invoice.invoiceNumber || invoice.id)}</strong></p>
         <p style="font-size:10px;">Contrat(s)&nbsp;: <strong>${safe(contractsLabel)}</strong></p>
-        <p style="font-size:10px;">Date&nbsp;: <strong>${safe(invoice.dueDate || new Date().toISOString().slice(0, 10))}</strong></p>
+        <p style="font-size:10px;">Date&nbsp;: <strong>${fmtDate(invoice.dueDate) || fmtDate(new Date().toISOString().slice(0, 10))}</strong></p>
       </td>
     </tr>
   </table>
@@ -6790,15 +6790,15 @@
       const firstLine = contractLines[0] || {};
       const firstCar  = firstLine.carId ? state.cars.find(c => String(c.id) === String(firstLine.carId)) : null;
 
-      const totalHt  = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
-      const totalVat = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
-      const totalTtc = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
-      const stampVal = Number(settings.stampDuty || settings.stamp || 0);
-      const totalLoc = totalHt; // Location HT avant TVA et timbre
+      const totalHt       = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
+      const totalVat      = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
+      const totalTtc      = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
+      const totalSubtotal = totalHt + totalVat; // Sous-total = HT + TVA
+      const stampVal      = Number(settings.stampDutyTnd || settings.stampDuty || settings.stamp || 0);
 
       // Helpers
       const f = v => safe(v || "");
-      const fd = v => v ? safe(String(v)) : "";
+      const fd = v => v ? safe(fmtDate(String(v))) : "";
       const fuelBar = (val) => {
         const levels = ["Vide","1/4","1/2","3/4","Plein"];
         return levels.map(l => `<td style="border:1px solid #333;padding:1px 4px;font-size:8px;text-align:center;background:${val===l?"#333":"#fff"};color:${val===l?"#fff":"#333"};min-width:20px;">${l}</td>`).join("");
@@ -6890,7 +6890,7 @@
           ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
           ${field("Nationalité / الجنسية", f(contract.customerNationality))}
           ${field("Date d'Entrée en Tunisie / تاريخ الدخول إلى تونس", fd(contract.customerEntryDateTn))}
-          ${field("Pièce d'Identité N° / ب.ت. وطنية عند", customer ? safe(customer.idNumber||"") : "")}
+          ${field("Pièce d'Identité N° / ب.ت. وطنية عند", f(contract.customerIdNumber) || safe(customer?.idNumber||""))}
           ${field("Etabli le / المسلمة في", fd(contract.customerIdIssuedDate)+" à "+f(contract.customerIdIssuedAt))}
           ${field("Permis N° / رخصة سياقة عند", f(contract.customerLicenseNumber))}
           ${field("Etabli le / المسلمة في", fd(contract.customerLicenseIssuedDate)+" à "+f(contract.customerLicenseIssuedAt))}
@@ -6905,7 +6905,7 @@
         </table>
         <div style="border:1px solid #333;margin-top:4px;padding:3px;">
           <div style="font-size:7.5px;font-weight:bold;">MONTANT DE FRANCHISE / التسوية على التأمين</div>
-          <div style="font-size:9px;border-bottom:1px solid #555;min-height:14px;margin-top:2px;">${contract.franchiseAmount!=null?Number(contract.franchiseAmount).toLocaleString("fr-FR",{maximumFractionDigits:2})+" TND":""}</div>
+          <div style="font-size:9px;border-bottom:1px solid #555;min-height:14px;margin-top:2px;">${contract.franchiseAmount!=null?Number(contract.franchiseAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div>
         </div>
       </td>
 
@@ -6963,13 +6963,12 @@
         </div>
         <table style="width:100%;margin-top:2px;">
           <tr><td style="padding:1px 3px;"><div class="field-label">Durée de la Location / مـدة الكـراء</div><div class="field-value">${firstLine.days||contract.days||""} jour(s)</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${totalHt > 0 ? totalHt.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance R.C.</div><div class="field-value">${contract.insuranceRcAmount!=null?Number(contract.insuranceRcAmount).toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND":""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND":""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{maximumFractionDigits:3})} TND</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A. (${Number(settings.vatRate||19)} %)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur État</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalTtc + stampVal).toLocaleString("fr-FR",{maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${totalSubtotal > 0 ? totalSubtotal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance R.C.</div><div class="field-value">${contract.insuranceRcAmount!=null?Number(contract.insuranceRcAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalSubtotal + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur État</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalTtc + stampVal).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
         </table>
       </td>
     </tr>
@@ -7139,8 +7138,8 @@
             return `<tr>
               <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate||"-")}</td>
               <td style="padding:5px;border:1px solid #c8daf9;">${safe(l.designation||(lcar?(((lcar.brand||"")+" "+(lcar.model||"")).trim()||"-"):"-"))}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart||"-")}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd||"-")}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${fd(l.periodStart)||"-"}</td>
+              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${fd(l.periodEnd)||"-"}</td>
               <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${l.days||"-"}</td>
               <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.rate)}</td>
               <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
@@ -10104,7 +10103,13 @@
     }
 
     function formatTnd(amount) {
-      return `${Number(amount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND`;
+      return `${Number(amount || 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND`;
+    }
+    function fmtDate(v) {
+      if (!v) return "";
+      const s = String(v).split("T")[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y,m,d] = s.split("-"); return `${d}/${m}/${y}`; }
+      return s;
     }
 
     function toIsoDate(date) {
@@ -10304,7 +10309,7 @@
           : '<span class="pill dispo">ok</span>';
 
         tr.innerHTML = `
-          <td>${safe(p.date)}</td>
+          <td>${fmtDate(p.date) || "-"}</td>
           <td class="num ${inflow > 0 ? "positive" : ""}">${formatTnd(inflow)}</td>
           <td class="num ${outflow > 0 ? "negative" : ""}">${formatTnd(outflow)}</td>
           <td class="num ${net < 0 ? "negative" : net > 0 ? "positive" : ""}">${formatTnd(net)}</td>
@@ -10739,7 +10744,7 @@
         tr.innerHTML = `
           <td>${safe(r.id)}</td>
           <td><span class="pill ${typeClass}">${safe(r.type)}</span></td>
-          <td>${safe(r.date || "-")} ${safe(r.time || "")}</td>
+          <td>${fmtDate(r.date) || "-"} ${safe(r.time || "")}</td>
           <td>${safe(r.carPlate || "-")}</td>
           <td>${(() => { const _ic = state.contracts.find(c => c.id === r.contractId); return safe(_ic ? (_ic.contractNumber || _ic.id) : (r.contractId || "-")); })()}</td>
           <td>${Number(r.odometerKm || 0).toLocaleString("fr-FR")} km</td>
@@ -10831,9 +10836,9 @@
           <td data-col="id"><a href="#" data-open-reservation="${safe(r.id)}">${safe(r.id)}</a></td>
           <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(r.customerName)}">${safe(r.customerName || "-")}</a></td>
           <td data-col="carPlate"><a class="xref" data-goto-tab="cars" data-goto-query="${safe(r.carPlate)}">${safe(r.carPlate || "-")}</a></td>
-          <td data-col="startDate">${safe(r.startDate || "-")}</td>
+          <td data-col="startDate">${fmtDate(r.startDate) || "-"}</td>
           <td data-col="startTime">${safe(r.startTime || "-")}</td>
-          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="endDate">${fmtDate(r.endDate) || "-"}</td>
           <td data-col="endTime">${safe(r.endTime || "-")}</td>
           <td data-col="status"><span class="pill ${pillClass}">${safe(r.status)}</span></td>
           <td><button data-del-reservation="${safe(r.id)}" class="secondary">Supprimer</button></td>
@@ -11443,7 +11448,7 @@
       byId("kpiCustomers").textContent = state.customers.length;
       byId("kpiContracts").textContent = state.contracts.filter((c) => c.status === "actif").length;
       const outstandingTnd = state.invoices.reduce((sum, i) => sum + Number(i.dueAmountTnd || 0), 0);
-      byId("kpiOutstanding").textContent = outstandingTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " TND";
+      byId("kpiOutstanding").textContent = outstandingTnd.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " TND";
     }
 
     function selectRow(entity, id) {
@@ -11481,9 +11486,9 @@
         { key: "id",             label: "Réf.",       render: r => safe(r.id) },
         { key: "carPlate",       label: "Véhicule",   render: r => safe(r.carPlate || "-") },
         { key: "type",           label: "Type",        render: r => safe(r.type || "-") },
-        { key: "date",           label: "Date",        render: r => safe(r.date || "-") },
+        { key: "date",           label: "Date",        render: r => fmtDate(r.date) || "-" },
         { key: "amountOriginal", label: "Montant",     render: r => `${Number(r.amountOriginal||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
-        { key: "amountTnd",      label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "amountTnd",      label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
         { key: "status",         label: "Statut",      render: r => safe(r.status || "-") },
         { key: "note",           label: "Note",        render: r => safe(r.note || "") },
       ],
@@ -11492,18 +11497,18 @@
         { key: "customerName", label: "Client",     render: r => safe(r.customerName || "-") },
         { key: "contractId",   label: "Contrat",    render: r => { const _c = state.contracts.find(c => c.id === r.contractId); return safe(_c ? (_c.contractNumber || _c.id) : (r.contractId || "-")); } },
         { key: "invoiceId",    label: "Facture",    render: r => { const _i = state.invoices.find(i => i.id === r.invoiceId); return safe(_i ? (_i.invoiceNumber || _i.id) : (r.invoiceId || "-")); } },
-        { key: "date",         label: "Date",        render: r => safe(r.date || "-") },
+        { key: "date",         label: "Date",        render: r => fmtDate(r.date) || "-" },
         { key: "amount",       label: "Montant",     render: r => `${Number(r.amount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
-        { key: "amountTnd",    label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "amountTnd",    label: "Montant TND", render: r => `${Number(r.amountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
         { key: "method",       label: "Mode",        render: r => safe(r.method || "-") },
       ],
       reservations: [
         { key: "id",           label: "Réf.",       render: r => safe(r.id) },
         { key: "customerName", label: "Client",     render: r => safe(r.customerName || "-") },
         { key: "carPlate",     label: "Véhicule",   render: r => safe(r.carPlate || "-") },
-        { key: "startDate",    label: "Début",       render: r => safe(r.startDate || "-") },
+        { key: "startDate",    label: "Début",       render: r => fmtDate(r.startDate) || "-" },
         { key: "startTime",    label: "Heure déb.", render: r => safe(r.startTime || "-") },
-        { key: "endDate",      label: "Fin",         render: r => safe(r.endDate || "-") },
+        { key: "endDate",      label: "Fin",         render: r => fmtDate(r.endDate) || "-" },
         { key: "endTime",      label: "Heure fin",  render: r => safe(r.endTime || "-") },
         { key: "status",       label: "Statut",      render: r => safe(r.status || "-") },
       ],
@@ -11513,8 +11518,8 @@
         { key: "insuranceCompany", label: "Assureur",      render: r => safe(r.insuranceCompany || r.provider || "-") },
         { key: "policyNumber",     label: "N° police",     render: r => safe(r.policyNumber || "-") },
         { key: "monthlyAmount",    label: "Mensualité",    render: r => `${Number(r.monthlyAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
-        { key: "startDate",        label: "Début",          render: r => safe(r.startDate || "-") },
-        { key: "endDate",          label: "Fin",            render: r => safe(r.endDate || "-") },
+        { key: "startDate",        label: "Début",          render: r => fmtDate(r.startDate) || "-" },
+        { key: "endDate",          label: "Fin",            render: r => fmtDate(r.endDate) || "-" },
         { key: "status",           label: "Statut",         render: r => safe(r.status || "-") },
       ],
       leasingContracts: [
@@ -11523,8 +11528,8 @@
         { key: "leasingCompany", label: "Société",      render: r => safe(r.leasingCompany || r.lender || "-") },
         { key: "contractNumber", label: "N° contrat",   render: r => safe(r.contractNumber || "-") },
         { key: "monthlyAmount",  label: "Mensualité",   render: r => `${Number(r.monthlyAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(r.currency||"TND")}` },
-        { key: "startDate",      label: "Début",         render: r => safe(r.startDate || "-") },
-        { key: "endDate",        label: "Fin",           render: r => safe(r.endDate || "-") },
+        { key: "startDate",      label: "Début",         render: r => fmtDate(r.startDate) || "-" },
+        { key: "endDate",        label: "Fin",           render: r => fmtDate(r.endDate) || "-" },
         { key: "status",         label: "Statut",        render: r => safe(r.status || "-") },
       ],
       vignettes: [
@@ -11532,8 +11537,8 @@
         { key: "carPlate",       label: "Véhicule",    render: v => safe(v.carPlate || "-") },
         { key: "fiscalYear",     label: "Année",       render: v => safe(v.fiscalYear) },
         { key: "amountOriginal", label: "Montant",     render: v => `${Number(v.amountOriginal||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} ${safe(v.currency||"TND")}` },
-        { key: "amountTnd",      label: "Montant TND", render: v => `${Number(v.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
-        { key: "dueDate",        label: "Échéance",    render: v => safe(v.dueDate) },
+        { key: "amountTnd",      label: "Montant TND", render: v => `${Number(v.amountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
+        { key: "dueDate",        label: "Échéance",    render: v => fmtDate(v.dueDate) || "-" },
         { key: "status",         label: "Statut",      render: v => safe(v.status) },
       ],
       contracts: [
@@ -11553,7 +11558,7 @@
         { key: "periodStart",    label: "Début",       render: () => "—" },
         { key: "periodEnd",      label: "Fin",         render: () => "—" },
         { key: "lignes",         label: "Lignes",      render: () => "—" },
-        { key: "totalAmountTtc", label: "Total TTC",   render: q => `${(q.totalAmountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "totalAmountTtc", label: "Total TTC",   render: q => `${(q.totalAmountTtc||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
         { key: "status",         label: "Statut",      render: q => safe(q.status) },
       ],
       invoices: [
@@ -11562,9 +11567,9 @@
         { key: "customerName", label: "Client",        render: i => safe(i.customerName || "-") },
         { key: "lignes",       label: "Lignes",        render: () => "—" },
         { key: "dueDate",      label: "Échéance",      render: i => safe(i.dueDate || "-") },
-        { key: "amountTnd",    label: "Total (TND)",   render: i => `${Number(i.amountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
-        { key: "paidAmountTnd",label: "Payé (TND)",    render: i => `${Number(i.paidAmountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
-        { key: "dueAmountTnd", label: "Restant (TND)", render: i => `${Number(i.dueAmountTnd||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND` },
+        { key: "amountTnd",    label: "Total (TND)",   render: i => `${Number(i.amountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
+        { key: "paidAmountTnd",label: "Payé (TND)",    render: i => `${Number(i.paidAmountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
+        { key: "dueAmountTnd", label: "Restant (TND)", render: i => `${Number(i.dueAmountTnd||0).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND` },
         { key: "status",       label: "Statut",        render: () => "—" },
       ],
     };
@@ -12329,10 +12334,10 @@
         tr.innerHTML = `
           <td data-col="id"><a href="#" data-open-quote="${safe(q.id)}">${safe(q.quoteNumber || q.id)}</a></td>
           <td data-col="customerName">${safe(q.customerName || "-")}</td>
-          <td data-col="periodStart" style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
-          <td data-col="periodEnd" style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodStart" style="${dateStyle}">${fmtDate(period.start) || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodEnd" style="${dateStyle}">${fmtDate(period.end)   || '<span style="color:var(--muted);">—</span>'}</td>
           <td data-col="lignes"><a href="#" data-open-quote-detail="${safe(q.id)}" class="badge-lignes">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
-          <td data-col="totalAmountTtc">${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="totalAmountTtc">${(q.totalAmountTtc || 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND</td>
           <td data-col="status"><span class="badge-status ${statusCss}">${displayStatus}</span></td>
         `;
         tr.querySelectorAll("[data-open-quote],[data-open-quote-detail]").forEach(a => a.addEventListener("click", e => {
@@ -12468,7 +12473,7 @@
           : `<button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
-          <td style="white-space:nowrap;">${l.periodStart || "-"}${l.pickupTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.pickupTime.slice(0,5)}</span>` : ""} → ${l.periodEnd || "-"}${l.returnTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.returnTime.slice(0,5)}</span>` : ""}</td>
+          <td style="white-space:nowrap;">${fmtDate(l.periodStart) || "-"}${l.pickupTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.pickupTime.slice(0,5)}</span>` : ""} → ${fmtDate(l.periodEnd) || "-"}${l.returnTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.returnTime.slice(0,5)}</span>` : ""}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
           <td style="text-align:right;">${rateTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
@@ -12910,8 +12915,8 @@
         return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate || "-")}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodStart || "-")}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.periodEnd || "-")}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(l.periodStart) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(l.periodEnd) || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${l.days || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
@@ -12969,7 +12974,7 @@
       <td style="vertical-align:top;text-align:right;">
         <h2 style="font-size:14px;color:#1540c8;">DEVIS</h2>
         <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(q.id)}</strong></p>
-        <p style="font-size:10px;">Date&nbsp;: <strong>${safe(quoteDate)}</strong></p>
+        <p style="font-size:10px;">Date&nbsp;: <strong>${fmtDate(quoteDate) || safe(quoteDate)}</strong></p>
       </td>
     </tr>
   </table>
@@ -13249,10 +13254,10 @@
           <td data-col="type">${safe(contract.type)}</td>
           <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(contract.customerName)}">${safe(contract.customerName || "-")}</a></td>
           <td data-col="quoteId">${quoteCell}</td>
-          <td data-col="periodStart" style="${dateStyle}">${period.start || '<span style="color:var(--muted);">—</span>'}</td>
-          <td data-col="periodEnd" style="${dateStyle}">${period.end   || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodStart" style="${dateStyle}">${fmtDate(period.start) || '<span style="color:var(--muted);">—</span>'}</td>
+          <td data-col="periodEnd" style="${dateStyle}">${fmtDate(period.end)   || '<span style="color:var(--muted);">—</span>'}</td>
           <td data-col="lignes"><a href="#" data-open-contract-detail="${safe(contract.id)}" class="badge-lignes" title="Voir les lignes de ce contrat">${lignesCount} ligne${lignesCount !== 1 ? "s" : ""}</a></td>
-          <td data-col="totalTnd">${totals.totalTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="totalTnd">${totals.totalTnd.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND</td>
           <td data-col="status">${safe(contract.status)}</td>
         `;
         tbody.appendChild(tr);
@@ -13443,7 +13448,7 @@
         tr.dataset.lineId = line.id || "";
         tr.innerHTML = `
           <td style="padding:6px 8px;">${(() => { const _lc = state.contracts.find(c => c.id === line.contractId); const cLabel = _lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-"); const _cl = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null; const _car = _cl ? state.cars.find(c => c.id === _cl.carId) : null; const desig = _car ? ((((_car.brand||"")+" "+(_car.model||"")).trim()) || "") : (_cl && _cl.designation && _cl.designation !== line.carPlate ? _cl.designation : ""); return `${safe(cLabel)} &mdash; ${safe(line.carPlate || "-")}${desig ? ` <span style="color:var(--muted);font-size:11px;">${safe(desig)}</span>` : ""}`; })()}</td>
-          <td style="padding:6px 8px;">${safe(line.periodStart || "-")}</td>
+          <td style="padding:6px 8px;">${fmtDate(line.periodStart) || "-"}</td>
           <td style="padding:6px 8px;text-align:right;">${line.days || 0}</td>
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.amountHt || 0)}</td>
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.vatAmount || 0)}</td>
@@ -13968,7 +13973,7 @@
 
     function composeInvoiceReminderMailto(email, invoices, customerName) {
       const title = invoices.length > 1 ? "Rappel de paiement de factures" : "Rappel de paiement de facture";
-      const lines = invoices.map((i) => `- ${i.id} | Echeance: ${i.dueDate} | Restant: ${Number(i.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND`).join("\n");
+      const lines = invoices.map((i) => `- ${i.id} | Echeance: ${i.dueDate} | Restant: ${Number(i.dueAmountTnd || 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND`).join("\n");
       const body = [
         `Bonjour ${customerName || ""},`,
         "",
@@ -14093,10 +14098,10 @@
           <td data-col="contractId"><a class="xref" data-goto-tab="contracts" data-goto-query="${safe(invoice.contractId)}">${safe((() => { const _c = state.contracts.find(c => c.id === invoice.contractId); return _c ? (_c.contractNumber || _c.id) : (invoice.contractId || "-"); })())}</a></td>
           <td data-col="customerName"><a class="xref" data-goto-tab="customers" data-goto-query="${safe(invoice.customerName)}">${safe(invoice.customerName || "-")}</a></td>
           <td data-col="lignes"><a href="#" class="badge-lignes" data-open-invoice="${safe(invoice.id)}">${lineCount} ligne${lineCount !== 1 ? "s" : ""}</a></td>
-          <td data-col="dueDate">${safe(invoice.dueDate || "-")}</td>
-          <td data-col="amountTnd">${Number(invoice.amountTnd).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td data-col="paidAmountTnd">${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td data-col="dueAmountTnd">${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td data-col="dueDate">${fmtDate(invoice.dueDate) || "-"}</td>
+          <td data-col="amountTnd">${Number(invoice.amountTnd).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND</td>
+          <td data-col="paidAmountTnd">${Number(invoice.paidAmountTnd || 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND</td>
+          <td data-col="dueAmountTnd">${Number(invoice.dueAmountTnd || 0).toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND</td>
           <td data-col="status"><span class="pill ${statusClass}">${statusLabel}</span></td>
         `;
         tbody.appendChild(tr);
@@ -14270,7 +14275,7 @@
           <td data-col="amount">${Number(p.amount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(p.currency || "TND")}</td>
           <td data-col="amountTnd">${Number(p.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td data-col="method">${safe(p.method || "-")}</td>
-          <td data-col="date">${safe(p.date || "-")}</td>
+          <td data-col="date">${fmtDate(p.date) || "-"}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -14344,7 +14349,7 @@
           <td data-col="id"><a href="#" data-open-maintenance="${safe(row.id)}">${safe(row.id)}</a></td>
           <td data-col="carPlate"><a class="xref" data-goto-tab="cars" data-goto-query="${safe(row.carPlate)}">${safe(row.carPlate || "-")}</a></td>
           <td data-col="type">${safe(row.type || "-")}</td>
-          <td data-col="date">${safe(row.date || "-")}</td>
+          <td data-col="date">${fmtDate(row.date) || "-"}</td>
           <td data-col="amountOriginal">${Number(row.amountOriginal || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${safe(row.currency || "TND")}</td>
           <td data-col="amountTnd">${amountTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td data-col="status">${safe(row.status || "-")}</td>
@@ -14604,7 +14609,7 @@
             <td>${safe(a.ref)}</td>
             <td>${safe(a.carPlate || "-")}</td>
             <td>${formatMoney(Number(a.amountOriginal || 0), a.currency || "TND")}</td>
-            <td>${safe(a.dueDate)}</td>
+            <td>${fmtDate(a.dueDate) || "-"}</td>
             <td>${a.daysLeft}</td>
             <td><span class="pill ${pillClass}">${safe(a.level)}</span></td>
           `;
@@ -14667,8 +14672,8 @@
           <td data-col="insuranceCompany">${safe(r.insuranceCompany || r.provider || "-")}</td>
           <td data-col="policyNumber">${safe(r.policyNumber || "-")}</td>
           <td data-col="monthlyAmount">${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
-          <td data-col="startDate">${safe(r.startDate || "-")}</td>
-          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="startDate">${fmtDate(r.startDate) || "-"}</td>
+          <td data-col="endDate">${fmtDate(r.endDate) || "-"}</td>
           <td data-col="status">${safe(r.status || "-")}</td>
           <td>${attachmentLinkHtml(r.attachmentName, r.attachmentData)}</td>
           <td><button data-del-insurance="${safe(r.id)}" class="secondary">Supprimer</button></td>
@@ -14740,7 +14745,7 @@
           <td>${safe(r.ownerId)}</td>
           <td>${safe(r.carPlate || "-")}</td>
           <td>${formatMoney(Number(r.amountOriginal || 0), r.currency || "TND")}<div class="small">${Number(r.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</div></td>
-          <td>${safe(r.dueDate)}</td>
+          <td>${fmtDate(r.dueDate) || "-"}</td>
           <td><span class="pill ${statusClass}">${safe(r.status)}</span></td>
           <td>${action}</td>
         `;
@@ -14817,8 +14822,8 @@
           <td data-col="leasingCompany">${safe(r.leasingCompany || r.lender || "-")}</td>
           <td data-col="contractNumber">${safe(r.contractNumber || "-")}</td>
           <td data-col="monthlyAmount">${formatMoney(Number(r.monthlyAmount || 0), r.currency || "TND")}</td>
-          <td data-col="startDate">${safe(r.startDate || "-")}</td>
-          <td data-col="endDate">${safe(r.endDate || "-")}</td>
+          <td data-col="startDate">${fmtDate(r.startDate) || "-"}</td>
+          <td data-col="endDate">${fmtDate(r.endDate) || "-"}</td>
           <td data-col="status">${safe(r.status || "-")}</td>
           <td>${attachmentLinkHtml(r.attachmentName, r.attachmentData)}</td>
           <td><button data-del-leasing="${safe(r.id)}" class="secondary">Supprimer</button></td>
@@ -14890,7 +14895,7 @@
           <td>${safe(r.ownerId)}</td>
           <td>${safe(r.carPlate || "-")}</td>
           <td>${formatMoney(Number(r.amountOriginal || 0), r.currency || "TND")}<div class="small">${Number(r.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</div></td>
-          <td>${safe(r.dueDate)}</td>
+          <td>${fmtDate(r.dueDate) || "-"}</td>
           <td><span class="pill ${statusClass}">${safe(r.status)}</span></td>
           <td>${action}</td>
         `;
@@ -14971,7 +14976,7 @@
           <td data-col="fiscalYear">${safe(v.fiscalYear)}</td>
           <td data-col="amountOriginal">${formatMoney(Number(v.amountOriginal || 0), v.currency || "TND")}<div class="small">${Number(v.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</div></td>
           <td data-col="amountTnd">${Number(v.amountTnd || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td data-col="dueDate">${safe(v.dueDate)}</td>
+          <td data-col="dueDate">${fmtDate(v.dueDate) || "-"}</td>
           <td data-col="status"><span class="pill ${statusClass}">${safe(v.status)}</span></td>
           <td>${attachmentLinkHtml(v.attachmentName, v.attachmentData)}</td>
           <td>${action} <button class="secondary" data-del-vig="${safe(v.id)}">Supprimer</button></td>
@@ -15619,7 +15624,7 @@
       if (!editMode) {
         const periodStart = lines.length ? lines.reduce((min, l) => l.periodStart < min ? l.periodStart : min, lines[0].periodStart) : null;
         const periodEnd   = lines.length ? lines.reduce((max, l) => l.periodEnd   > max ? l.periodEnd   : max, lines[0].periodEnd)   : null;
-        const periodLabel = periodStart ? `${periodStart} → ${periodEnd}` : "—";
+        const periodLabel = periodStart ? `${fmtDate(periodStart)} → ${fmtDate(periodEnd)}` : "—";
         const isBrouillon = contract.status === "brouillon";
         const statusStyle = isBrouillon ? "color:#d97706;font-weight:600;" : "";
         const linkedQuote = contract.quoteId ? (state.quotes || []).find(q => q.id === contract.quoteId) : null;
@@ -15934,8 +15939,8 @@
         const pickupStr = l.pickupTime ? `<span style="font-size:10px;color:#4d6a97;"> ${l.pickupTime.slice(0,5)}</span>` : "";
         const returnStr = l.returnTime ? `<span style="font-size:10px;color:#4d6a97;"> ${l.returnTime.slice(0,5)}</span>` : "";
         const periodLabel = l.actualEndDate
-          ? `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}<br><span style="color:#c53030;font-size:10px;">résil. ${l.actualEndDate}</span>`
-          : `${l.periodStart || "-"}${pickupStr} → ${l.periodEnd || "-"}${returnStr}`;
+          ? `${fmtDate(l.periodStart) || "-"}${pickupStr} → ${fmtDate(l.periodEnd) || "-"}${returnStr}<br><span style="color:#c53030;font-size:10px;">résil. ${fmtDate(l.actualEndDate) || l.actualEndDate}</span>`
+          : `${fmtDate(l.periodStart) || "-"}${pickupStr} → ${fmtDate(l.periodEnd) || "-"}${returnStr}`;
         const contractForLock = state.contracts.find(c => c.id === contractId);
         const isContractLockedForLine = contractForLock ? isContractFactured(contractId) : false;
         const canEdit      = !isContractLockedForLine && displayStatus !== "annule" && displayStatus !== "resilie";
@@ -16899,7 +16904,7 @@
           actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">${safe(_schedInvLabel)}</a>`;
         }
         return `<tr style="border-bottom:1px solid #e2e8f0;">
-          <td style="padding:7px 8px;">${safe(s.periodStart)} → ${safe(s.periodEnd)}</td>
+          <td style="padding:7px 8px;">${fmtDate(s.periodStart) || "-"} → ${fmtDate(s.periodEnd) || "-"}</td>
           <td style="padding:7px 8px;">${safe(s.label)}</td>
           <td style="padding:7px 8px;text-align:right;">${formatTnd(s.amountHt)}</td>
           <td style="padding:7px 8px;text-align:right;">${formatTnd(s.lineTtc)}</td>
