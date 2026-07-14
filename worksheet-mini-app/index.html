@@ -16129,6 +16129,10 @@
       tr.querySelector("#cleDesig")?.addEventListener("input", () => { if (tr.querySelector("#cleDesig")) tr.querySelector("#cleDesig").dataset.edited = "1"; });
       tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
       tr.querySelector("#cleCancelBtn").onclick = () => renderContractDetailLines(contractId);
+      // Recalcul initial : durée + tous les montants depuis les valeurs stockées
+      updateDur();
+      if (Number(tr.querySelector("#cleRate").value || 0) > 0) recomputeFromRate();
+      else if (Number(tr.querySelector("#cleSubtotal").value || 0) > 0) recomputeSubtotal();
       tr.querySelector("#cleCar").focus();
     }
 
