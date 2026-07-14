@@ -6793,7 +6793,8 @@
       const totalHt       = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
       const totalVat      = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
       const totalTtc      = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
-      const totalSubtotal = totalHt + totalVat; // Sous-total = HT + TVA
+      const dailyTaxRate  = Number(settings.dailyTaxTnd || 0);
+      const totalDailyTax = contractLines.reduce((s, l) => s + Math.round((l.days || 0) * dailyTaxRate * 1000) / 1000, 0);
       const stampVal      = Number(settings.stampDutyTnd || settings.stampDuty || settings.stamp || 0);
 
       // Helpers
@@ -6898,8 +6899,7 @@
         <div class="section-title">I- IDENTIFICATION DU LOCATAIRE<br><span style="font-size:7px;">السائق الأول</span></div>
         <table style="width:100%;margin-top:2px;">
           ${field("Sté / شركة", customer?.type === "entreprise" ? safe(customer.name) : "")}
-          ${field("Nom / الإسم", customer ? safe(customer.name?.split(" ")[0] || "") : "")}
-          ${field("Prénom / اللقب", customer ? safe(customer.name?.split(" ").slice(1).join(" ") || "") : "")}
+          ${field("Nom et Prénom / الإسم واللقب", customer ? safe(customer.name || "") : "")}
           ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
           ${field("Nationalité / الجنسية", f(contract.customerNationality))}
           ${field("Date d'Entrée en Tunisie / تاريخ الدخول إلى تونس", fd(contract.customerEntryDateTn))}
@@ -6981,8 +6981,9 @@
           <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A (${Number(settings.vatRate||19)}%)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Taxe Locative / الأداء على الإيجار (${dailyTaxRate > 0 ? dailyTaxRate.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND/j" : ""})</div><div class="field-value">${totalDailyTax > 0 ? totalDailyTax.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur Etat</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0) + totalVat + stampVal).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${totalTtc > 0 ? totalTtc.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
         </table>
       </td>
     </tr>
