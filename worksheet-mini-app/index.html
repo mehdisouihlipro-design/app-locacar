@@ -1593,11 +1593,15 @@
         </div>
         <div id="custParticulierFields">
           <label>Nom</label>
-          <input id="custFirstName" placeholder="Ben Ali" />
+          <input id="custFirstName" placeholder="Ben Ali" oninput="updateCustFullName()" />
         </div>
         <div id="custParticulierFieldsPrenom">
           <label>Prénom</label>
-          <input id="custLastName" placeholder="Mohamed" />
+          <input id="custLastName" placeholder="Mohamed" oninput="updateCustFullName()" />
+        </div>
+        <div id="custFullNamePreview" style="display:none;">
+          <label>Nom complet</label>
+          <input id="custFullName" readonly style="background:#f1f5f9;color:var(--muted);" tabindex="-1" />
         </div>
         <div id="custEntrepriseFields" style="display:none;">
           <label>Raison sociale</label>
@@ -6034,7 +6038,7 @@
       const lastName  = type === "particulier" ? (byId("custLastName")?.value.trim()  || "") : "";
       const name      = type === "entreprise"
         ? (byId("custName")?.value.trim() || "")
-        : [firstName, lastName].filter(Boolean).join(" ");
+        : [lastName, firstName].filter(Boolean).join(" "); // prénom + nom
       const phone   = byId("custPhone").value.trim();
       const email   = byId("custEmail").value.trim();
       const address = byId("custAddress").value.trim();
@@ -7656,12 +7660,24 @@
       });
     }
 
+    function updateCustFullName() {
+      const prenom = byId("custLastName")?.value.trim() || "";
+      const nom    = byId("custFirstName")?.value.trim() || "";
+      const full   = [prenom, nom].filter(Boolean).join(" ");
+      if (byId("custFullName")) byId("custFullName").value = full;
+      if (byId("custFullNamePreview")) byId("custFullNamePreview").style.display = full ? "" : "none";
+    }
+
     function toggleCustNameFields() {
       const type = byId("custType")?.value;
       const isEnt = type === "entreprise";
       if (byId("custParticulierFields"))       byId("custParticulierFields").style.display       = isEnt ? "none" : "";
       if (byId("custParticulierFieldsPrenom")) byId("custParticulierFieldsPrenom").style.display = isEnt ? "none" : "";
+      if (byId("custFullNamePreview"))         byId("custFullNamePreview").style.display         = "none";
       if (byId("custEntrepriseFields"))        byId("custEntrepriseFields").style.display        = isEnt ? "" : "none";
+      if (isEnt && byId("custFirstName"))  byId("custFirstName").value = "";
+      if (isEnt && byId("custLastName"))   byId("custLastName").value  = "";
+      if (!isEnt && byId("custName"))      byId("custName").value      = "";
     }
 
     if (byId("newCustomerBtn")) {
