@@ -16118,8 +16118,8 @@
       const clearCleError = () => { tr.querySelector("#cleError").style.display = "none"; };
       tr.querySelector("#cleRate").oninput       = () => { recomputeFromRate(); clearCleError(); };
       tr.querySelector("#cleRateTtc").oninput    = () => { recomputeFromRateTtc(); clearCleError(); };
-      tr.querySelector("#cleSubtotal").oninput   = () => { recomputeSubtotal(); clearCleError(); };
-      tr.querySelector("#cleTtc").oninput        = () => { recomputeTtc(); clearCleError(); };
+      tr.querySelector("#cleSubtotal").onchange   = () => { recomputeSubtotal(); clearCleError(); };
+      tr.querySelector("#cleTtc").onchange        = () => { recomputeTtc(); clearCleError(); };
       tr.querySelector("#cleStart").oninput      = () => { updateDur(); clearCleError(); };
       tr.querySelector("#cleEnd").oninput        = () => { updateDur(); clearCleError(); };
       ["input","change"].forEach(ev => {
@@ -16415,7 +16415,7 @@
         if (days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
         clearIlError();
       };
-      byId("ilSubtotal").oninput = () => {
+      byId("ilSubtotal").onchange = () => {
         const subtotal = Number(byId("ilSubtotal").value || 0);
         const vr = Number(state.settings.vatRate || 19);
         const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
@@ -16424,7 +16424,7 @@
         ilRateFromHt(ht, days);
         clearIlError();
       };
-      byId("ilAmtTtc").oninput = () => {
+      byId("ilAmtTtc").onchange = () => {
         const days = ilGetDays();
         const { amountHt } = computeContractLineHt(Number(byId("ilAmtTtc").value || 0), days);
         ilSyncFromHt(amountHt, days);
