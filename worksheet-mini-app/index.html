@@ -6876,7 +6876,6 @@
         <div class="section-title">I- IDENTIFICATION DU LOCATAIRE<br><span style="font-size:7px;">السائق الأول</span></div>
         <table style="width:100%;margin-top:2px;">
           ${field("Sté / شركة", customer?.type === "entreprise" ? safe(customer.name) : "")}
-          ${customer?.type === "entreprise" ? field("N° Registre de Commerce / RC", f(contract.registerNumber)) : ""}
           ${field("Nom / الإسم", customer ? safe(customer.name?.split(" ")[0] || "") : "")}
           ${field("Prénom / اللقب", customer ? safe(customer.name?.split(" ").slice(1).join(" ") || "") : "")}
           ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
@@ -15712,7 +15711,7 @@
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               <div><label class="label-small">Date de naissance</label><input id="cdlEDob" type="date" value="${contract.customerDob||""}" style="width:100%;" /></div>
               <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality)}" style="width:100%;" /></div>
-              <div><label class="label-small">N° Registre de commerce / RC</label><input id="cdlERegisterNo" type="text" value="${safe(contract.registerNumber)}" style="width:100%;" /></div>
+              <div><label class="label-small">Numéro de registre</label><input id="cdlERegisterNo" type="text" value="${safe(contract.registerNumber)}" style="width:100%;" /></div>
               <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||""}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||""}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt)}" style="width:100%;" /></div>
