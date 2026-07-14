@@ -1585,8 +1585,23 @@
       <div id="customerLegacyForm" style="display:none;">
       <div class="row">
         <div>
-          <label>Nom complet</label>
-          <input id="custName" placeholder="Fatima Zahra" />
+          <label>Type</label>
+          <select id="custType" onchange="toggleCustNameFields()">
+            <option value="particulier">particulier</option>
+            <option value="entreprise">entreprise</option>
+          </select>
+        </div>
+        <div id="custParticulierFields">
+          <label>Nom</label>
+          <input id="custFirstName" placeholder="Ben Ali" />
+        </div>
+        <div id="custParticulierFieldsPrenom">
+          <label>Prénom</label>
+          <input id="custLastName" placeholder="Mohamed" />
+        </div>
+        <div id="custEntrepriseFields" style="display:none;">
+          <label>Raison sociale</label>
+          <input id="custName" placeholder="Société XYZ" />
         </div>
         <div>
           <label>Telephone</label>
@@ -1603,13 +1618,6 @@
         <div>
           <label>Email</label>
           <input id="custEmail" placeholder="client@email.com" />
-        </div>
-        <div>
-          <label>Type</label>
-          <select id="custType">
-            <option value="particulier">particulier</option>
-            <option value="entreprise">entreprise</option>
-          </select>
         </div>
       </div>
       <button id="addCustomerBtn">Ajouter client</button>
@@ -5700,7 +5708,8 @@
       }));
 
       if (customers) state.customers = customers.map(c => ({
-        id: c.id, name: c.name, phone: c.phone || "", email: c.email || "",
+        id: c.id, name: c.name, firstName: c.first_name || "", lastName: c.last_name || "",
+        phone: c.phone || "", email: c.email || "",
         address: c.address || "", type: c.type || "particulier",
         taxId: c.tax_id || "",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
@@ -6020,21 +6029,27 @@
     });
 
     document.getElementById("addCustomerBtn").addEventListener("click", async () => {
-      const name    = byId("custName").value.trim();
+      const type      = byId("custType").value;
+      const firstName = type === "particulier" ? (byId("custFirstName")?.value.trim() || "") : "";
+      const lastName  = type === "particulier" ? (byId("custLastName")?.value.trim()  || "") : "";
+      const name      = type === "entreprise"
+        ? (byId("custName")?.value.trim() || "")
+        : [firstName, lastName].filter(Boolean).join(" ");
       const phone   = byId("custPhone").value.trim();
       const email   = byId("custEmail").value.trim();
       const address = byId("custAddress").value.trim();
       const taxId   = byId("custTaxId").value.trim();
-      const type    = byId("custType").value;
 
       if (!name) { alert("Le nom du client est obligatoire."); return; }
 
       let id = uid("CLI");
-      const saved = await apiPost("/customers", { name, phone, email, address, tax_id: taxId, type });
+      const saved = await apiPost("/customers", { name, first_name: firstName, last_name: lastName, phone, email, address, tax_id: taxId, type });
       if (saved && saved.id) id = saved.id;
 
-      state.customers.push({ id, name, phone, email, address, taxId, type });
-      byId("custName").value = "";
+      state.customers.push({ id, name, firstName, lastName, phone, email, address, taxId, type });
+      if (byId("custFirstName")) byId("custFirstName").value = "";
+      if (byId("custLastName"))  byId("custLastName").value  = "";
+      if (byId("custName"))      byId("custName").value      = "";
       byId("custPhone").value = "";
       byId("custEmail").value = "";
       byId("custAddress").value = "";
@@ -6899,7 +6914,8 @@
         <div class="section-title">I- IDENTIFICATION DU LOCATAIRE<br><span style="font-size:7px;">السائق الأول</span></div>
         <table style="width:100%;margin-top:2px;">
           ${field("Sté / شركة", customer?.type === "entreprise" ? safe(customer.name) : "")}
-          ${field("Nom et Prénom / الإسم واللقب", customer ? safe(customer.name || "") : "")}
+          ${field("Nom / الإسم", customer ? safe(customer.firstName || "") : "")}
+          ${field("Prénom / اللقب", customer ? safe(customer.lastName || "") : "")}
           ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
           ${field("Nationalité / الجنسية", f(contract.customerNationality))}
           ${field("Date d'Entrée en Tunisie / تاريخ الدخول إلى تونس", fd(contract.customerEntryDateTn))}
@@ -7640,19 +7656,30 @@
       });
     }
 
+    function toggleCustNameFields() {
+      const type = byId("custType")?.value;
+      const isEnt = type === "entreprise";
+      if (byId("custParticulierFields"))       byId("custParticulierFields").style.display       = isEnt ? "none" : "";
+      if (byId("custParticulierFieldsPrenom")) byId("custParticulierFieldsPrenom").style.display = isEnt ? "none" : "";
+      if (byId("custEntrepriseFields"))        byId("custEntrepriseFields").style.display        = isEnt ? "" : "none";
+    }
+
     if (byId("newCustomerBtn")) {
       byId("newCustomerBtn").addEventListener("click", () => {
         const form = byId("customerLegacyForm");
         if (form) {
           form.style.display = form.style.display === "none" ? "block" : "none";
           if (form.style.display === "block") {
-            byId("custName").value = "";
+            if (byId("custFirstName")) byId("custFirstName").value = "";
+            if (byId("custLastName"))  byId("custLastName").value  = "";
+            if (byId("custName"))      byId("custName").value      = "";
             byId("custPhone").value = "";
             byId("custEmail").value = "";
             byId("custAddress").value = "";
             byId("custTaxId").value = "";
             byId("custType").value = "particulier";
-            byId("custName").focus();
+            toggleCustNameFields();
+            byId("custFirstName")?.focus();
           }
         }
       });

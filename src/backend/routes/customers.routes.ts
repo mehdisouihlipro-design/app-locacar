@@ -26,10 +26,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, phone, email, address, city, postal_code, country, id_number, tax_id, notes } = req.body;
+    const { name, first_name, last_name, phone, email, address, city, postal_code, country, id_number, tax_id, notes } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Le nom est requis.' });
     const id = req.body.id || uuidv4();
-    await global.db.post('/customers', stampCreate({ id, name, phone, email, address, city, postal_code, country, id_number, tax_id, notes }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
+    await global.db.post('/customers', stampCreate({ id, name, first_name, last_name, phone, email, address, city, postal_code, country, id_number, tax_id, notes }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     res.status(201).json({ success: true, data: { id, name, phone, email } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
