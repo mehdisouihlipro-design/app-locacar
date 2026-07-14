@@ -2,6 +2,20 @@
 
 ## Règles du projet
 
+### Alignement label-valeur (règle absolue UI)
+Dans **tous les écrans** (modals, listes, formulaires, cartes KPI, tableaux), le bord gauche du label doit être **exactement aligné** avec le bord gauche de la valeur qu'il décrit. Règles concrètes :
+- Ne jamais mettre un `padding` ou `margin-left` différent sur le label et sur la valeur dans un même bloc.
+- Utiliser `display: flex; flex-direction: column; align-items: flex-start;` (ou `display: block`) pour les paires label/valeur — jamais `text-align: center` sauf dans les cellules de tableaux centrées explicitement.
+- Les labels de sections (ex. `MUTED_LABEL`, `<small>`, `<span class="label">`) doivent hériter du même `padding-left` que leur valeur.
+- **Repère d'audit** : sélectionner visuellement le label, vérifier que son bord gauche coïncide pixel par pixel avec celui de la valeur en dessous.
+
+### Visibilité complète des valeurs (règle absolue UI)
+Les valeurs (texte, nombres, badges, dates) doivent être **entièrement lisibles** dans tous les états de l'interface. Règles concrètes :
+- Interdire `overflow: hidden` sur un conteneur de valeur sans prévoir `text-overflow: ellipsis` + `title` tooltip affichant la valeur complète.
+- Les colonnes de tableaux ont une largeur minimale suffisante (`min-width`) pour que la valeur la plus courante soit visible sans tronquage ni débordement masqué.
+- Les inputs et cellules de formulaire en mode lecture ne doivent pas clipper leur contenu.
+- **Repère d'audit** : réduire la fenêtre à 1024 px de large → aucune valeur ne doit être coupée ; le tableau doit défiler (`overflow-x: auto`) plutôt que tronquer.
+
 ### Documentation
 Après **chaque modification** de code, mettre à jour la documentation correspondante dans `docs/` :
 - `docs/01-specifications/BMAD.md` — si les specs métier ou règles business changent

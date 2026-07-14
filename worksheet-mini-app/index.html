@@ -330,7 +330,7 @@
     .xref:hover { text-decoration: underline; }
     .badge-lignes { display:inline-block;font-size:11px;font-weight:600;background:#e8f0fe;color:#1540c8;border-radius:12px;padding:2px 8px;text-decoration:none;cursor:pointer;white-space:nowrap; }
     .badge-lignes:hover { background:#c7d9fc; }
-    .label-small { font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
+    .label-small { display:block; font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
 
     .hidden {
       display: none !important;
@@ -3201,7 +3201,7 @@
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Désignation</th>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT · TTC</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Sous-total</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA · T/j · Tmb</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Total TTC</th>
@@ -15907,9 +15907,9 @@
       tbody.innerHTML = "";
       const lines = (state.contractLines || []).filter(l => l.contractId === contractId);
       byId("cdlEmptyMsg").style.display = (lines.length || inlineRow) ? "none" : "";
-      let sumHt = 0, sumTtc = 0;
+      let sumHt = 0, sumVat = 0, sumTtc = 0;
       lines.forEach(l => {
-        if (l.status !== "annule") { sumHt += l.amountHt || 0; sumTtc += l.amountTtc || 0; }
+        if (l.status !== "annule") { sumHt += l.amountHt || 0; sumVat += l.vatAmount || 0; sumTtc += l.amountTtc || 0; }
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
         tr.dataset.lineId = l.id;
@@ -15938,7 +15938,7 @@
           <td style="white-space:nowrap;">${periodLabel}</td>
           <td style="text-align:right;">${dur}</td>
           <td style="text-align:right;">${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
-          <td style="text-align:right;">${(l.amountHt || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
+          <td style="text-align:right;">${((l.amountHt || 0) + (l.vatAmount || 0)).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:right;">${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:right;">${(l.amountTtc || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</td>
           <td style="text-align:center;">${statusBadge}</td>
@@ -15963,7 +15963,7 @@
       const tfoot = byId("cdlLinesFoot");
       if (tfoot) {
         tfoot.innerHTML = lines.length
-          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td></td><td></td></tr>`
+          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;color:var(--muted);font-size:12px;">${sumHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND HT</td><td style="text-align:right;padding:6px 8px;"><strong>${(sumHt + sumVat).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND</strong></td><td></td><td></td><td></td></tr>`
           : "";
       }
     }
