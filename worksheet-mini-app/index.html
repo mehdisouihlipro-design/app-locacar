@@ -6838,7 +6838,6 @@
     table { border-collapse:collapse; width:100%; }
     td { vertical-align:top; }
     .page { width:210mm; min-height:297mm; padding:6mm 6mm 4mm 6mm; }
-    .border-box { border:1px solid #333; }
     .section-title { font-size:8px; font-weight:bold; text-align:center; background:#ddd; padding:2px; border:1px solid #333; margin-bottom:0; }
     .field-label { font-size:7px; color:#444; }
     .field-value { font-size:8.5px; border-bottom:1px solid #555; min-height:12px; padding-bottom:1px; margin-bottom:3px; }
@@ -6851,28 +6850,42 @@
 <div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
 <div class="page">
 
-  <!-- ══ EN-TÊTE ══════════════════════════════════════════════════════ -->
+  <!-- ══ BANNIÈRE SOCIÉTÉ (logo + coordonnées + nom) ══════════════════ -->
+  <table style="margin-bottom:3px;border-bottom:1px solid #333;padding-bottom:3px;">
+    <tr>
+      <td style="width:75px;vertical-align:middle;">
+        <img src="${safe(logoUrl)}" style="max-width:72px;max-height:55px;display:block;" />
+      </td>
+      <td style="text-align:center;vertical-align:middle;font-size:7.5px;line-height:1.8;padding:0 6px;">
+        ${settings.companyAddress ? `<div>&#x1F4CD; ${safe(settings.companyAddress)}</div>` : ""}
+        ${settings.companyEmail ? `<div>&#x2709; ${safe(settings.companyEmail)}</div>` : ""}
+        ${settings.companyPhone ? `<div>&#x260E; ${safe(settings.companyPhone)}</div>` : ""}
+      </td>
+      <td style="text-align:right;vertical-align:middle;">
+        <div style="font-size:17px;font-weight:900;letter-spacing:1px;">${safe(companyName)}</div>
+        <div style="font-size:9px;color:#444;">Location de Voitures</div>
+        ${settings.companyTaxId ? `<div style="font-size:8px;">MF&nbsp;: ${safe(settings.companyTaxId)}</div>` : ""}
+      </td>
+    </tr>
+  </table>
+
+  <!-- ══ TITRE : IMPORTANT + CONTRAT DE LOCATION + هام ══════════════ -->
   <table style="margin-bottom:3px;">
     <tr>
-      <td style="width:110px;vertical-align:middle;">
+      <td style="width:120px;vertical-align:top;">
         <div style="border:1px solid #333;padding:3px;font-size:7px;line-height:1.4;">
           <strong>IMPORTANT</strong><br>
           L'assurance ne couvre pas les dégâts occasionnés aux pneumatiques bris de glace et optiques avant et arrières et les accessoires qui sont exclusivement à la charge du locataire.
         </div>
       </td>
-      <td style="text-align:center;vertical-align:top;padding:0 8px;">
-        <div style="font-size:16px;font-weight:900;letter-spacing:1px;">CONTRAT DE LOCATION</div>
-        <div style="font-size:11px;font-weight:bold;letter-spacing:2px;">عـقـد كـراء</div>
-        <div style="font-size:13px;font-weight:bold;margin-top:3px;">N&deg; ${safe(contract.contractNumber || contractId)}</div>
+      <td style="text-align:center;vertical-align:middle;padding:0 8px;">
+        <div style="font-size:15px;font-weight:900;letter-spacing:1px;">CONTRAT DE LOCATION</div>
+        <div style="font-size:12px;font-weight:bold;">عـقـد كـراء</div>
+        <div style="font-size:14px;font-weight:bold;margin-top:3px;">N&deg;&nbsp;${safe(contract.contractNumber || contractId)}</div>
       </td>
-      <td style="width:130px;text-align:right;vertical-align:top;">
-        <div style="font-weight:bold;font-size:13px;">${safe(companyName)}</div>
-        <div style="font-size:7px;line-height:1.5;">
-          ${settings.companyAddress ? safe(settings.companyAddress)+"<br>" : ""}
-          ${settings.companyEmail ? safe(settings.companyEmail)+"<br>" : ""}
-          ${settings.companyPhone ? safe(settings.companyPhone)+"<br>" : ""}
-          ${settings.companyTaxId ? "MF: "+safe(settings.companyTaxId) : ""}
-        </div>
+      <td style="width:120px;text-align:right;vertical-align:top;direction:rtl;font-size:7px;line-height:1.5;">
+        <strong>هـام</strong><br>
+        جميع الأضرار للزجاج والخلفي ولكل الأضواء والإطارات المطاطية ولجميع التجهيزات والوثائق على حساب الجريف.
       </td>
     </tr>
   </table>
@@ -6964,12 +6977,12 @@
         <table style="width:100%;margin-top:2px;">
           <tr><td style="padding:1px 3px;"><div class="field-label">Durée de la Location / مـدة الكـراء</div><div class="field-value">${firstLine.days||contract.days||""} jour(s)</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${totalHt > 0 ? totalHt.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">TVA (${Number(settings.vatRate||19)}%)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Assurance R.C.</div><div class="field-value">${contract.insuranceRcAmount!=null?Number(contract.insuranceRcAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalSubtotal + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur État</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalTtc + stampVal).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0)).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A (${Number(settings.vatRate||19)}%)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur Etat</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${(totalHt + Number(contract.insuranceRcAmount||0) + Number(contract.insurancePassengersAmount||0) + totalVat + stampVal).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
         </table>
       </td>
     </tr>
