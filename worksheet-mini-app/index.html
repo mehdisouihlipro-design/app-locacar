@@ -5729,6 +5729,7 @@
         hasMirrors: Boolean(c.has_mirrors),
         hasAc: Boolean(c.has_ac),
         // Groupe 5 — locataire complémentaire
+        registerNumber: c.register_number || "",
         customerDob: c.customer_dob || null,
         customerNationality: c.customer_nationality || "",
         customerEntryDateTn: c.customer_entry_date_tn || null,
@@ -6875,6 +6876,7 @@
         <div class="section-title">I- IDENTIFICATION DU LOCATAIRE<br><span style="font-size:7px;">السائق الأول</span></div>
         <table style="width:100%;margin-top:2px;">
           ${field("Sté / شركة", customer?.type === "entreprise" ? safe(customer.name) : "")}
+          ${customer?.type === "entreprise" ? field("N° Registre de Commerce / RC", f(contract.registerNumber)) : ""}
           ${field("Nom / الإسم", customer ? safe(customer.name?.split(" ")[0] || "") : "")}
           ${field("Prénom / اللقب", customer ? safe(customer.name?.split(" ").slice(1).join(" ") || "") : "")}
           ${field("D. de Naissance / تاريخ الولادة", fd(contract.customerDob))}
@@ -7022,6 +7024,86 @@
       </td>
     </tr>
   </table>
+
+</div>
+
+<!-- ══ PAGE 2 : VERSO — CONDITIONS GÉNÉRALES ══════════════════════════ -->
+<div class="page" style="page-break-before:always;">
+
+  <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:6px;">
+    <div style="font-size:11px;font-weight:bold;letter-spacing:1px;">CONDITIONS GÉNÉRALES DE LOCATION</div>
+    <div style="font-size:10px;font-weight:bold;">الشروط العامة للكراء</div>
+    <div style="font-size:8px;color:#555;margin-top:2px;">${safe(companyName)}</div>
+  </div>
+
+  <div style="column-count:2;column-gap:8mm;font-size:7.5px;line-height:1.55;text-align:justify;">
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 1 — Conditions de location / شروط الكراء</div>
+      Toute location est subordonnée à la présentation par le locataire d'un permis de conduire valide, d'une pièce d'identité en cours de validité et d'une caution. Le locataire doit être âgé d'au moins 21 ans et titulaire de son permis depuis au moins 1 an. Le véhicule ne peut être utilisé que par le(s) conducteur(s) désigné(s) au contrat.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 2 — Durée de location / مدة الكراء</div>
+      La durée de location est celle indiquée au recto. Toute prolongation doit être préalablement accordée par le loueur. En cas de restitution tardive non autorisée, le loueur se réserve le droit de majorer le tarif convenu et d'engager une procédure de récupération du véhicule aux frais du locataire.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 3 — Utilisation du véhicule / استعمال السيارة</div>
+      Le véhicule est loué pour un usage personnel ou professionnel normal sur le territoire tunisien uniquement. Il est formellement interdit de : sous-louer le véhicule, l'utiliser pour le transport rémunéré de personnes ou de marchandises, participer à des compétitions ou courses, sortir du territoire tunisien sans autorisation écrite préalable du loueur.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 4 — Assurances / التأمين</div>
+      Le véhicule est couvert par une assurance Responsabilité Civile (RC) obligatoire. L'assurance ne couvre pas : les dommages aux pneumatiques, le bris de glace, les optiques avant et arrière, les accessoires intérieurs et extérieurs du véhicule, les dommages causés en état d'ivresse ou sous stupéfiants, ni les dommages survenus en dehors du territoire tunisien. Le locataire est responsable des dommages non couverts, dans la limite du montant de franchise indiqué au recto.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 5 — Responsabilités du locataire / مسؤولية المستأجر</div>
+      Le locataire est tenu responsable de tous les dégâts, dommages, pertes ou vols subis par le véhicule pendant la durée de la location, qu'il en soit ou non responsable. Le locataire doit restituer le véhicule dans le même état que celui dans lequel il lui a été remis. Tout dommage constaté à la restitution sera facturé au locataire.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 6 — Carburant / الوقود</div>
+      Le véhicule est remis au locataire avec le niveau de carburant indiqué au recto. Il doit être restitué avec le même niveau. Tout manquant sera facturé au tarif de la pompe majoré d'une redevance de service.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 7 — Dépannage et accidents / الإصلاح والحوادث</div>
+      En cas de panne ou d'accident, le locataire est tenu d'aviser immédiatement le loueur. Aucune réparation ne peut être effectuée sans accord préalable du loueur. En cas d'accident, le locataire doit obligatoirement établir un constat amiable et le remettre au loueur. Les frais de dépannage résultant d'une négligence du locataire sont à sa charge.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 8 — Restitution du véhicule / إعادة السيارة</div>
+      Le véhicule doit être restitué à l'agence, à la date et à l'heure prévues au contrat. La restitution hors des heures d'ouverture de l'agence se fait aux risques et périls du locataire jusqu'à constatation de l'état du véhicule par le loueur. L'état du véhicule à la restitution fait foi.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 9 — Amendes et infractions / المخالفات</div>
+      Toute contravention, amende ou pénalité occasionnée par le locataire pendant la durée de la location est entièrement à sa charge. Le loueur se réserve le droit de débiter le montant correspondant sur la caution ou de le facturer ultérieurement.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 10 — Paiement et caution / الدفع والضمان</div>
+      Le règlement du montant de la location s'effectue à la signature du contrat ou selon les modalités convenues. Une caution est exigée à la prise en charge du véhicule. Elle est restituée à la restitution du véhicule, déduction faite de tout montant dû par le locataire. En cas de paiement par carte bancaire, le locataire autorise le loueur à débiter les sommes dues.
+    </div>
+
+    <div style="break-inside:avoid;margin-bottom:5px;">
+      <div style="font-size:8px;font-weight:bold;margin-bottom:2px;">Art. 11 — Litiges et juridiction compétente / النزاعات</div>
+      Tout litige relatif à l'exécution du présent contrat sera soumis à la juridiction des tribunaux tunisiens compétents. La loi tunisienne est applicable. Le présent contrat constitue l'intégralité de l'accord entre les parties et annule tout accord antérieur portant sur le même objet.
+    </div>
+
+  </div>
+
+  <div style="border-top:1px solid #333;margin-top:8px;padding-top:5px;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div style="font-size:7px;color:#555;max-width:60%;">
+      Le locataire reconnaît avoir pris connaissance des présentes conditions générales et les accepte sans réserve.<br>
+      يُقرّ المستأجر باطّلاعه على الشروط العامة أعلاه وقبوله لها دون تحفظ.
+    </div>
+    <div style="text-align:center;width:160px;">
+      <div style="border-top:1px solid #333;margin-top:30px;padding-top:4px;font-size:7.5px;">Signature du locataire<br>إمضاء المستأجر</div>
+    </div>
+  </div>
 
 </div>
 </body>
@@ -12707,6 +12789,7 @@
         hasSpareTire: Boolean(c.has_spare_tire), hasJackTools: Boolean(c.has_jack_tools),
         hasRadio: Boolean(c.has_radio), hasHubcaps: Boolean(c.has_hubcaps),
         hasMirrors: Boolean(c.has_mirrors), hasAc: Boolean(c.has_ac),
+        registerNumber: c.register_number || "",
         customerDob: c.customer_dob || null, customerNationality: c.customer_nationality || "",
         customerEntryDateTn: c.customer_entry_date_tn || null,
         customerIdIssuedDate: c.customer_id_issued_date || null, customerIdIssuedAt: c.customer_id_issued_at || "",
@@ -15629,6 +15712,7 @@
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               <div><label class="label-small">Date de naissance</label><input id="cdlEDob" type="date" value="${contract.customerDob||""}" style="width:100%;" /></div>
               <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality)}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Registre de commerce / RC</label><input id="cdlERegisterNo" type="text" value="${safe(contract.registerNumber)}" style="width:100%;" /></div>
               <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||""}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||""}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt)}" style="width:100%;" /></div>
@@ -15727,6 +15811,7 @@
             has_spare_tire: vb("cdlESpareTire"), has_jack_tools: vb("cdlEJack"), has_radio: vb("cdlERadio"),
             has_hubcaps: vb("cdlEHubcaps"), has_mirrors: vb("cdlEMirrors"), has_ac: vb("cdlEAc"),
             // Groupe 5 — locataire
+            register_number: v("cdlERegisterNo"),
             customer_dob: v("cdlEDob") || null, customer_nationality: v("cdlENationality"),
             customer_entry_date_tn: v("cdlEEntryDate") || null,
             customer_id_issued_date: v("cdlEIdDate") || null, customer_id_issued_at: v("cdlEIdAt"),
@@ -15752,6 +15837,7 @@
               fuelLevelStart: v("cdlEFuelStart")||null, fuelLevelEnd: v("cdlEFuelEnd")||null,
               hasSpareTire: vb("cdlESpareTire"), hasJackTools: vb("cdlEJack"), hasRadio: vb("cdlERadio"),
               hasHubcaps: vb("cdlEHubcaps"), hasMirrors: vb("cdlEMirrors"), hasAc: vb("cdlEAc"),
+              registerNumber: v("cdlERegisterNo")||"",
               customerDob: v("cdlEDob")||null, customerNationality: v("cdlENationality")||"",
               customerEntryDateTn: v("cdlEEntryDate")||null,
               customerIdIssuedDate: v("cdlEIdDate")||null, customerIdIssuedAt: v("cdlEIdAt")||"",
