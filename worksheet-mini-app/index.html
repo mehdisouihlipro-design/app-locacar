@@ -3201,10 +3201,10 @@
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Désignation</th>
                 <th style="text-align:left;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Période</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant HT</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TTC</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT · TTC</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Sous-total</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA · T/j · Tmb</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Total TTC</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Réservation</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);position:sticky;right:0;z-index:2;box-shadow:-2px 0 4px rgba(0,0,0,.06);">Actions</th>
@@ -16005,25 +16005,20 @@
           <input id="cleReturnTime" type="time" value="${line.returnTime||""}" style="width:75px;font-size:12px;margin-left:2px;" />
         </td>
         <td id="cleDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
-        <td style="padding:4px;">
-          <input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" title="Tarif HT" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit} HT</div>
-          <input id="cleRateTtc" type="number" step="0.01" value="${initRateTtc}" style="width:70px;font-size:12px;text-align:right;margin-top:2px;" title="Tarif TTC" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit} TTC</div>
+        <td style="padding:4px;white-space:nowrap;">
+          <input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:65px;font-size:12px;text-align:right;" title="Tarif HT/j" />
+          <span style="font-size:9px;color:var(--muted);margin:0 3px;">HT</span>
+          <input id="cleRateTtc" type="number" step="0.01" value="${initRateTtc}" style="width:65px;font-size:12px;text-align:right;" title="Tarif TTC/j" />
+          <span style="font-size:9px;color:var(--muted);margin-left:2px;">TTC</span>
         </td>
         <td style="padding:4px;">
-          <input id="cleSubtotal" type="number" step="0.01" value="${initSubtotal}" style="width:80px;font-size:12px;text-align:right;" title="Montant HT+TVA" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">HT+TVA</div>
+          <input id="cleSubtotal" type="number" step="0.01" value="${initSubtotal}" style="width:85px;font-size:12px;text-align:right;" title="Montant HT+TVA" />
           <input id="cleHt" type="hidden" value="${line.amountHt||""}" />
         </td>
-        <td style="padding:4px;">
-          <input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
-            Taxe/j <input id="cleDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
-            Timbre <input id="cleStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          </div>
+        <td style="padding:4px;white-space:nowrap;">
+          <span style="font-size:9px;color:var(--muted);">TVA </span><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:55px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <span style="font-size:9px;color:var(--muted);margin-left:4px;">T/j </span><input id="cleDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:50px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <span style="font-size:9px;color:var(--muted);margin-left:4px;">Tmb </span><input id="cleStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:50px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
         </td>
         <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" title="Total TTC" /></td>
         <td colspan="2"></td>
@@ -16310,25 +16305,20 @@
           ${isShortTerm ? `<input id="ilReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="ilDur" style="text-align:right;padding:6px 4px;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:6px 4px;text-align:right;">
-          <input id="ilRate" type="number" step="0.01" min="0" placeholder="tarif/j" style="width:75px;font-size:12px;text-align:right;" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">HT/j</div>
-          <input id="ilRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:75px;font-size:12px;text-align:right;margin-top:2px;" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">TTC/j</div>
-        </td>
-        <td style="padding:6px 4px;text-align:right;">
-          <input id="ilSubtotal" type="number" step="0.01" min="0" placeholder="HT+TVA" style="width:85px;font-size:12px;text-align:right;" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">HT+TVA</div>
-          <input id="ilHt" type="hidden" value="0" />
+        <td style="padding:6px 4px;white-space:nowrap;">
+          <input id="ilRate" type="number" step="0.01" min="0" placeholder="HT/j" style="width:65px;font-size:12px;text-align:right;" />
+          <span style="font-size:9px;color:var(--muted);margin:0 3px;">HT</span>
+          <input id="ilRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:65px;font-size:12px;text-align:right;" />
+          <span style="font-size:9px;color:var(--muted);margin-left:2px;">TTC</span>
         </td>
         <td style="padding:6px 4px;">
-          <input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
-            Taxe/j <input id="ilDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;gap:4px;align-items:center;white-space:nowrap;">
-            Timbre <input id="ilStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:11px;text-align:right;background:#f1f5f9;color:var(--muted);" />
-          </div>
+          <input id="ilSubtotal" type="number" step="0.01" min="0" placeholder="HT+TVA" style="width:85px;font-size:12px;text-align:right;" />
+          <input id="ilHt" type="hidden" value="0" />
+        </td>
+        <td style="padding:6px 4px;white-space:nowrap;">
+          <span style="font-size:9px;color:var(--muted);">TVA </span><input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:55px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <span style="font-size:9px;color:var(--muted);margin-left:4px;">T/j </span><input id="ilDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
+          <span style="font-size:9px;color:var(--muted);margin-left:4px;">Tmb </span><input id="ilStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:50px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" />
         </td>
         <td style="padding:6px 4px;text-align:right;">
           <input id="ilAmtTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
