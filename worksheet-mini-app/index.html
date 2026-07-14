@@ -3374,6 +3374,10 @@
               <label>Buffer reservations (heures)</label>
               <input id="reservationBufferHours" type="number" min="0" step="0.5" value="2" />
             </div>
+            <div>
+              <label>Tolérance retard location (heures)</label>
+              <input id="rentalToleranceHours" type="number" min="0" step="1" value="0" title="Si la durée réelle dépasse N jours entiers de moins de X heures, on ne compte pas un jour supplémentaire." />
+            </div>
           </div>
         </div>
 
@@ -5648,6 +5652,7 @@
         eurToTnd: Number(settingsRow.eur_to_tnd ?? state.settings.eurToTnd ?? 3.4),
         openingCashTnd: Number(settingsRow.opening_cash_tnd ?? state.settings.openingCashTnd ?? 0),
         reservationBufferHours: Number(settingsRow.reservation_buffer_hours ?? state.settings.reservationBufferHours ?? 2),
+        rentalToleranceHours: Number(settingsRow.rental_tolerance_hours ?? state.settings.rentalToleranceHours ?? 0),
         vatRate: Number(settingsRow.vat_rate ?? state.settings.vatRate ?? 19),
         dailyTaxTnd: Number(settingsRow.daily_tax_tnd ?? state.settings.dailyTaxTnd ?? 2),
         stampDutyTnd: Number(settingsRow.stamp_duty_tnd ?? state.settings.stampDutyTnd ?? 1),
@@ -5733,6 +5738,7 @@
         customerDob: c.customer_dob || null,
         customerNationality: c.customer_nationality || "",
         customerEntryDateTn: c.customer_entry_date_tn || null,
+        customerIdNumber: c.customer_id_number || "",
         customerIdIssuedDate: c.customer_id_issued_date || null,
         customerIdIssuedAt: c.customer_id_issued_at || "",
         customerLicenseNumber: c.customer_license_number || "",
@@ -8908,9 +8914,11 @@
       const eurToTnd = Number(byId("eurToTnd").value || 3.4);
       const openingCashTnd = Number(byId("openingCashTnd").value || 0);
       const reservationBufferHours = Number(byId("reservationBufferHours").value || 0);
+      const rentalToleranceHours = Number(byId("rentalToleranceHours").value ?? 0);
 
       if (eurToTnd <= 0) return { ok: false, message: "❌ Le taux EUR→TND doit etre positif." };
       if (!Number.isFinite(reservationBufferHours) || reservationBufferHours < 0) return { ok: false, message: "❌ Le buffer des reservations doit etre >= 0." };
+      if (!Number.isInteger(rentalToleranceHours) || rentalToleranceHours < 0) return { ok: false, message: "❌ La tolérance retard doit etre un entier >= 0." };
       if (!Number.isFinite(vatRate) || vatRate < 0) return { ok: false, message: "❌ Le taux de TVA doit etre >= 0." };
       if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) return { ok: false, message: "❌ La taxe par jour doit etre >= 0." };
       if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) return { ok: false, message: "❌ Le timbre fiscal doit etre >= 0." };
@@ -8918,6 +8926,7 @@
       state.settings.eurToTnd = eurToTnd;
       state.settings.openingCashTnd = openingCashTnd;
       state.settings.reservationBufferHours = reservationBufferHours;
+      state.settings.rentalToleranceHours = rentalToleranceHours;
       state.settings.vatRate = vatRate;
       state.settings.dailyTaxTnd = dailyTaxTnd;
       state.settings.stampDutyTnd = stampDutyTnd;
@@ -8935,6 +8944,7 @@
         eur_to_tnd: eurToTnd,
         opening_cash_tnd: openingCashTnd,
         reservation_buffer_hours: reservationBufferHours,
+        rental_tolerance_hours: rentalToleranceHours,
         vat_rate: vatRate,
         daily_tax_tnd: dailyTaxTnd,
         stamp_duty_tnd: stampDutyTnd,
@@ -9092,6 +9102,7 @@
       byId("eurToTnd").value = state.settings.eurToTnd;
       byId("openingCashTnd").value = Number(state.settings.openingCashTnd || 0).toFixed(2);
       byId("reservationBufferHours").value = Number(state.settings.reservationBufferHours || 2);
+      byId("rentalToleranceHours").value = Number(state.settings.rentalToleranceHours ?? 0);
       byId("vatRate").value = state.settings.vatRate ?? 19;
       byId("dailyTaxTnd").value = state.settings.dailyTaxTnd ?? 2;
       byId("stampDutyTnd").value = state.settings.stampDutyTnd ?? 1;
@@ -9121,10 +9132,19 @@
       return computeContractLineTtc(ht);
     }
     // Calcule { days, months } entre deux dates ISO (bornes incluses)
-    function calcLineDuration(startStr, endStr) {
+    function calcLineDuration(startStr, endStr, pickupTime, returnTime) {
       if (!startStr || !endStr) return { days: 0, months: 0 };
-      const ms = new Date(endStr) - new Date(startStr);
-      const days = Math.max(1, Math.round(ms / 86400000) + 1);
+      // Construire des datetimes si les heures sont fournies (format HH:MM)
+      const sDate = pickupTime ? new Date(startStr + "T" + pickupTime + ":00") : new Date(startStr);
+      const eDate = returnTime ? new Date(endStr   + "T" + returnTime + ":00") : new Date(endStr);
+      const ms = eDate - sDate;
+      if (ms < 0) return { days: 0, months: 0 };
+      const baseDays = Math.floor(ms / 86400000);
+      const extraHours = (ms - baseDays * 86400000) / 3600000;
+      // Appliquer la tolérance : si les heures dépassantes sont <= X, on ne rajoute pas de jour sup
+      const tolerance = (typeof state !== "undefined" && state.settings?.rentalToleranceHours != null)
+        ? Number(state.settings.rentalToleranceHours) : 0;
+      const days = Math.max(1, (extraHours > 0 && extraHours > tolerance) ? baseDays + 1 : baseDays);
       return { days, months: Math.round(days / 30) };
     }
 
@@ -12791,6 +12811,7 @@
         registerNumber: c.register_number || "",
         customerDob: c.customer_dob || null, customerNationality: c.customer_nationality || "",
         customerEntryDateTn: c.customer_entry_date_tn || null,
+        customerIdNumber: c.customer_id_number || "",
         customerIdIssuedDate: c.customer_id_issued_date || null, customerIdIssuedAt: c.customer_id_issued_at || "",
         customerLicenseNumber: c.customer_license_number || "",
         customerLicenseIssuedDate: c.customer_license_issued_date || null, customerLicenseIssuedAt: c.customer_license_issued_at || "",
@@ -15713,6 +15734,7 @@
               <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality)}" style="width:100%;" /></div>
               <div><label class="label-small">Numéro de registre</label><input id="cdlERegisterNo" type="text" value="${safe(contract.registerNumber)}" style="width:100%;" /></div>
               <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||""}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Pièce d'identité (CIN/Passeport)</label><input id="cdlEIdNo" type="text" value="${safe(contract.customerIdNumber)}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||""}" style="width:100%;" /></div>
               <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt)}" style="width:100%;" /></div>
               <div><label class="label-small">Motif de séjour</label>
@@ -15777,6 +15799,13 @@
         editBtn.textContent = "✓ Enregistrer";
         cancelBtn.style.display = "";
         cancelBtn.onclick = () => renderContractDetailHeader(contractId, false);
+        // zone d'erreur inline
+        if (!byId("cdlHeaderError")) {
+          const errDiv = document.createElement("div");
+          errDiv.id = "cdlHeaderError";
+          errDiv.style.cssText = "display:none;color:#c53030;font-size:12px;margin-top:6px;padding:6px 10px;background:#fff5f5;border-radius:4px;";
+          editBtn.parentElement.appendChild(errDiv);
+        } else { byId("cdlHeaderError").style.display = "none"; }
         editBtn.onclick = async () => {
           const customerId = byId("cdlEClient").value;
           const type = byId("cdlEType").value;
@@ -15795,7 +15824,9 @@
           const v = id => byId(id)?.value || null;
           const vn = id => { const val = byId(id)?.value; return val !== "" && val != null ? Number(val) : null; };
           const vb = id => byId(id)?.checked || false;
-          await apiPut(`/contracts/${contractId}`, {
+          const prevEditBtnText = editBtn.textContent;
+          editBtn.disabled = true; editBtn.textContent = "…";
+          const saveResult = await apiPutWithError(`/contracts/${contractId}`, {
             customer_id: customerId, customer_name: customer ? customer.name : contract.customerName,
             type, rate_type: rateType, contract_date: contractDate,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
@@ -15813,6 +15844,7 @@
             register_number: v("cdlERegisterNo"),
             customer_dob: v("cdlEDob") || null, customer_nationality: v("cdlENationality"),
             customer_entry_date_tn: v("cdlEEntryDate") || null,
+            customer_id_number: v("cdlEIdNo"),
             customer_id_issued_date: v("cdlEIdDate") || null, customer_id_issued_at: v("cdlEIdAt"),
             customer_license_number: v("cdlELicenseNo"), customer_license_issued_date: v("cdlELicenseDate") || null,
             customer_license_issued_at: v("cdlELicenseAt"), customer_local_address: v("cdlELocalAddr"),
@@ -15825,6 +15857,14 @@
             // Groupe 7 — changement voiture
             replacement_car_model: v("cdlEReplModel"), replacement_car_plate: v("cdlEReplPlate"),
           });
+          editBtn.disabled = false; editBtn.textContent = prevEditBtnText;
+          if (!saveResult.ok) {
+            const errMsg = saveResult.errorMsg || "Erreur lors de la sauvegarde";
+            const errEl = byId("cdlHeaderError");
+            if (errEl) { errEl.textContent = "❌ " + errMsg; errEl.style.display = ""; }
+            else { alert("❌ " + errMsg); }
+            return;
+          }
           const idx = state.contracts.findIndex(c => c.id === contractId);
           if (idx >= 0) {
             Object.assign(state.contracts[idx], {
@@ -15839,6 +15879,7 @@
               registerNumber: v("cdlERegisterNo")||"",
               customerDob: v("cdlEDob")||null, customerNationality: v("cdlENationality")||"",
               customerEntryDateTn: v("cdlEEntryDate")||null,
+              customerIdNumber: v("cdlEIdNo")||"",
               customerIdIssuedDate: v("cdlEIdDate")||null, customerIdIssuedAt: v("cdlEIdAt")||"",
               customerLicenseNumber: v("cdlELicenseNo")||"", customerLicenseIssuedDate: v("cdlELicenseDate")||null,
               customerLicenseIssuedAt: v("cdlELicenseAt")||"", customerLocalAddress: v("cdlELocalAddr")||"",
@@ -15936,22 +15977,29 @@
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand || c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
+      const vatRateCle = Number(state.settings.vatRate || 19);
+      const initRateTtc = line.rate ? (Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100).toFixed(2) : "";
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:4px;"><select id="cleCar" style="width:100%;min-width:100px;font-size:12px;">${carOptions}</select></td>
         <td style="padding:4px;"><input id="cleDesig" type="text" placeholder="Désignation (auto)" value="${safe(line.designation || (() => { const lcar = state.cars.find(c => c.id === line.carId); return lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()) : ""; })())}" style="width:130px;font-size:12px;" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <input id="cleStart" type="date" value="${line.periodStart||""}" style="width:105px;font-size:12px;" />
-          → <input id="cleEnd" type="date" value="${line.periodEnd||""}" style="width:105px;font-size:12px;" />
+          <input id="clePickupTime" type="time" value="${line.pickupTime||""}" style="width:75px;font-size:12px;margin-left:2px;" />
+          <br>→&nbsp;
+          <input id="cleEnd" type="date" value="${line.periodEnd||""}" style="width:105px;font-size:12px;" />
+          <input id="cleReturnTime" type="time" value="${line.returnTime||""}" style="width:75px;font-size:12px;margin-left:2px;" />
         </td>
         <td id="cleDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
         <td style="padding:4px;">
-          <input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" />
-          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit}</div>
+          <input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:70px;font-size:12px;text-align:right;" title="Tarif HT" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit} HT</div>
+          <input id="cleRateTtc" type="number" step="0.01" value="${initRateTtc}" style="width:70px;font-size:12px;text-align:right;margin-top:2px;" title="Tarif TTC" />
+          <div style="font-size:9px;color:var(--muted);text-align:right;">${rateUnit} TTC</div>
         </td>
-        <td style="padding:4px;"><input id="cleHt" type="number" step="0.01" value="${line.amountHt||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="cleHt" type="number" step="0.01" value="${line.amountHt||""}" style="width:80px;font-size:12px;text-align:right;" title="Total HT" /></td>
         <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:70px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:80px;font-size:12px;text-align:right;" title="Total TTC" /></td>
         <td colspan="2"></td>
         <td style="padding:4px;white-space:nowrap;">
           <button id="cleSaveBtn" style="padding:2px 8px;font-size:13px;">✓</button>
@@ -15960,17 +16008,22 @@
         </td>
       `;
       // ── Recalculs bidirectionnels ────────────────────────────────────
+      const getVatRate = () => Number(state.settings.vatRate || 19);
       const getDurData = () => {
         const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
         if (!s || !e || e < s) return { days: 0, mult: 1 };
-        const { days } = calcLineDuration(s, e);
+        const pt = tr.querySelector("#clePickupTime")?.value || null;
+        const rt = tr.querySelector("#cleReturnTime")?.value || null;
+        const { days } = calcLineDuration(s, e, pt, rt);
         const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
         return { days, mult };
       };
-      // Tarif → HT → VAT → TTC
+      // Tarif HT → Tarif TTC → Total HT → VAT → Total TTC
       const recomputeFromRate = () => {
         const rate = Number(tr.querySelector("#cleRate").value || 0);
         if (rate <= 0) return;
+        const vr = getVatRate();
+        tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
         const { mult } = getDurData();
         const ht = rateType === "monthly" ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value) : Math.round(rate * mult * 100) / 100;
         const { vatAmount, amountTtc } = computeContractLineTtc(Math.round(ht * 100) / 100);
@@ -15978,38 +16031,59 @@
         tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
         tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
       };
-      // HT modifié → MAJ VAT, TTC, puis tarif
+      // Tarif TTC → Tarif HT → recalcul
+      const recomputeFromRateTtc = () => {
+        const rateTtc = Number(tr.querySelector("#cleRateTtc").value || 0);
+        if (rateTtc <= 0) return;
+        const rate = Math.round(rateTtc / (1 + getVatRate() / 100) * 100) / 100;
+        tr.querySelector("#cleRate").value = rate.toFixed(2);
+        recomputeFromRate();
+      };
+      // Total HT → MAJ VAT, Total TTC, Tarif HT, Tarif TTC
       const recomputeHt = () => {
-        const { vatAmount, amountTtc } = computeContractLineTtc(Number(tr.querySelector("#cleHt").value || 0));
+        const ht = Number(tr.querySelector("#cleHt").value || 0);
+        const { vatAmount, amountTtc } = computeContractLineTtc(ht);
         tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
         tr.querySelector("#cleTtc").value = amountTtc.toFixed(2);
-        const ht = Number(tr.querySelector("#cleHt").value || 0);
         const { mult } = getDurData();
-        if (ht > 0 && mult > 0) tr.querySelector("#cleRate").value = (Math.round(ht / mult * 100) / 100).toFixed(2);
+        if (ht > 0 && mult > 0) {
+          const rate = Math.round(ht / mult * 100) / 100;
+          tr.querySelector("#cleRate").value = rate.toFixed(2);
+          tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + getVatRate() / 100) * 100) / 100).toFixed(2);
+        }
       };
-      // TTC modifié → MAJ HT, VAT, puis tarif
+      // Total TTC → MAJ Total HT, VAT, Tarif HT, Tarif TTC
       const recomputeTtc = () => {
         const { amountHt, vatAmount } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0));
         tr.querySelector("#cleHt").value  = amountHt.toFixed(2);
         tr.querySelector("#cleVat").value = vatAmount.toFixed(2);
         const { mult } = getDurData();
-        if (amountHt > 0 && mult > 0) tr.querySelector("#cleRate").value = (Math.round(amountHt / mult * 100) / 100).toFixed(2);
+        if (amountHt > 0 && mult > 0) {
+          const rate = Math.round(amountHt / mult * 100) / 100;
+          tr.querySelector("#cleRate").value = rate.toFixed(2);
+          tr.querySelector("#cleRateTtc").value = (Math.round(rate * (1 + getVatRate() / 100) * 100) / 100).toFixed(2);
+        }
       };
       // Dates changées → MAJ durée, recalcul depuis tarif si renseigné
       const updateDur = () => {
         const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
         if (s && e && e >= s) {
-          const { days } = calcLineDuration(s, e);
+          const pt = tr.querySelector("#clePickupTime")?.value || null;
+          const rt = tr.querySelector("#cleReturnTime")?.value || null;
+          const { days } = calcLineDuration(s, e, pt, rt);
           tr.querySelector("#cleDur").textContent = days + "j";
           if (Number(tr.querySelector("#cleRate").value || 0) > 0) recomputeFromRate();
         } else { tr.querySelector("#cleDur").textContent = "—"; }
       };
       const clearCleError = () => { tr.querySelector("#cleError").style.display = "none"; };
-      tr.querySelector("#cleRate").oninput  = () => { recomputeFromRate(); clearCleError(); };
-      tr.querySelector("#cleHt").oninput    = () => { recomputeHt(); clearCleError(); };
-      tr.querySelector("#cleTtc").oninput   = () => { recomputeTtc(); clearCleError(); };
-      tr.querySelector("#cleStart").oninput = () => { updateDur(); clearCleError(); };
-      tr.querySelector("#cleEnd").oninput   = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#cleRate").oninput       = () => { recomputeFromRate(); clearCleError(); };
+      tr.querySelector("#cleRateTtc").oninput    = () => { recomputeFromRateTtc(); clearCleError(); };
+      tr.querySelector("#cleHt").oninput         = () => { recomputeHt(); clearCleError(); };
+      tr.querySelector("#cleTtc").oninput        = () => { recomputeTtc(); clearCleError(); };
+      tr.querySelector("#cleStart").oninput      = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#cleEnd").oninput        = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#clePickupTime").oninput = () => { updateDur(); clearCleError(); };
+      tr.querySelector("#cleReturnTime").oninput = () => { updateDur(); clearCleError(); };
       tr.querySelector("#cleCar").onchange  = () => { clearCleError(); const sc = state.cars.find(c => c.id === tr.querySelector("#cleCar").value); if (sc) { const dInput = tr.querySelector("#cleDesig"); if (dInput && !dInput.dataset.edited) dInput.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); } };
       tr.querySelector("#cleDesig")?.addEventListener("input", () => { if (tr.querySelector("#cleDesig")) tr.querySelector("#cleDesig").dataset.edited = "1"; });
       tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
@@ -16033,10 +16107,13 @@
       const saveBtn = tr.querySelector("#cleSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
       const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(periodStart, periodEnd);
+      const pickupTime = tr.querySelector("#clePickupTime")?.value || null;
+      const returnTime = tr.querySelector("#cleReturnTime")?.value || null;
+      const { days, months } = calcLineDuration(periodStart, periodEnd, pickupTime, returnTime);
       const result = await apiPutWithError(`/contract-lines/${lineId}`, {
         car_id: carId, car_plate: car ? car.plate : "",
         period_start: periodStart, period_end: periodEnd, days, months,
+        pickup_time: pickupTime, return_time: returnTime,
         rate, amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
       });
       if (!result.ok) {
@@ -16051,6 +16128,7 @@
         const datesChanged = periodStart !== prevLine.periodStart || periodEnd !== prevLine.periodEnd;
         Object.assign(state.contractLines[idx], {
           carId, carPlate: car ? car.plate : "", designation, periodStart, periodEnd, days, months,
+          pickupTime: pickupTime || null, returnTime: returnTime || null,
           rate, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
         });
         // Sync reservation dates in state if period changed
