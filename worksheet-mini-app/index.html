@@ -780,10 +780,30 @@
       color: #1540c8;
       font-size: 11px;
       overflow: hidden;
+      white-space: nowrap;
+      padding: 0 5px;
+      line-height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2px;
+    }
+    .tbar-loc {
+      flex-shrink: 0;
+      max-width: 30%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 9px;
+      opacity: 0.8;
+      white-space: nowrap;
+    }
+    .tbar-center {
+      flex: 1;
+      text-align: center;
+      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      padding: 0 8px;
-      line-height: 18px;
+      min-width: 0;
     }
 
     .timeline-bar.confirmee {
@@ -2177,6 +2197,16 @@
       </div>
       <div class="row">
         <div>
+          <label>Lieu de sortie</label>
+          <input id="reservationPickupLocation" type="text" placeholder="ex: Aéroport, Agence..." />
+        </div>
+        <div>
+          <label>Lieu d'entrée</label>
+          <input id="reservationDropoffLocation" type="text" placeholder="ex: Hôtel, Domicile..." />
+        </div>
+      </div>
+      <div class="row">
+        <div>
           <label>Statut</label>
           <select id="reservationStatus">
             <option value="en_attente">en_attente</option>
@@ -3113,6 +3143,16 @@
           <input type="time" id="gqpEndTime" value="18:00" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
         </div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Lieu de sortie</label>
+          <input type="text" id="gqpPickupLocation" placeholder="ex: Aéroport, Agence..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px;">Lieu d'entrée</label>
+          <input type="text" id="gqpDropoffLocation" placeholder="ex: Hôtel, Domicile..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">
+        </div>
+      </div>
       <input type="text" id="gqpNote" placeholder="Note (optionnel)" style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:10px;box-sizing:border-box;">
       <div id="gqpError" style="display:none;color:#c53030;font-size:12px;margin-bottom:8px;background:#fff5f5;border-radius:5px;padding:5px 8px;"></div>
       <div style="display:flex;gap:8px;">
@@ -3764,13 +3804,31 @@
     }, true);
 
     byId("prevCalendarMonth").addEventListener("click", () => {
-      reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() - 1);
+      const zoomMode = dashboardFilters.timeline.zoomMode || "month";
+      if (zoomMode === "month") {
+        reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() - 1);
+      } else {
+        const delta = zoomMode === "week" ? 7 : 1;
+        const fd = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+        fd.setDate(fd.getDate() - delta);
+        dashboardFilters.timeline.focusDateIso = fd.toISOString().slice(0, 10);
+        reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+      }
       renderReservationCalendar();
       renderReservationTimeline();
     });
 
     byId("nextCalendarMonth").addEventListener("click", () => {
-      reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() + 1);
+      const zoomMode = dashboardFilters.timeline.zoomMode || "month";
+      if (zoomMode === "month") {
+        reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() + 1);
+      } else {
+        const delta = zoomMode === "week" ? 7 : 1;
+        const fd = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+        fd.setDate(fd.getDate() + delta);
+        dashboardFilters.timeline.focusDateIso = fd.toISOString().slice(0, 10);
+        reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+      }
       renderReservationCalendar();
       renderReservationTimeline();
     });
@@ -3820,15 +3878,33 @@
     }
     if (byId("homePrevMonth")) {
       byId("homePrevMonth").addEventListener("click", () => {
-        homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() - 1);
-        dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        const zoomMode = dashboardFilters.homeTimeline.zoomMode || "month";
+        if (zoomMode === "month") {
+          homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() - 1);
+          dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        } else {
+          const delta = zoomMode === "week" ? 7 : 1;
+          const fd = new Date(`${dashboardFilters.homeTimeline.focusDateIso || today}T00:00:00`);
+          fd.setDate(fd.getDate() - delta);
+          dashboardFilters.homeTimeline.focusDateIso = fd.toISOString().slice(0, 10);
+          homeTimelineCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+        }
         renderHomeGantt();
       });
     }
     if (byId("homeNextMonth")) {
       byId("homeNextMonth").addEventListener("click", () => {
-        homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() + 1);
-        dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        const zoomMode = dashboardFilters.homeTimeline.zoomMode || "month";
+        if (zoomMode === "month") {
+          homeTimelineCursor.setMonth(homeTimelineCursor.getMonth() + 1);
+          dashboardFilters.homeTimeline.focusDateIso = `${homeTimelineCursor.getFullYear()}-${String(homeTimelineCursor.getMonth() + 1).padStart(2, "0")}-01`;
+        } else {
+          const delta = zoomMode === "week" ? 7 : 1;
+          const fd = new Date(`${dashboardFilters.homeTimeline.focusDateIso || today}T00:00:00`);
+          fd.setDate(fd.getDate() + delta);
+          dashboardFilters.homeTimeline.focusDateIso = fd.toISOString().slice(0, 10);
+          homeTimelineCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+        }
         renderHomeGantt();
       });
     }
@@ -5912,6 +5988,8 @@
         startDate: r.start_date || "", startTime: (r.start_time || "09:00").slice(0, 5),
         endDate: r.end_date || "", endTime: (r.end_time || "18:00").slice(0, 5),
         status: r.status || "en_attente",
+        pickupLocation: r.pickup_location || "", dropoffLocation: r.dropoff_location || "",
+        notes: r.notes || "",
         createdAt: r.created_at || "", createdBy: r.created_by || null,
         updatedAt: r.updated_at || "", updatedBy: r.updated_by || null,
       }));
@@ -7275,6 +7353,8 @@
       const startTime = byId("reservationStartTime").value || "09:00";
       const endTime = byId("reservationEndTime").value || "18:00";
       const status = byId("reservationStatus").value || "en_attente";
+      const pickupLocation  = byId("reservationPickupLocation")?.value.trim()  || null;
+      const dropoffLocation = byId("reservationDropoffLocation")?.value.trim() || null;
 
       if (!customerId || !carId || !startDate || !endDate || !startTime || !endTime) {
         alert("Completer tous les champs reservation.");
@@ -7311,7 +7391,7 @@
       }
 
       let resId = uid("RES");
-      const savedRes = await apiPost("/reservations", { id: resId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status });
+      const savedRes = await apiPost("/reservations", { id: resId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status, pickup_location: pickupLocation || null, dropoff_location: dropoffLocation || null });
       if (savedRes && savedRes.id) resId = savedRes.id;
 
       state.reservations.push({
@@ -7325,6 +7405,8 @@
         endDate,
         endTime,
         status,
+        pickupLocation: pickupLocation || "",
+        dropoffLocation: dropoffLocation || "",
       });
 
       saveAndRender();
@@ -9154,7 +9236,7 @@
     }
 
     function mapReservationToApi(c) {
-      return { customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente" };
+      return { customer_id: c.customerId, car_id: c.carId, customer_name: c.customerName || "", car_plate: c.carPlate || "", start_date: c.startDate || today, start_time: c.startTime || "09:00", end_date: c.endDate || today, end_time: c.endTime || "18:00", status: c.status || "en_attente", pickup_location: c.pickupLocation || null, dropoff_location: c.dropoffLocation || null };
     }
 
     // Entites editables via la modale generique (openRecordEditor) qui disposent d'une route PUT /:id
@@ -11231,9 +11313,13 @@
 
               const startTimeText = r.startTime || "00:00";
               const endTimeText = r.endTime || "23:59";
-              const label = `${r.customerName || "—"} (${r.startDate} ${startTimeText} → ${r.endDate} ${endTimeText})${conflict ? " [CONFLIT]" : ""}`;
+              const locIn  = r.dropoffLocation || "";
+              const locOut = r.pickupLocation  || "";
+              const label = `${r.customerName || "—"} (${r.startDate} ${startTimeText} → ${r.endDate} ${endTimeText})${locOut ? " | Départ: "+locOut : ""}${locIn ? " | Retour: "+locIn : ""}${conflict ? " [CONFLIT]" : ""}`;
               const barText = r.customerName ? `${r.customerName} ${startTimeText}-${endTimeText}` : `${startTimeText}-${endTimeText}`;
-              return `<span class="timeline-bar ${safe(r.status)} ${conflictClass}" data-res-id="${safe(r.id)}" onclick="handleGanttBarClick(event,this)" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;cursor:pointer;" title="${safe(label)}">${safe(barText)}</span>`;
+              const leftLoc  = locOut ? `<span class="tbar-loc" title="${safe(locOut)}">${safe(locOut)}</span>` : `<span class="tbar-loc"></span>`;
+              const rightLoc = locIn  ? `<span class="tbar-loc" title="${safe(locIn)}">${safe(locIn)}</span>`  : `<span class="tbar-loc"></span>`;
+              return `<span class="timeline-bar ${safe(r.status)} ${conflictClass}" data-res-id="${safe(r.id)}" onclick="handleGanttBarClick(event,this)" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;cursor:pointer;" title="${safe(label)}">${leftLoc}<span class="tbar-center">${safe(barText)}</span>${rightLoc}</span>`;
             })
             .join("");
 
@@ -11352,6 +11438,8 @@
         byId("gqpStartTime").value = reservation.startTime || "09:00";
         byId("gqpEndDate").value = reservation.endDate || "";
         byId("gqpEndTime").value = reservation.endTime || "18:00";
+        byId("gqpPickupLocation").value  = reservation.pickupLocation  || "";
+        byId("gqpDropoffLocation").value = reservation.dropoffLocation || "";
         byId("gqpNote").value = reservation.notes || "";
       } else {
         byId("gqpStartDate").value = dateIso;
@@ -11360,11 +11448,13 @@
         nd.setDate(nd.getDate() + 1);
         byId("gqpEndDate").value = `${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,"0")}-${String(nd.getDate()).padStart(2,"0")}`;
         byId("gqpEndTime").value = "18:00";
+        byId("gqpPickupLocation").value  = "";
+        byId("gqpDropoffLocation").value = "";
         byId("gqpNote").value = "";
       }
 
       // Rendre les champs en lecture seule si lié à un contrat
-      ["gqpStartDate","gqpStartTime","gqpEndDate","gqpEndTime","gqpNote"].forEach((id) => {
+      ["gqpStartDate","gqpStartTime","gqpEndDate","gqpEndTime","gqpPickupLocation","gqpDropoffLocation","gqpNote"].forEach((id) => {
         const el = byId(id);
         if (el) el.readOnly = isReadOnly;
       });
@@ -11396,7 +11486,9 @@
       const startTime = byId("gqpStartTime").value || "09:00";
       const endDate = byId("gqpEndDate").value;
       const endTime = byId("gqpEndTime").value || "18:00";
-      const note = byId("gqpNote").value.trim();
+      const note           = byId("gqpNote").value.trim();
+      const pickupLocation  = byId("gqpPickupLocation")?.value.trim()  || null;
+      const dropoffLocation = byId("gqpDropoffLocation")?.value.trim() || null;
       const errEl = byId("gqpError");
       errEl.style.display = "none";
 
@@ -11429,8 +11521,8 @@
         const url = isEdit ? `${API_URL}/reservations/${resId}` : `${API_URL}/reservations`;
         const method = isEdit ? "PUT" : "POST";
         const body = isEdit
-          ? { car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, notes: note || null }
-          : { id: uid("RES"), car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status: "en_attente", notes: note || null };
+          ? { car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, pickup_location: pickupLocation, dropoff_location: dropoffLocation, notes: note || null }
+          : { id: uid("RES"), car_id: carId, car_plate: car ? car.plate : "", start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status: "en_attente", pickup_location: pickupLocation, dropoff_location: dropoffLocation, notes: note || null };
 
         const resp = await fetch(url, {
           method,
@@ -11449,12 +11541,12 @@
           // Mettre à jour l'entrée dans state
           const idx = state.reservations.findIndex((x) => String(x.id) === String(resId));
           if (idx !== -1) {
-            state.reservations[idx] = { ...state.reservations[idx], carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, notes: note || null };
+            state.reservations[idx] = { ...state.reservations[idx], carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, pickupLocation: pickupLocation || "", dropoffLocation: dropoffLocation || "", notes: note || null };
           }
         } else {
           const saved = data.data;
           const actualId = (saved && saved.id) ? saved.id : body.id;
-          state.reservations.push({ id: actualId, customerId: null, customerName: "", carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, status: "en_attente", notes: note || null });
+          state.reservations.push({ id: actualId, customerId: null, customerName: "", carId, carPlate: car ? car.plate : "", startDate, startTime, endDate, endTime, status: "en_attente", pickupLocation: pickupLocation || "", dropoffLocation: dropoffLocation || "", notes: note || null });
         }
       } catch (fetchErr) {
         if (btn) btn.disabled = false;

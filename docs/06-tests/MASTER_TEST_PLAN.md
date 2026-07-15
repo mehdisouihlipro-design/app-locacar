@@ -1047,5 +1047,32 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-13 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17).*  
+### UC-RSV-11 : Renseigner et visualiser les lieux de sortie/entrée d'une réservation
+
+**En tant qu'opérateur**, je veux indiquer où le véhicule est remis au client (lieu de sortie) et où il est rendu (lieu d'entrée), et les voir affichés directement sur le Gantt.
+
+- [ ] **Formulaire de création** : les champs "Lieu de sortie" et "Lieu d'entrée" sont visibles dans le formulaire de réservation → saisir des valeurs → créer → F5 → valeurs conservées en base
+- [ ] **Popover Gantt** : ouvrir le popover de création rapide depuis le Gantt → les mêmes deux champs sont présents → saisir des valeurs → créer → barre Gantt affiche les lieux
+- [ ] **Affichage Gantt** : la barre d'une réservation avec lieux renseignés affiche le lieu de sortie à gauche et le lieu d'entrée à droite ; le nom du client est centré
+- [ ] **Tooltip complet** : survoler une barre Gantt → le tooltip affiche la période, le nom du client, "Départ: <lieu>" et "Retour: <lieu>"
+- [ ] **Lieux vides** : réservation sans lieux → barre Gantt sans texte à gauche/droite, uniquement le nom client centré
+- [ ] **Persistance** : F5 après création → lieux présents dans le Gantt et dans la fiche réservation
+
+---
+
+### UC-RSV-12 : Navigation Gantt en mode Semaine et Jour (correction bug)
+
+**En tant qu'opérateur**, je veux que les flèches ◀/▶ du Gantt naviguent de ±7 jours en mode Semaine et de ±1 jour en mode Jour.
+
+- [ ] **Mode Semaine — suivant** : Gantt en zoom Semaine, semaine affichée = 7-13 juillet → cliquer ▶ → semaine affichée = 14-20 juillet (pas de saut au 1er du mois suivant)
+- [ ] **Mode Semaine — précédent** : Gantt en zoom Semaine, semaine affichée = 7-13 juillet → cliquer ◀ → semaine affichée = 30 juin – 6 juillet
+- [ ] **Mode Jour — suivant** : Gantt en zoom Jour, jour affiché = 10 juillet → cliquer ▶ → jour affiché = 11 juillet
+- [ ] **Mode Jour — précédent** : idem en sens inverse
+- [ ] **Mode Mois — inchangé** : en zoom Mois, les flèches naviguent toujours de ±1 mois
+- [ ] **Gantt accueil** : les boutons ◀/▶ du Gantt sur la page d'accueil respectent les mêmes règles
+- [ ] **Gantt Réservations** : idem pour les boutons de l'onglet Réservations
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-15 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17 ; lieux sortie/entrée réservation UC-RSV-11 ; navigation Gantt semaine/jour UC-RSV-12).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

@@ -1723,6 +1723,43 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+---
+
+### 9.28 ✅ Implémenté (2026-07) — Lieux de sortie/entrée sur les réservations + affichage Gantt
+
+**Problème résolu** : les réservations ne permettaient pas d'indiquer où le véhicule est remis au client (lieu de sortie) ni où il est rendu (lieu d'entrée), et le Gantt n'affichait pas ces informations.
+
+**Implémentation** :
+- Migration SQL 026 : deux colonnes `pickup_location VARCHAR(200)` et `dropoff_location VARCHAR(200)` ajoutées à la table `reservations` (+ `pg_notify` pour rechargement du cache PostgREST).
+- Formulaire de création de réservation : deux champs texte "Lieu de sortie" / "Lieu d'entrée" ajoutés, envoyés dans `POST /reservations`.
+- Popover de création rapide Gantt (`#ganttQuickPopover`) : mêmes deux champs, sauvegardés dans `ganttQuickSave`.
+- Barre Gantt en layout flex (display:flex + justify-content:space-between) : lieu de sortie `<span class="tbar-loc">` à gauche, nom client centré `.tbar-center`, lieu d'entrée `<span class="tbar-loc">` à droite. Tooltip complet affiché au survol.
+- `mapReservationToApi` mis à jour pour inclure `pickup_location`/`dropoff_location`.
+- `state.reservations` enrichi des champs `pickupLocation`/`dropoffLocation` au chargement et après création.
+
+**Fichiers modifiés** :
+- `src/backend/migrations/026_reservations_pickup_dropoff_location.sql` — ALTER TABLE + pg_notify
+- `worksheet-mini-app/index.html` — formulaire réservation, popover Gantt, CSS `.timeline-bar`/`.tbar-loc`/`.tbar-center`, `mapReservationToApi`, state mapping, `ganttQuickSave`, `addReservationBtn` handler
+
+---
+
+### 9.29 ✅ Implémenté (2026-07) — Correction navigation Gantt en mode Semaine/Jour
+
+**Problème résolu** : en mode Semaine ou Jour, cliquer sur ◀/▶ faisait sauter le Gantt d'environ 4 semaines (vers le 1er du mois suivant/précédent) au lieu de naviguer de ±7 jours (semaine) ou ±1 jour (jour).
+
+**Cause** : les handlers `homePrevMonth`/`homeNextMonth` et `prevCalendarMonth`/`nextCalendarMonth` appelaient toujours `setMonth(±1)` et réinitialisaient `focusDateIso` au 1er du nouveau mois, quelle que soit le zoom actif.
+
+**Implémentation** :
+- Mode mois : comportement inchangé (±1 mois, focusDateIso = 1er du mois).
+- Mode semaine : `focusDateIso` avancé ou reculé de 7 jours ; `calCursor` mis à jour sur le 1er du mois de la nouvelle date.
+- Mode jour : idem avec delta = 1 jour.
+- Corrigé dans les deux Gantts : tableau de bord accueil (`homePrevMonth`/`homeNextMonth`) et onglet Réservations (`prevCalendarMonth`/`nextCalendarMonth`).
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — handlers `prevCalendarMonth`, `nextCalendarMonth`, `homePrevMonth`, `homeNextMonth`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026
