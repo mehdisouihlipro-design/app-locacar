@@ -15705,8 +15705,21 @@
       "cars.gpsSpeed": "GPS Vitesse (km/h)", "cars.gpsUpdatedAt": "GPS Mis à jour le",
       // Clients
       "customers.name": "Nom complet", "customers.firstName": "Nom", "customers.lastName": "Prénom",
-      "customers.phone": "Téléphone",
-      "customers.email": "E-mail", "customers.address": "Adresse", "customers.taxId": "Matricule fiscal", "customers.type": "Type",
+      "customers.phone": "Téléphone", "customers.email": "E-mail",
+      "customers.address": "Adresse", "customers.city": "Ville",
+      "customers.postalCode": "Code postal", "customers.country": "Pays",
+      "customers.taxId": "Matricule fiscal", "customers.type": "Type", "customers.notes": "Notes",
+      // Clients — identification locataire (migration 027)
+      "customers.idNumber": "N° Pièce d'identité (CIN/Passeport)",
+      "customers.idIssuedDate": "CIN/Passeport établi le",
+      "customers.idIssuedPlace": "CIN/Passeport établi à",
+      "customers.licenseNumber": "N° Permis de conduire",
+      "customers.licenseIssuedDate": "Permis établi le",
+      "customers.licenseIssuedPlace": "Permis établi à",
+      "customers.dob": "Date de naissance",
+      "customers.nationality": "Nationalité",
+      "customers.entryDateTn": "Date d'entrée en Tunisie",
+      "customers.stayReason": "Motif de séjour",
       // Contrats
       "contracts.customerId": "Client", "contracts.carId": "Véhicule",
       "contracts.customerName": "Nom client", "contracts.carPlate": "Immatriculation",
@@ -15783,6 +15796,7 @@
         "maintenanceCosts.currency": ["TND", "EUR"],
         "maintenanceCosts.status": ["paye", "a_payer"],
         "reservations.status": ["en_attente", "confirmee", "annulee", "terminee"],
+        "customers.stayReason": ["Tourisme", "Affaire", "Visite", "Autre"],
         "insurances.currency": ["TND", "EUR"],
         "insuranceInstallments.currency": ["TND", "EUR"],
         "insuranceInstallments.status": ["a_payer", "paye"],
@@ -15841,6 +15855,11 @@
         "reservations.endDate": "date",
         "reservations.startTime": "time",
         "reservations.endTime": "time",
+        // Clients — champs date identification
+        "customers.dob": "date",
+        "customers.idIssuedDate": "date",
+        "customers.licenseIssuedDate": "date",
+        "customers.entryDateTn": "date",
       };
 
       const enumMap2 = {

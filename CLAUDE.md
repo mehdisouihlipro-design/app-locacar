@@ -9,6 +9,20 @@ Dans **tous les écrans** (modals, listes, formulaires, cartes KPI, tableaux), l
 - Les labels de sections (ex. `MUTED_LABEL`, `<small>`, `<span class="label">`) doivent hériter du même `padding-left` que leur valeur.
 - **Repère d'audit** : sélectionner visuellement le label, vérifier que son bord gauche coïncide pixel par pixel avec celui de la valeur en dessous.
 
+### Label obligatoire sur chaque champ (règle absolue UI)
+Tout champ de formulaire, d'éditeur générique ou de modal doit avoir un **label en français lisible** — jamais le nom technique camelCase ou snake_case.
+
+Règles concrètes :
+- **Formulaire de création/édition HTML** : chaque `<input>`, `<select>`, `<textarea>` doit être précédé d'un `<label>` (ou d'un `<label class="label-small">`) avec le libellé français.
+- **Éditeur générique `openRecordEditor`** : tout nouveau champ d'une entité doit avoir une entrée dans `fieldLabelMap` (`"entite.champ": "Libellé français"`). Si le champ n'est pas dans ce map, l'éditeur affiche le nom technique brut — c'est une régression.
+- **Règles complémentaires pour `getEditorFieldConfig`** :
+  - Champ date → ajouter `"entite.champ": "date"` dans `inputTypeMap`
+  - Champ enum (liste fermée) → ajouter dans `enumMap` ou `enumMap2`
+  - Champ lié à une autre entité → ajouter dans `lookupMap`
+  - Champ calculé/lecture seule → ajouter dans `calculatedFields`
+- **Migration DB** : tout nouveau champ persisté en base nécessite une migration SQL dans `src/backend/migrations/<N>_<nom>.sql`. **Signaler explicitement à l'utilisateur** qu'il doit exécuter la migration dans le SQL Editor Supabase avant de tester — ne jamais supposer qu'elle sera appliquée automatiquement.
+- **Repère d'audit** : ouvrir l'éditeur générique (double-clic sur une ligne) de l'entité modifiée → aucun champ ne doit afficher un nom camelCase ou snake_case comme label.
+
 ### Visibilité complète des valeurs (règle absolue UI)
 Les valeurs (texte, nombres, badges, dates) doivent être **entièrement lisibles** dans tous les états de l'interface. Règles concrètes :
 - Interdire `overflow: hidden` sur un conteneur de valeur sans prévoir `text-overflow: ellipsis` + `title` tooltip affichant la valeur complète.
