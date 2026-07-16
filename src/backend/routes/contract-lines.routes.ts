@@ -77,6 +77,8 @@ async function findVehicleOverlap(
   const overlappingReservation = (reservationsResult.data || []).find((rsv: any) => {
     if (rsv.status === 'annulee' || rsv.status === 'terminee') return false;
     if (excludeLineId && rsv.contract_line_id === excludeLineId) return false;
+    // Réservation orpheline (pas encore liée à une ligne) : BR25 l'absorbera → ne pas bloquer
+    if (!rsv.contract_line_id) return false;
     return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, rsv.start_date, rsv.end_date, rsv.start_time, rsv.end_time, bufferHours);
   });
 

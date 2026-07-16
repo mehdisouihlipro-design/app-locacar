@@ -107,6 +107,7 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
       const rsvOverlap = (rsvCheck.data || []).find((r: any) =>
         r.status !== 'annulee' && r.status !== 'terminee' &&
         r.contract_line_id !== line.id &&
+        !!r.contract_line_id && // Réservation orpheline → sera liée par BR25, ne pas bloquer
         line.period_start <= r.end_date && line.period_end >= r.start_date
       );
       if (rsvOverlap) {

@@ -1145,5 +1145,20 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-16 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17 ; lieux sortie/entrée réservation UC-RSV-11 ; navigation Gantt semaine/jour UC-RSV-12 ; PDF deux copies UC-CTR-18 ; PDF changement voiture UC-CTR-19 ; identification client UC-CUST-6/7 ; format dates UC-UI-1 ; Gantt réservations UC-RSV-13).*  
+---
+
+### UC-RSV-14 : Workflow réservation → contrat (flux naturel sans blocage)
+
+**En tant qu'opérateur**, je veux créer d'abord une réservation pour bloquer un créneau, puis créer le contrat correspondant sans que le système refuse la ligne de contrat.
+
+- [ ] **Scénario nominal** : créer une réservation (statut "confirmée") pour le véhicule V du J1 au J2 → créer un contrat → ajouter une ligne de contrat pour le même véhicule V, mêmes dates J1-J2 → la ligne est créée sans erreur 409 ; la réservation est automatiquement liée à la nouvelle ligne (BR25)
+- [ ] **Lien BR25 vérifié** : après création de la ligne, ouvrir la réservation → son champ `contract_line_id` est renseigné ; son statut passe à "confirmée" liée
+- [ ] **Double-booking contrats protégé** : créer deux lignes de contrat actives pour le même véhicule/période → la deuxième est refusée (409) même si aucune réservation préexistante
+- [ ] **Réservation déjà liée bloque** : si une réservation a déjà un `contract_line_id` (liée à un autre contrat) et qu'on essaie de créer une ligne chevauchante → 409 attendu
+- [ ] **Workflow confirm** : créer contrat en brouillon avec lignes brouillon → confirmer → même réservation orpheline est liée sans erreur 409 lors de la confirmation
+- [ ] **Persistance** : F5 après la création → ligne de contrat et réservation liées toujours présentes
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-16 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17 ; lieux sortie/entrée réservation UC-RSV-11 ; navigation Gantt semaine/jour UC-RSV-12 ; PDF deux copies UC-CTR-18 ; PDF changement voiture UC-CTR-19 ; identification client UC-CUST-6/7 ; format dates UC-UI-1 ; Gantt réservations UC-RSV-13 ; workflow réservation→contrat UC-RSV-14).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*

@@ -1836,6 +1836,30 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+---
+
+### 9.35 ✅ Implémenté (2026-07) — Workflow réservation → contrat sans blocage chevauchement
+
+**Besoin** : quand un opérateur crée d'abord une réservation manuelle (pour bloquer le créneau) puis crée ensuite le contrat correspondant, la vérification BR19 ne doit pas bloquer la création de la ligne de contrat.
+
+**Cause du bug** : `findVehicleOverlap` testait TOUTES les réservations non-annulées/non-terminées, y compris les réservations "orphelines" (sans `contract_line_id`). Or BR25 est précisément conçu pour lier ces réservations orphelines à la nouvelle ligne de contrat.
+
+**Implémentation** :
+- `findVehicleOverlap` (`contract-lines.routes.ts`) : ajout de `if (!rsv.contract_line_id) return false;` — les réservations sans ligne liée sont ignorées dans le check BR19 ; BR25 les absorbera après l'insertion.
+- Route `/confirm` (`contracts.routes.ts`) : même ajout `!!r.contract_line_id` dans le `.find()` pour le check de confirmation.
+- La protection reste complète : le check sur les lignes de contrat actives tourne toujours en premier et bloque tout vrai double-booking contractualisé.
+
+**Invariants préservés** :
+- Double-booking entre deux contrats → toujours bloqué (contract_lines check en premier).
+- Double-booking entre deux réservations orphelines → la première crée une ligne et lie la réservation ; la deuxième tente de créer une ligne mais est bloquée par le contract_lines check (la première ligne est maintenant active).
+- Réservation déjà liée à une autre ligne (`contract_line_id ≠ null`) → toujours bloquée.
+
+**Fichiers modifiés** :
+- `src/backend/routes/contract-lines.routes.ts` — `findVehicleOverlap`
+- `src/backend/routes/contracts.routes.ts` — route `POST /:id/confirm`
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026
