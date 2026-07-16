@@ -1644,6 +1644,57 @@
           <input id="custEmail" placeholder="client@email.com" />
         </div>
       </div>
+      <div id="custIdentificationFields" style="border-top:1px solid #e2e8f0;margin-top:10px;padding-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:6px;letter-spacing:.5px;">IDENTIFICATION (facultatif)</div>
+        <div class="row">
+          <div>
+            <label>N° Pièce d'identité (CIN/Passeport)</label>
+            <input id="custIdNumber" placeholder="ex: 09823456" />
+          </div>
+          <div>
+            <label>CIN/Passeport établi le</label>
+            <input id="custIdIssuedDate" type="date" placeholder="jj/mm/aaaa" />
+          </div>
+          <div>
+            <label>Etabli à</label>
+            <input id="custIdIssuedPlace" placeholder="ex: Tunis" />
+          </div>
+          <div>
+            <label>N° Permis de conduire</label>
+            <input id="custLicenseNumber" placeholder="ex: P123456" />
+          </div>
+          <div>
+            <label>Permis établi le</label>
+            <input id="custLicenseIssuedDate" type="date" placeholder="jj/mm/aaaa" />
+          </div>
+          <div>
+            <label>Permis établi à</label>
+            <input id="custLicenseIssuedPlace" placeholder="ex: Sfax" />
+          </div>
+          <div>
+            <label>Date de naissance</label>
+            <input id="custDob" type="date" placeholder="jj/mm/aaaa" />
+          </div>
+          <div>
+            <label>Nationalité</label>
+            <input id="custNationality" placeholder="ex: Tunisienne" />
+          </div>
+          <div>
+            <label>Date d'entrée en Tunisie</label>
+            <input id="custEntryDateTn" type="date" placeholder="jj/mm/aaaa" />
+          </div>
+          <div>
+            <label>Motif de séjour</label>
+            <select id="custStayReason">
+              <option value="">—</option>
+              <option value="Tourisme">Tourisme</option>
+              <option value="Affaire">Affaire</option>
+              <option value="Visite">Visite</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <button id="addCustomerBtn">Ajouter client</button>
       </div>
 
@@ -2279,6 +2330,11 @@
             <option value="">Tous les vehicules</option>
           </select>
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin:8px 0 2px;">
+        <button id="resGanttPrev" class="secondary" style="padding:4px 10px;font-size:12px;">◀</button>
+        <span id="resGanttTitle" style="font-size:13px;font-weight:600;min-width:140px;text-align:center;">-</span>
+        <button id="resGanttNext" class="secondary" style="padding:4px 10px;font-size:12px;">▶</button>
       </div>
       <div id="reservationTimeline" class="reservation-timeline"></div>
     </section>
@@ -3609,6 +3665,68 @@
   </div>
 
   <script>
+    // ── Dates DD/MM/YYYY globales ────────────────────────────────────────────
+    // Toutes les dates affichées = DD/MM/YYYY ; les valeurs échangées avec l'API
+    // restent en ISO YYYY-MM-DD. Ce bloc intercepte automatiquement tous les
+    // input[type="date"] (statiques et dynamiques) via MutationObserver.
+    (function () {
+      function isoToFr(v) {
+        if (!v) return "";
+        const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? m[3] + "/" + m[2] + "/" + m[1] : String(v);
+      }
+      function frToIso(v) {
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}/.test(v)) return String(v).slice(0, 10);
+        const m = String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        return m ? m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0") : "";
+      }
+      window.isoToFr = isoToFr;
+      window.frToIso = frToIso;
+
+      const nativeGet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").get;
+      const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+
+      function enhance(el) {
+        if (!el || el.dataset.frDate || el.type !== "date") return;
+        el.dataset.frDate = "1";
+        const origIso = nativeGet.call(el);
+        el.type = "text";
+        el.placeholder = el.placeholder || "jj/mm/aaaa";
+        el.maxLength = 10;
+        if (origIso) nativeSet.call(el, isoToFr(origIso));
+        Object.defineProperty(el, "value", {
+          get() { const r = nativeGet.call(this); return frToIso(r) || r; },
+          set(v) { nativeSet.call(this, v ? (isoToFr(String(v)) || String(v)) : ""); },
+          configurable: true, enumerable: true,
+        });
+        el.addEventListener("blur", () => {
+          const raw = nativeGet.call(el);
+          const iso = frToIso(raw);
+          if (iso) nativeSet.call(el, isoToFr(iso));
+        });
+      }
+
+      function enhanceAll() {
+        document.querySelectorAll("input[type=date]:not([data-fr-date])").forEach(enhance);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", enhanceAll);
+      } else {
+        enhanceAll();
+      }
+      const obs = new MutationObserver(enhanceAll);
+      if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener("DOMContentLoaded", () =>
+          obs.observe(document.body, { childList: true, subtree: true })
+        );
+      }
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
     const KEY = "locacar-mini-v3";
     const INSPECTION_DRAFT_KEY = "locacar-inspection-draft-v1";
     const MEDIA_DB_NAME = "locacar-media-v1";
@@ -3815,7 +3933,7 @@
         reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
       }
       renderReservationCalendar();
-      renderReservationTimeline();
+      renderResGantt();
     });
 
     byId("nextCalendarMonth").addEventListener("click", () => {
@@ -3830,8 +3948,64 @@
         reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
       }
       renderReservationCalendar();
-      renderReservationTimeline();
+      renderResGantt();
     });
+
+    // ── Reservation tab Gantt — titre + navigation alignés sur le Gantt accueil ──
+    function renderResGantt() {
+      const title = byId("resGanttTitle");
+      if (title) {
+        const zoomMode = dashboardFilters.timeline.zoomMode || "month";
+        if (zoomMode === "month") {
+          title.textContent = reservationCalendarCursor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+        } else if (zoomMode === "week") {
+          const focusDate = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+          const dow = focusDate.getDay();
+          const startOfWeek = new Date(focusDate);
+          startOfWeek.setDate(focusDate.getDate() - (dow === 0 ? 6 : dow - 1));
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          title.textContent = `${startOfWeek.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} – ${endOfWeek.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`;
+        } else {
+          const fd = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+          title.textContent = fd.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+        }
+      }
+      renderReservationTimeline();
+    }
+
+    if (byId("resGanttPrev")) {
+      byId("resGanttPrev").addEventListener("click", () => {
+        const zoomMode = dashboardFilters.timeline.zoomMode || "month";
+        if (zoomMode === "month") {
+          reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() - 1);
+        } else {
+          const delta = zoomMode === "week" ? 7 : 1;
+          const fd = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+          fd.setDate(fd.getDate() - delta);
+          dashboardFilters.timeline.focusDateIso = fd.toISOString().slice(0, 10);
+          reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+        }
+        renderReservationCalendar();
+        renderResGantt();
+      });
+    }
+    if (byId("resGanttNext")) {
+      byId("resGanttNext").addEventListener("click", () => {
+        const zoomMode = dashboardFilters.timeline.zoomMode || "month";
+        if (zoomMode === "month") {
+          reservationCalendarCursor.setMonth(reservationCalendarCursor.getMonth() + 1);
+        } else {
+          const delta = zoomMode === "week" ? 7 : 1;
+          const fd = new Date(`${dashboardFilters.timeline.focusDateIso || today}T00:00:00`);
+          fd.setDate(fd.getDate() + delta);
+          dashboardFilters.timeline.focusDateIso = fd.toISOString().slice(0, 10);
+          reservationCalendarCursor.setFullYear(fd.getFullYear(), fd.getMonth(), 1);
+        }
+        renderReservationCalendar();
+        renderResGantt();
+      });
+    }
 
     // Timeline zoom controls
     ["day", "week", "month"].forEach((mode) => {
@@ -3841,7 +4015,7 @@
           dashboardFilters.timeline.zoomMode = mode;
           document.querySelectorAll(".zoom-btn").forEach((b) => b.classList.remove("active"));
           btn.classList.add("active");
-          renderReservationTimeline();
+          renderResGantt();
         });
       }
     });
@@ -3850,7 +4024,7 @@
     if (byId("timelineVehicleFilter")) {
       byId("timelineVehicleFilter").addEventListener("change", (e) => {
         dashboardFilters.timeline.vehicleFilter = e.target.value;
-        renderReservationTimeline();
+        renderResGantt();
       });
     }
 
@@ -5792,6 +5966,9 @@
         phone: c.phone || "", email: c.email || "",
         address: c.address || "", type: c.type || "particulier",
         taxId: c.tax_id || "",
+        idNumber: c.id_number || "", idIssuedDate: c.id_issued_date || null, idIssuedPlace: c.id_issued_place || "",
+        licenseNumber: c.license_number || "", licenseIssuedDate: c.license_issued_date || null, licenseIssuedPlace: c.license_issued_place || "",
+        dob: c.dob || null, nationality: c.nationality || "", entryDateTn: c.entry_date_tn || null, stayReason: c.stay_reason || "",
         createdAt: c.created_at || "", createdBy: c.created_by || null,
         updatedAt: c.updated_at || "", updatedBy: c.updated_by || null,
       }));
@@ -6121,18 +6298,37 @@
       const email   = byId("custEmail").value.trim();
       const address = byId("custAddress").value.trim();
       const taxId   = byId("custTaxId").value.trim();
+      const idNumber        = byId("custIdNumber")?.value.trim()       || null;
+      const idIssuedDate    = byId("custIdIssuedDate")?.value          || null;
+      const idIssuedPlace   = byId("custIdIssuedPlace")?.value.trim()  || null;
+      const licenseNumber   = byId("custLicenseNumber")?.value.trim()  || null;
+      const licenseIssuedDate  = byId("custLicenseIssuedDate")?.value  || null;
+      const licenseIssuedPlace = byId("custLicenseIssuedPlace")?.value.trim() || null;
+      const dob             = byId("custDob")?.value                   || null;
+      const nationality     = byId("custNationality")?.value.trim()    || null;
+      const entryDateTn     = byId("custEntryDateTn")?.value           || null;
+      const stayReason      = byId("custStayReason")?.value            || null;
 
       if (!name) { alert("Le nom du client est obligatoire."); return; }
 
       let id = uid("CLI");
-      const result = await apiPostWithError("/customers", { name, first_name: firstName, last_name: lastName, phone, email, address, tax_id: taxId, type });
+      const result = await apiPostWithError("/customers", {
+        name, first_name: firstName, last_name: lastName, phone, email, address, tax_id: taxId, type,
+        id_number: idNumber, id_issued_date: idIssuedDate, id_issued_place: idIssuedPlace,
+        license_number: licenseNumber, license_issued_date: licenseIssuedDate, license_issued_place: licenseIssuedPlace,
+        dob, nationality, entry_date_tn: entryDateTn, stay_reason: stayReason,
+      });
       if (!result.ok) {
         alert("Erreur lors de la sauvegarde du client : " + result.errorMsg);
         return;
       }
       if (result.data?.id) id = result.data.id;
 
-      state.customers.push({ id, name, firstName, lastName, phone, email, address, taxId, type });
+      state.customers.push({ id, name, firstName, lastName, phone, email, address, taxId, type,
+        idNumber: idNumber||"", idIssuedDate: idIssuedDate||null, idIssuedPlace: idIssuedPlace||"",
+        licenseNumber: licenseNumber||"", licenseIssuedDate: licenseIssuedDate||null, licenseIssuedPlace: licenseIssuedPlace||"",
+        dob: dob||null, nationality: nationality||"", entryDateTn: entryDateTn||null, stayReason: stayReason||"",
+      });
       if (byId("custFirstName")) byId("custFirstName").value = "";
       if (byId("custLastName"))  byId("custLastName").value  = "";
       if (byId("custName"))      byId("custName").value      = "";
@@ -6950,7 +7146,7 @@
 </head>
 <body>
 <div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
-<div class="page">
+<div class="page" id="contractMainPage">
 
   <!-- ══ BANNIÈRE SOCIÉTÉ (logo + coordonnées + nom) ══════════════════ -->
   <table style="margin-bottom:3px;border-bottom:1px solid #333;padding-bottom:3px;">
@@ -6984,6 +7180,7 @@
         <div style="font-size:15px;font-weight:900;letter-spacing:1px;">CONTRAT DE LOCATION</div>
         <div style="font-size:12px;font-weight:bold;">عـقـد كـراء</div>
         <div style="font-size:14px;font-weight:bold;margin-top:3px;">N&deg;&nbsp;${safe(contract.contractNumber || contractId)}</div>
+        <div id="contractCopyLabel" style="font-size:10px;font-weight:900;color:#b00;border:1px solid #b00;display:inline-block;padding:1px 10px;margin-top:3px;letter-spacing:1px;">COPIE CLIENT</div>
       </td>
       <td style="width:120px;text-align:right;vertical-align:top;direction:rtl;font-size:7px;line-height:1.5;">
         <strong>هـام</strong><br>
@@ -7042,10 +7239,9 @@
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم دخول — Kms départ</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null?contract.mileageStart:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم رجوع — Kms retour</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageEnd!=null?contract.mileageEnd:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">الفارق — Kms parcours</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null&&contract.mileageEnd!=null?Number(contract.mileageEnd)-Number(contract.mileageStart):""}</div></td></tr>
-          ${contract.replacementCarModel || contract.replacementCarPlate ? `
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;font-weight:bold;">Changement de Voiture :</div></td></tr>
-          ${field("Model", f(contract.replacementCarModel))}
-          ${field("Matricul", f(contract.replacementCarPlate))}` : ""}
+          ${field("Modèle", f(contract.replacementCarModel))}
+          ${field("Matricule", f(contract.replacementCarPlate))}
           ${field("Type de carburant", firstCar ? safe(firstCar.fuelType||"") : "")}
           <tr><td style="padding:2px 3px;">
             <div class="field-label">Niv. de carburant Départ / البنزين عند الخروج</div>
@@ -7152,7 +7348,7 @@
 </div>
 
 <!-- ══ PAGE 2 : VERSO — CONDITIONS GÉNÉRALES ══════════════════════════ -->
-<div class="page" style="page-break-before:always;">
+<div class="page" id="contractConditionsPage" style="page-break-before:always;">
 
   <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:6px;">
     <div style="font-size:11px;font-weight:bold;letter-spacing:1px;">CONDITIONS GÉNÉRALES DE LOCATION</div>
@@ -7230,6 +7426,20 @@
   </div>
 
 </div>
+<script>
+  // Clone la page contrat pour générer COPIE AGENCE (insérée avant les conditions)
+  (function() {
+    var main = document.getElementById("contractMainPage");
+    var cond = document.getElementById("contractConditionsPage");
+    if (!main || !cond) return;
+    var clone = main.cloneNode(true);
+    clone.style.pageBreakBefore = "always";
+    clone.removeAttribute("id");
+    var lbl = clone.querySelector("#contractCopyLabel");
+    if (lbl) { lbl.removeAttribute("id"); lbl.textContent = "COPIE AGENCE"; }
+    cond.parentNode.insertBefore(clone, cond);
+  })();
+<\/script>
 </body>
 </html>`);
       win.document.close();
@@ -7779,6 +7989,10 @@
             byId("custAddress").value = "";
             byId("custTaxId").value = "";
             byId("custType").value = "particulier";
+            ["custIdNumber","custIdIssuedDate","custIdIssuedPlace","custLicenseNumber",
+             "custLicenseIssuedDate","custLicenseIssuedPlace","custDob","custNationality",
+             "custEntryDateTn"].forEach(id => { const el = byId(id); if (el) el.value = ""; });
+            if (byId("custStayReason")) byId("custStayReason").value = "";
             toggleCustNameFields();
             updateCustFullName();
             byId("custFirstName")?.focus();
@@ -9232,6 +9446,9 @@
         name: c.name, first_name: c.firstName || null, last_name: c.lastName || null,
         type: c.type || "particulier", phone: c.phone || "", email: c.email || "",
         address: c.address || null, tax_id: c.taxId || null,
+        id_number: c.idNumber || null, id_issued_date: c.idIssuedDate || null, id_issued_place: c.idIssuedPlace || null,
+        license_number: c.licenseNumber || null, license_issued_date: c.licenseIssuedDate || null, license_issued_place: c.licenseIssuedPlace || null,
+        dob: c.dob || null, nationality: c.nationality || null, entry_date_tn: c.entryDateTn || null, stay_reason: c.stayReason || null,
       };
     }
 
@@ -9804,7 +10021,7 @@
       document.querySelectorAll(".zoom-btn").forEach((btn) => btn.classList.remove("active"));
       const activeBtn = byId(`zoom${zoomMode.charAt(0).toUpperCase() + zoomMode.slice(1)}`);
       if (activeBtn) activeBtn.classList.add("active");
-      renderReservationTimeline();
+      if (typeof renderResGantt === "function") renderResGantt(); else renderReservationTimeline();
       renderAlerts();
       renderInsuranceCarOptions();
       renderLeasingCarOptions();
@@ -15772,6 +15989,7 @@
     function renderContractDetailHeader(contractId, editMode) {
       const contract = state.contracts.find(c => c.id === contractId);
       if (!contract) return;
+      const custForPrefill = state.customers.find(c => String(c.id) === String(contract.customerId));
       const lines = (state.contractLines || []).filter(l => l.contractId === contractId && l.status !== "annule");
       const sumHt = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
       const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
@@ -15902,22 +16120,22 @@
           <div style="grid-column:1/-1;margin-top:12px;border-top:2px solid #e2e8f0;padding-top:10px;">
             <div style="font-size:11px;font-weight:700;color:#1540c8;margin-bottom:8px;letter-spacing:.5px;">I — IDENTIFICATION LOCATAIRE</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-              <div><label class="label-small">Date de naissance</label><input id="cdlEDob" type="date" value="${contract.customerDob||""}" style="width:100%;" /></div>
-              <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality)}" style="width:100%;" /></div>
+              <div><label class="label-small">Date de naissance</label><input id="cdlEDob" type="date" value="${contract.customerDob||custForPrefill?.dob||""}" style="width:100%;" /></div>
+              <div><label class="label-small">Nationalité</label><input id="cdlENationality" type="text" value="${safe(contract.customerNationality||custForPrefill?.nationality||"")}" style="width:100%;" /></div>
               <div><label class="label-small">Numéro de registre</label><input id="cdlERegisterNo" type="text" value="${safe(contract.registerNumber)}" style="width:100%;" /></div>
-              <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||""}" style="width:100%;" /></div>
-              <div><label class="label-small">N° Pièce d'identité (CIN/Passeport)</label><input id="cdlEIdNo" type="text" value="${safe(contract.customerIdNumber)}" style="width:100%;" /></div>
-              <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||""}" style="width:100%;" /></div>
-              <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt)}" style="width:100%;" /></div>
+              <div><label class="label-small">Date d'entrée en Tunisie</label><input id="cdlEEntryDate" type="date" value="${contract.customerEntryDateTn||custForPrefill?.entryDateTn||""}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Pièce d'identité (CIN/Passeport)</label><input id="cdlEIdNo" type="text" value="${safe(contract.customerIdNumber||custForPrefill?.idNumber||"")}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi le</label><input id="cdlEIdDate" type="date" value="${contract.customerIdIssuedDate||custForPrefill?.idIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">CIN/Passeport établi à</label><input id="cdlEIdAt" type="text" value="${safe(contract.customerIdIssuedAt||custForPrefill?.idIssuedPlace||"")}" style="width:100%;" /></div>
               <div><label class="label-small">Motif de séjour</label>
                 <select id="cdlEStayReason" style="width:100%;">
-                  ${["","Tourisme","Affaire","Visite","Autre"].map(v=>`<option value="${v}"${(contract.customerStayReason||"")===v?" selected":""}>${v||"—"}</option>`).join("")}
+                  ${["","Tourisme","Affaire","Visite","Autre"].map(v=>`<option value="${v}"${(contract.customerStayReason||custForPrefill?.stayReason||"")===v?" selected":""}>${v||"—"}</option>`).join("")}
                 </select>
               </div>
-              <div><label class="label-small">N° Permis de conduire</label><input id="cdlELicenseNo" type="text" value="${safe(contract.customerLicenseNumber)}" style="width:100%;" /></div>
-              <div><label class="label-small">Permis établi le</label><input id="cdlELicenseDate" type="date" value="${contract.customerLicenseIssuedDate||""}" style="width:100%;" /></div>
-              <div><label class="label-small">Permis établi à</label><input id="cdlELicenseAt" type="text" value="${safe(contract.customerLicenseIssuedAt)}" style="width:100%;" /></div>
-              <div style="grid-column:span 3;"><label class="label-small">Adresse locale en Tunisie</label><input id="cdlELocalAddr" type="text" value="${safe(contract.customerLocalAddress)}" style="width:100%;" /></div>
+              <div><label class="label-small">N° Permis de conduire</label><input id="cdlELicenseNo" type="text" value="${safe(contract.customerLicenseNumber||custForPrefill?.licenseNumber||"")}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi le</label><input id="cdlELicenseDate" type="date" value="${contract.customerLicenseIssuedDate||custForPrefill?.licenseIssuedDate||""}" style="width:100%;" /></div>
+              <div><label class="label-small">Permis établi à</label><input id="cdlELicenseAt" type="text" value="${safe(contract.customerLicenseIssuedAt||custForPrefill?.licenseIssuedPlace||"")}" style="width:100%;" /></div>
+              <div style="grid-column:span 3;"><label class="label-small">Adresse locale en Tunisie</label><input id="cdlELocalAddr" type="text" value="${safe(contract.customerLocalAddress||custForPrefill?.address||"")}" style="width:100%;" /></div>
             </div>
           </div>
 

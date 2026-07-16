@@ -1760,6 +1760,82 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.30 ✅ Implémenté (2026-07) — PDF contrat : deux copies (COPIE CLIENT / COPIE AGENCE)
+
+**Besoin** : le PDF du contrat court terme doit imprimer deux exemplaires sur le même document — un pour le client, un pour l'agence — pour faciliter l'archivage.
+
+**Implémentation** :
+- La première page du contrat reçoit l'identifiant `id="contractMainPage"` et un badge `<div id="contractCopyLabel">COPIE CLIENT</div>` sous le numéro de contrat.
+- La deuxième page (conditions générales) reçoit l'identifiant `id="contractConditionsPage"`.
+- Un script inline injecté avant `</body>` clone `#contractMainPage` via `cloneNode(true)`, change le texte du badge en "COPIE AGENCE" et insère le clone juste avant `#contractConditionsPage`.
+- Résultat : 3 pages imprimées — COPIE CLIENT · COPIE AGENCE · CONDITIONS GÉNÉRALES.
+- Le clone script utilise `<\/script>` pour éviter la fermeture prématurée de la balise script parente dans le template literal.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — fonction `generateContractPdf` (template HTML PDF)
+
+---
+
+### 9.31 ✅ Implémenté (2026-07) — Champs identification locataire sur la fiche client
+
+**Besoin** : les champs du pavé "Identification locataire" du contrat (date de naissance, nationalité, N° pièce d'identité, permis, lieu d'entrée en Tunisie, motif de séjour, etc.) doivent pouvoir être renseignés sur la fiche client (en optionnel) et pré-remplis automatiquement lors de la sélection du client dans un contrat.
+
+**Implémentation** :
+- Migration SQL `027_customers_identification.sql` : ajout de 10 colonnes sur la table `customers` (`id_number`, `id_issued_date`, `id_issued_place`, `license_number`, `license_issued_date`, `license_issued_place`, `dob`, `nationality`, `entry_date_tn`, `stay_reason`).
+- Backend `customers.routes.ts` : route POST étendue avec tous les nouveaux champs ; fallback deux étapes (INSERT complet → INSERT basique + PATCH) pour la compatibilité cache PostgREST.
+- Frontend state : `mapCustomerFromApi` et `mapCustomerToApi` étendus avec les 10 nouveaux champs.
+- Formulaire de création client : section "Identification" ajoutée avec les 10 champs (tous optionnels).
+- Pré-remplissage contrat : dans `renderContractDetailHeader` (mode édition), `custForPrefill = state.customers.find(...)` est utilisé en fallback `contract.field || custForPrefill?.field || ""` pour chaque champ d'identification et l'adresse locale.
+
+**Fichiers modifiés** :
+- `src/backend/migrations/027_customers_identification.sql` — nouvelle migration
+- `src/backend/routes/customers.routes.ts` — route POST
+- `worksheet-mini-app/index.html` — state mapping, formulaire création client, `renderContractDetailHeader`
+
+---
+
+### 9.32 ✅ Implémenté (2026-07) — Format de date DD/MM/YYYY dans toute l'application
+
+**Besoin** : tous les champs date de l'application doivent afficher et saisir les dates au format JJ/MM/AAAA (standard français), qu'ils soient statiques ou générés dynamiquement.
+
+**Implémentation** :
+- Script IIFE injecté au début du bloc `<script>` principal :
+  - Fonctions `isoToFr(v)` et `frToIso(v)` exposées sur `window`.
+  - Boucle initiale `enhanceAll()` : sélectionne tous les `input[type="date"]` sans `[data-fr-date]`, les passe en `type="text"`, adapte `placeholder` et `maxLength`, et surcharge leur `value` via `Object.defineProperty` (getter → retourne ISO, setter → affiche DD/MM/YYYY).
+  - `MutationObserver` sur `document.body` : appelle `enhanceAll()` à chaque mutation pour couvrir les inputs injectés dynamiquement (modals, templates).
+- Aucune modification du code existant de lecture/écriture : les valeurs ISO continuent de circuler de façon transparente.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — script d'amélioration global des dates (début du bloc `<script>`)
+
+---
+
+### 9.33 ✅ Implémenté (2026-07) — Gantt réservations aligné avec le Gantt tableau de bord
+
+**Besoin** : le Gantt de l'onglet Réservations manquait la barre de navigation ◀ [titre période] ▶ et du sélecteur de zoom présents sur le Gantt du tableau de bord accueil.
+
+**Implémentation** :
+- Ajout des boutons `#resGanttPrev` / `#resGanttTitle` / `#resGanttNext` au-dessus de `#reservationTimeline` dans l'onglet Réservations.
+- Fonction `renderResGantt()` miroir de `renderHomeGantt()` : met à jour `#resGanttTitle` selon le zoom (mois / semaine / jour) et appelle `renderReservationTimeline()`.
+- Tous les appelants existants (boutons zoom, filtre véhicule, `prevCalendarMonth`, `nextCalendarMonth`, `saveAndRender`) passent à `renderResGantt()`.
+- Navigation ◀/▶ zoom-aware : ±7 jours en mode semaine, ±1 jour en mode jour, ±1 mois en mode mois.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — HTML onglet Réservations, fonction `renderResGantt`, handlers nav/zoom/filtre
+
+---
+
+### 9.34 ✅ Implémenté (2026-07) — Section "Changement de voiture" toujours visible dans le PDF
+
+**Besoin** : la section "Changement de Voiture" du PDF contrat court terme n'apparaissait que si les champs `replacementCarModel` / `replacementCarPlate` étaient renseignés, rendant la section absente sur les contrats sans remplacement.
+
+**Implémentation** : suppression de la condition ternaire ; la section (titre + lignes Modèle + Matricule) est désormais toujours rendue, avec les valeurs vides affichées comme lignes vides sur lesquelles l'agent peut écrire manuellement.
+
+**Fichiers modifiés** :
+- `worksheet-mini-app/index.html` — fonction `generateContractPdf`, colonne IV du tableau principal
+
+---
+
 **Document Version**: 1.0  
 **Last Updated**: July 2026  
 **Next Review**: September 2026

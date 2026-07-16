@@ -26,22 +26,33 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, first_name, last_name, type, phone, email, address, city, postal_code, country, id_number, tax_id, notes } = req.body;
+    const { name, first_name, last_name, type, phone, email, address, city, postal_code, country,
+            id_number, id_issued_date, id_issued_place,
+            license_number, license_issued_date, license_issued_place,
+            dob, nationality, entry_date_tn, stay_reason,
+            tax_id, notes } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Le nom est requis.' });
     const id = req.body.id || uuidv4();
 
+    const fullPayload = {
+      id, name, first_name, last_name, type, phone, email, address, city, postal_code, country,
+      id_number, id_issued_date, id_issued_place,
+      license_number, license_issued_date, license_issued_place,
+      dob, nationality, entry_date_tn, stay_reason,
+      tax_id, notes,
+    };
+
     // Tentative 1 : INSERT complet avec tous les champs
     try {
-      await global.db.post('/customers', stampCreate({ id, name, first_name, last_name, type, phone, email, address, city, postal_code, country, id_number, tax_id, notes }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
+      await global.db.post('/customers', stampCreate(fullPayload, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
     } catch (e1: any) {
-      // Tentative 2 : INSERT sans les champs potentiellement absents du cache PostgREST,
-      // puis PATCH pour les ajouter séparément
+      // Tentative 2 : INSERT champs de base, PATCH pour les nouveaux champs
       console.warn('[customers POST] insert complet échoué, fallback:', e1?.response?.data?.message || String(e1));
-      await global.db.post('/customers', stampCreate({ id, name, phone, email, address, city, postal_code, country, id_number, tax_id, notes }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
+      await global.db.post('/customers', stampCreate({ id, name, phone, email, address, city, postal_code, country, tax_id, notes }, req), { headers: { Prefer: 'resolution=merge-duplicates' } });
       const patch: Record<string, unknown> = {};
-      if (first_name != null) patch.first_name = first_name;
-      if (last_name  != null) patch.last_name  = last_name;
-      if (type       != null) patch.type        = type;
+      for (const [k, v] of Object.entries({ first_name, last_name, type, id_number, id_issued_date, id_issued_place, license_number, license_issued_date, license_issued_place, dob, nationality, entry_date_tn, stay_reason })) {
+        if (v != null) patch[k] = v;
+      }
       if (Object.keys(patch).length > 0) {
         try { await global.db.patch(`/customers?id=eq.${id}`, stampUpdate(patch, req)); }
         catch (e2: any) { console.warn('[customers POST] patch new fields échoué:', e2?.response?.data?.message || String(e2)); }

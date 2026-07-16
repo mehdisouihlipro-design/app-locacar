@@ -1074,5 +1074,76 @@
 
 ---
 
-*Document généré le 2026-06-24 — mis à jour le 2026-07-15 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17 ; lieux sortie/entrée réservation UC-RSV-11 ; navigation Gantt semaine/jour UC-RSV-12).*  
+### UC-CTR-18 : PDF contrat — deux copies (COPIE CLIENT / COPIE AGENCE)
+
+**En tant qu'opérateur**, je veux que le PDF du contrat court terme génère automatiquement deux exemplaires du recto — un étiqueté "COPIE CLIENT" et un "COPIE AGENCE" — suivi des conditions générales.
+
+- [ ] **Scénario nominal** : ouvrir un contrat court terme → cliquer "📄 PDF" → la fenêtre d'impression contient 3 pages : COPIE CLIENT · COPIE AGENCE · CONDITIONS GÉNÉRALES
+- [ ] **Badge visible** : le badge "COPIE CLIENT" apparaît sous le numéro de contrat sur la première page ; "COPIE AGENCE" sur la deuxième
+- [ ] **Contenu identique** : les deux copies affichent les mêmes données (client, véhicule, dates, tarifs)
+- [ ] **Impression** : cliquer "🖨 Imprimer / PDF" → l'aperçu avant impression montre bien 3 pages dans le bon ordre
+- [ ] **Contrat long terme** : les contrats de type "long" utilisent le PDF générique (pas le template court terme) → pas de duplication attendue
+
+---
+
+### UC-CTR-19 : PDF contrat — section "Changement de voiture" toujours visible
+
+**En tant qu'opérateur**, je veux que la section "Changement de Voiture" apparaisse toujours dans le PDF, même si aucun véhicule de remplacement n'est renseigné.
+
+- [ ] **Sans remplacement** : contrat sans `replacementCarModel`/`replacementCarPlate` → PDF affiche quand même la section "Changement de Voiture" avec des lignes vides (Modèle · Matricule)
+- [ ] **Avec remplacement** : contrat avec modèle et matricule renseignés → PDF affiche les valeurs dans la section
+- [ ] **Validation UI** : la section "Changement de voiture" dans l'éditeur du contrat (modal de détail) permet de saisir modèle et matricule → sauvegarde → PDF mis à jour
+
+---
+
+### UC-CUST-6 : Renseigner les champs identification sur la fiche client
+
+**En tant qu'opérateur**, je veux pouvoir renseigner les informations d'identification (pièce d'identité, permis, date de naissance, nationalité, etc.) directement sur la fiche client, pour les pré-remplir automatiquement dans les contrats.
+
+- [ ] **Scénario nominal** : créer un client avec les champs identification remplis (N° CIN, date délivrance, lieu, N° permis, date de naissance, nationalité) → sauvegarder → F5 → fiche client affiche toujours les valeurs
+- [ ] **Champs optionnels** : créer un client sans aucun champ d'identification → pas d'erreur de validation
+- [ ] **Persistance DB** : vérifier dans Supabase que les colonnes `id_number`, `license_number`, `dob`, etc. sont bien renseignées après création
+- [ ] **Validation UI** : champs de date au format DD/MM/YYYY dans le formulaire
+- [ ] **Rétro-compatibilité** : clients existants sans ces champs restent listés et éditables normalement
+
+---
+
+### UC-CUST-7 : Pré-remplissage des champs identification dans un contrat
+
+**En tant qu'opérateur**, je veux que la sélection d'un client dans l'éditeur de contrat pré-remplisse les champs d'identification vides avec les données de la fiche client.
+
+- [ ] **Scénario nominal** : contrat avec champs identification vides, client ayant des données identification → ouvrir éditeur contrat → les champs sont pré-remplis avec les données du client
+- [ ] **Priorité contrat** : contrat avec des données identification propres → les données du client ne les écrasent pas (le contrat prime sur la fiche client)
+- [ ] **Adresse locale** : le champ "Adresse locale en Tunisie" du contrat est pré-rempli avec l'adresse du client si le contrat n'en a pas
+- [ ] **Client sans identification** : client sans données identification → les champs restent vides (aucune erreur)
+- [ ] **Sauvegarde indépendante** : sauvegarder le contrat ne modifie pas la fiche client
+
+---
+
+### UC-UI-1 : Format de date DD/MM/YYYY dans toute l'application
+
+**En tant qu'opérateur**, je veux que toutes les dates s'affichent et se saisissent au format JJ/MM/AAAA, quelle que soit la section de l'application.
+
+- [ ] **Formulaires statiques** : champs date dans les formulaires de création (contrat, client, réservation) affichent DD/MM/YYYY
+- [ ] **Modaux dynamiques** : champs date générés dynamiquement (modal détail contrat, éditeur client) affichent DD/MM/YYYY
+- [ ] **Popover Gantt** : le mini-formulaire de création rapide de réservation depuis le Gantt affiche les dates en DD/MM/YYYY
+- [ ] **Saisie** : saisir "15/07/2026" dans un champ date → la valeur ISO "2026-07-15" est envoyée à l'API
+- [ ] **Persistance** : ouvrir un enregistrement existant avec une date → la date s'affiche en DD/MM/YYYY (pas en YYYY-MM-DD)
+- [ ] **Aucune régression** : les opérations de création/modification qui lisent la valeur `.value` des inputs date continuent de fonctionner correctement
+
+---
+
+### UC-RSV-13 : Gantt réservations — navigation et titre de période
+
+**En tant qu'opérateur**, je veux que le Gantt de l'onglet Réservations ait les mêmes contrôles de navigation (◀ [titre] ▶ + sélecteur de zoom) que le Gantt du tableau de bord.
+
+- [ ] **Barre navigation visible** : l'onglet Réservations affiche ◀ [titre de la période] ▶ au-dessus du diagramme
+- [ ] **Navigation mois** : en zoom Mois, cliquer ▶ → passe au mois suivant ; ◀ → mois précédent
+- [ ] **Navigation semaine** : en zoom Semaine, cliquer ▶ → +7 jours ; ◀ → -7 jours ; titre = "lun. J1 – dim. J7"
+- [ ] **Navigation jour** : en zoom Jour, cliquer ▶ → +1 jour ; ◀ → -1 jour ; titre = "JJ mois AAAA"
+- [ ] **Cohérence avec accueil** : le comportement de navigation est identique entre l'onglet Réservations et le Gantt de la page d'accueil
+
+---
+
+*Document généré le 2026-06-24 — mis à jour le 2026-07-16 (Capital, UC-SET-1 ; lignes contrat, UC-CTR-10/11/12 ; Gantt dashboard UC-DASH-7 ; suppression contrat UC-CTR-13 ; corrections UX UC-UX-1/2/3, UC-CUST-5, UC-SEQ-6, UC-DASH-8 ; création rapide depuis Gantt UC-RSV-10 ; libération souche à suppression UC-SEQ-7 ; sync TTC↔Tarif UC-CTR-4 + déblocage UC-CTR-14 + modifier montants UC-CTR-15 ; champs court terme + PDF template officiel UC-CTR-16/17 ; lieux sortie/entrée réservation UC-RSV-11 ; navigation Gantt semaine/jour UC-RSV-12 ; PDF deux copies UC-CTR-18 ; PDF changement voiture UC-CTR-19 ; identification client UC-CUST-6/7 ; format dates UC-UI-1 ; Gantt réservations UC-RSV-13).*  
 *Pour les tests exhaustifs BR18-BR27, voir `docs/06-tests/V2_TEST_PLAN.md`.*
