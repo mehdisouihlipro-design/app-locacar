@@ -1147,16 +1147,19 @@
 
 ---
 
-### UC-RSV-14 : Workflow réservation → contrat (flux naturel sans blocage)
+### UC-RSV-14 : Workflow réservation → contrat via sélecteur (Option B)
 
-**En tant qu'opérateur**, je veux créer d'abord une réservation pour bloquer un créneau, puis créer le contrat correspondant sans que le système refuse la ligne de contrat.
+**En tant qu'opérateur**, je veux, lors de l'ajout d'une ligne de contrat, sélectionner une réservation existante pour que véhicule et dates soient pré-remplis et que la réservation soit automatiquement liée.
 
-- [ ] **Scénario nominal** : créer une réservation (statut "confirmée") pour le véhicule V du J1 au J2 → créer un contrat → ajouter une ligne de contrat pour le même véhicule V, mêmes dates J1-J2 → la ligne est créée sans erreur 409 ; la réservation est automatiquement liée à la nouvelle ligne (BR25)
-- [ ] **Lien BR25 vérifié** : après création de la ligne, ouvrir la réservation → son champ `contract_line_id` est renseigné ; son statut passe à "confirmée" liée
-- [ ] **Double-booking contrats protégé** : créer deux lignes de contrat actives pour le même véhicule/période → la deuxième est refusée (409) même si aucune réservation préexistante
-- [ ] **Réservation déjà liée bloque** : si une réservation a déjà un `contract_line_id` (liée à un autre contrat) et qu'on essaie de créer une ligne chevauchante → 409 attendu
-- [ ] **Workflow confirm** : créer contrat en brouillon avec lignes brouillon → confirmer → même réservation orpheline est liée sans erreur 409 lors de la confirmation
-- [ ] **Persistance** : F5 après la création → ligne de contrat et réservation liées toujours présentes
+- [ ] **Sélecteur visible** : si des réservations orphelines (non liées, non annulées) existent, une bannière "🔗 Lier une réservation" apparaît au-dessus de la ligne de saisie lors du clic sur "+ Ajouter une ligne"
+- [ ] **Pré-remplissage** : sélectionner une réservation dans le dropdown → le véhicule, la date de début et la date de fin se remplissent automatiquement dans la ligne de saisie
+- [ ] **Heures pré-remplies** : si la réservation a des heures (start_time/end_time) et que le contrat est court terme → `#ilPickup` et `#ilReturn` sont aussi pré-remplis
+- [ ] **Saisie complétée** : l'opérateur saisit tarif et montants → cliquer ✓ → la ligne est créée, la réservation est liée (contract_line_id renseigné dans la réservation)
+- [ ] **BR19 non bloqué** : la réservation sélectionnée ne déclenche pas de 409, seule cette réservation précise est exemptée
+- [ ] **Double-booking protégé** : si une autre réservation LIÉE à un autre contrat chevauche → 409 attendu
+- [ ] **Pas de réservation disponible** : si aucune réservation orpheline n'existe → la bannière de sélection n'apparaît pas, comportement standard
+- [ ] **Annuler** : cliquer ✗ supprime la bannière ET la ligne de saisie
+- [ ] **Persistance** : F5 après la création → ligne de contrat liée à la réservation ; ouvrir la réservation → son `contract_line_id` est renseigné
 
 ---
 

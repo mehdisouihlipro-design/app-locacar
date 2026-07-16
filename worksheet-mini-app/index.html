@@ -16663,9 +16663,40 @@
       const contract = state.contracts.find(c => c.id === contractId);
       const isShortTerm = !contract || contract.type === "court";
 
+      // Réservations orphelines disponibles pour lien direct (Option B)
+      const orphanRsvs = (state.reservations || []).filter(r =>
+        !r.contractLineId && r.status !== "annulee" && r.status !== "terminee"
+      );
+
+      // Ligne picker réservation (optionnelle, insérée avant la ligne de saisie)
+      let trPicker = null;
+      if (orphanRsvs.length > 0) {
+        const rsvOpts = orphanRsvs.map(r => {
+          const rCar = state.cars.find(c => c.id === r.carId);
+          const carLabel = r.carPlate || (rCar ? (((rCar.brand||"")+" "+(rCar.model||"")).trim()) : "");
+          const clientLabel = r.customerName ? ` · ${r.customerName}` : "";
+          const dLabel = `${r.startDate||"?"} → ${r.endDate||"?"}`;
+          return `<option value="${safe(r.id)}" data-car-id="${safe(r.carId||"")}" data-start="${safe(r.startDate||"")}" data-end="${safe(r.endDate||"")}" data-st="${safe(r.startTime||"")}" data-et="${safe(r.endTime||"")}">${safe(r.id)} — ${safe(carLabel)}${safe(clientLabel)} · ${dLabel}</option>`;
+        }).join("");
+        trPicker = document.createElement("tr");
+        trPicker.className = "inline-rsv-picker";
+        trPicker.style.cssText = "background:#fffbeb;border-top:2px solid #2f6bff;";
+        trPicker.innerHTML = `
+          <td colspan="14" style="padding:5px 8px;">
+            <span style="font-size:11px;font-weight:600;color:#92400e;margin-right:6px;">🔗 Lier une réservation :</span>
+            <select id="ilRsvPicker" style="font-size:12px;max-width:460px;border:1px solid #d97706;border-radius:4px;padding:2px 4px;">
+              <option value="">— aucune (créer automatiquement) —</option>
+              ${rsvOpts}
+            </select>
+            <input type="hidden" id="ilLinkedRsvId" value="" />
+          </td>
+        `;
+        tbody.appendChild(trPicker);
+      }
+
       const tr = document.createElement("tr");
       tr.className = "inline-new-line";
-      tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
+      tr.style.cssText = trPicker ? "background:#f0f7ff;" : "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:6px 4px;">
           <select id="ilCar" style="width:100%;min-width:110px;font-size:12px;">
@@ -16754,6 +16785,30 @@
       }
 
       const clearIlError = () => { byId("ilError").style.display = "none"; tr.style.outline = ""; };
+
+      // Handler sélecteur réservation orpheline → pré-remplit véhicule + dates
+      if (trPicker && byId("ilRsvPicker")) {
+        byId("ilRsvPicker").onchange = function() {
+          const sel = this.options[this.selectedIndex];
+          byId("ilLinkedRsvId").value = this.value;
+          if (!this.value) return;
+          const carId = sel.dataset.carId;
+          if (carId) {
+            byId("ilCar").value = carId;
+            byId("ilCar").dispatchEvent(new Event("change")); // déclenche auto-désignation
+          }
+          const s = sel.dataset.start, e = sel.dataset.end;
+          if (s) byId("ilStart").value = s;
+          if (e) byId("ilEnd").value   = e;
+          if (isShortTerm) {
+            if (byId("ilPickup") && sel.dataset.st) byId("ilPickup").value = sel.dataset.st;
+            if (byId("ilReturn") && sel.dataset.et) byId("ilReturn").value = sel.dataset.et;
+          }
+          updateDuration();
+          clearIlError();
+        };
+      }
+
       byId("ilStart").oninput = () => { updateDuration(); clearIlError(); };
       byId("ilEnd").oninput = () => { updateDuration(); clearIlError(); };
       byId("ilCar").onchange = () => { clearIlError(); const sc = state.cars.find(c => c.id === byId("ilCar").value); const di = byId("ilDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
@@ -16803,17 +16858,21 @@
         clearIlError();
       };
 
-      byId("ilCancelBtn").onclick = () => {
+      const removeInlineForms = () => {
         tr.remove();
+        trPicker?.remove();
         byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      };
+      byId("ilCancelBtn").onclick = () => {
+        removeInlineForms();
         const hasLines = (state.contractLines || []).some(l => l.contractId === contractId);
         byId("cdlEmptyMsg").style.display = hasLines ? "none" : "";
       };
-      byId("ilSaveBtn").onclick = () => submitInlineContractLine(contractId, tr);
+      byId("ilSaveBtn").onclick = () => submitInlineContractLine(contractId, tr, removeInlineForms);
       byId("ilCar").focus();
     }
 
-    async function submitInlineContractLine(contractId, tr) {
+    async function submitInlineContractLine(contractId, tr, onCleanup) {
       const carId = byId("ilCar").value;
       const designation = (byId("ilDesig") ? byId("ilDesig").value : "") || "";
       const startStr = byId("ilStart").value;
@@ -16847,6 +16906,8 @@
       const parentContract = state.contracts.find(c => c.id === contractId);
       const lineStatus = (parentContract && parentContract.status === "brouillon") ? "brouillon" : "active";
 
+      const reservationIdToLink = byId("ilLinkedRsvId")?.value || undefined;
+
       const result = await apiPostWithError("/contract-lines", {
         contract_id: contractId, car_id: carId, car_plate: car ? car.plate : "", designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
         period_start: startStr, period_end: endStr, days, months,
@@ -16855,6 +16916,7 @@
         status: lineStatus,
         ...(pickupTime ? { pickup_time: pickupTime } : {}),
         ...(returnTime ? { return_time: returnTime } : {}),
+        ...(reservationIdToLink ? { reservation_id_to_link: reservationIdToLink } : {}),
       });
 
       if (!result.ok) {
@@ -16896,8 +16958,8 @@
         if (typeof renderReservations === "function") renderReservations();
       }
 
-      tr.remove();
-      byId("cdlAddLineToggleBtn").textContent = "+ Ajouter une ligne";
+      if (typeof onCleanup === "function") onCleanup();
+      else tr.remove();
       renderContractDetailLines(contractId);
       renderContractDetailHeader(contractId, false);
       renderContracts();

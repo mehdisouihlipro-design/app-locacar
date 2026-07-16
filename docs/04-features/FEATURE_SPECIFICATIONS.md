@@ -1849,14 +1849,22 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 - Route `/confirm` (`contracts.routes.ts`) : même ajout `!!r.contract_line_id` dans le `.find()` pour le check de confirmation.
 - La protection reste complète : le check sur les lignes de contrat actives tourne toujours en premier et bloque tout vrai double-booking contractualisé.
 
+**Implémentation définitive (Option B) — Sélecteur de réservation lors de l'ajout de ligne** :
+- Frontend : lors du clic sur "+ Ajouter une ligne", si des réservations orphelines existent, une bannière "🔗 Lier une réservation" s'affiche avec un dropdown filtré (non annulées, non liées). La sélection pré-remplit véhicule, dates et heures dans la ligne de saisie.
+- Le formulaire stocke `reservation_id_to_link` dans un champ caché `#ilLinkedRsvId` et l'inclut dans le POST.
+- Backend `findVehicleOverlap` : skip ciblé — si `reservationIdToLink` est fourni, seule cette réservation précise est exemptée du check (pas toutes les orphelines).
+- Backend `applyBR25` : si `reservationIdToLink` est fourni, lien direct sans recherche (PATCH réservation + PATCH ligne).
+- Route `/confirm` : garde le skip `!!r.contract_line_id` (correct pour le flux brouillon → confirmation).
+
 **Invariants préservés** :
 - Double-booking entre deux contrats → toujours bloqué (contract_lines check en premier).
-- Double-booking entre deux réservations orphelines → la première crée une ligne et lie la réservation ; la deuxième tente de créer une ligne mais est bloquée par le contract_lines check (la première ligne est maintenant active).
-- Réservation déjà liée à une autre ligne (`contract_line_id ≠ null`) → toujours bloquée.
+- Réservation déjà liée à un autre contrat (`contract_line_id ≠ null`) → toujours bloquée.
+- Si aucune réservation n'est sélectionnée → comportement BR25 standard (création auto).
 
 **Fichiers modifiés** :
-- `src/backend/routes/contract-lines.routes.ts` — `findVehicleOverlap`
+- `src/backend/routes/contract-lines.routes.ts` — `findVehicleOverlap`, `applyBR25`, route POST
 - `src/backend/routes/contracts.routes.ts` — route `POST /:id/confirm`
+- `worksheet-mini-app/index.html` — `appendInlineLineRow`, `submitInlineContractLine`
 
 ---
 

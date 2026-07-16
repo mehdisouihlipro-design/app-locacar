@@ -34,13 +34,15 @@ function periodsConflict(
 
 // BR19 niveau 2 : vérifie chevauchement sur les lignes actives et les réservations.
 // Applique le buffer de paramétrage pour les cas intra-journaliers (court terme).
+// reservationIdToLink : réservation explicitement choisie par l'opérateur — exemptée du check, BR25 la liera.
 async function findVehicleOverlap(
   carId: string,
   periodStart: string,
   periodEnd: string,
   pickupTime: string | null = null,
   returnTime: string | null = null,
-  excludeLineId?: string
+  excludeLineId?: string,
+  reservationIdToLink?: string
 ): Promise<{ message: string; conflict: Record<string, unknown> } | null> {
   // Lire le buffer depuis les paramètres
   let bufferHours = 0;
@@ -77,8 +79,8 @@ async function findVehicleOverlap(
   const overlappingReservation = (reservationsResult.data || []).find((rsv: any) => {
     if (rsv.status === 'annulee' || rsv.status === 'terminee') return false;
     if (excludeLineId && rsv.contract_line_id === excludeLineId) return false;
-    // Réservation orpheline (pas encore liée à une ligne) : BR25 l'absorbera → ne pas bloquer
-    if (!rsv.contract_line_id) return false;
+    // Réservation explicitement choisie par l'opérateur → BR25 la liera directement, pas de blocage
+    if (reservationIdToLink && rsv.id === reservationIdToLink) return false;
     return periodsConflict(periodStart, periodEnd, pickupTime, returnTime, rsv.start_date, rsv.end_date, rsv.start_time, rsv.end_time, bufferHours);
   });
 
@@ -100,6 +102,7 @@ function isExclusionViolation(err: any): boolean {
 }
 
 // BR25 : après insertion d'une ligne active, recherche ou crée une réservation liée.
+// Si reservationIdToLink est fourni, lien direct sans recherche (workflow réservation → contrat).
 // Retourne la réservation retenue/créée, ou null en cas d'erreur (non bloquant).
 async function applyBR25(
   lineId: string,
@@ -110,9 +113,26 @@ async function applyBR25(
   contractId: string,
   pickupTime: string | null,
   returnTime: string | null,
-  req: AuthRequest
+  req: AuthRequest,
+  reservationIdToLink?: string
 ): Promise<Record<string, unknown> | null> {
   try {
+    // Lien direct : réservation explicitement choisie par l'opérateur
+    if (reservationIdToLink) {
+      await global.db.patch(
+        `/reservations?id=eq.${reservationIdToLink}`,
+        stampUpdate({ contract_line_id: lineId, start_date: periodStart, end_date: periodEnd }, req),
+        { headers: { Prefer: 'return=minimal' } }
+      );
+      await global.db.patch(
+        `/contract_lines?id=eq.${lineId}`,
+        stampUpdate({ reservation_id: reservationIdToLink }, req),
+        { headers: { Prefer: 'return=minimal' } }
+      );
+      const finalRes = await global.db.get(`/reservations?id=eq.${reservationIdToLink}&select=*`);
+      return finalRes.data?.[0] || null;
+    }
+
     // Infos client depuis le contrat
     const contractRes = await global.db.get(`/contracts?id=eq.${contractId}&select=customer_id,customer_name`);
     const contract = contractRes.data?.[0] || {};
@@ -203,13 +223,17 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const status = req.body.status || 'active';
     const pickupTime: string | null = req.body.pickup_time || null;
     const returnTime: string | null = req.body.return_time || null;
+    const reservationIdToLink: string | undefined = req.body.reservation_id_to_link || undefined;
+
     if (status === 'active') {
-      const overlap = await findVehicleOverlap(req.body.car_id, req.body.period_start, req.body.period_end, pickupTime, returnTime);
+      const overlap = await findVehicleOverlap(req.body.car_id, req.body.period_start, req.body.period_end, pickupTime, returnTime, undefined, reservationIdToLink);
       if (overlap) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: overlap.message, conflict: overlap.conflict });
     }
 
     const id = req.body.id || uuidv4();
-    const result = await global.db.post('/contract_lines', stampCreate({ ...req.body, id, status }, req), {
+    // Ne pas persister reservation_id_to_link dans la table contract_lines
+    const { reservation_id_to_link: _rsvLink, ...bodyToInsert } = req.body;
+    const result = await global.db.post('/contract_lines', stampCreate({ ...bodyToInsert, id, status }, req), {
       headers: { Prefer: 'return=representation' },
     });
     const line: Record<string, unknown> = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -226,7 +250,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         String(line.contract_id),
         pickupTime,
         returnTime,
-        req
+        req,
+        reservationIdToLink
       );
       if (reservation) line.reservation_id = reservation.id;
     }
