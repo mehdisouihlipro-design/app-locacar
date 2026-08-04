@@ -66,11 +66,23 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const invoiceId = req.body.invoice_id;
     if (!invoiceId) return res.status(400).json({ success: false, message: 'invoice_id requis.' });
 
-    const invCheck = await global.db.get(`/invoices?id=eq.${invoiceId}&select=id`);
-    if (!invCheck.data?.[0]) return res.status(404).json({ success: false, message: 'Facture introuvable.' });
+    // Récupérer la facture pour hériter du contract_id si besoin
+    const invRes = await global.db.get(`/invoices?id=eq.${invoiceId}&select=id,contract_id,status`);
+    const invoice = invRes.data?.[0];
+    if (!invoice) return res.status(404).json({ success: false, message: 'Facture introuvable.' });
+
+    // N'autoriser l'ajout que pour les factures en brouillon
+    if (invoice.status && invoice.status !== 'brouillon') {
+      return res.status(422).json({ success: false, message: 'Impossible d\'ajouter une ligne : la facture est déjà confirmée.' });
+    }
+
+    // Si aucun contract_id fourni, hériter de celui de la facture (utile pour factures brouillon)
+    const providedContractId = req.body.contract_id || req.body.contractId || null;
+    const contractIdToUse = providedContractId || invoice.contract_id || null;
 
     const id = req.body.id || uid('ILN');
-    const body = stampCreate({ ...req.body, id }, req);
+    const bodyPayload = { ...req.body, id, contract_id: contractIdToUse };
+    const body = stampCreate(bodyPayload, req);
     await global.db.post('/invoice_lines', body, { headers: { Prefer: 'return=minimal' } });
 
     await recalcInvoiceTotals(invoiceId);
