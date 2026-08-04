@@ -14124,7 +14124,10 @@
       const lineId = uid("ILN");
 
       const finalContractId = contractId || invoice.contractId || null;
-      const finalDesignation = car ? (car.model || car.brand || '') : (contract ? (state.cars.find(c=>c.id===contract.carId)?.model || '') : '');
+      const getCarDesignation = (c) => c ? (((c.brand || "") + " " + (c.model || "")).trim() || "") : "";
+      const finalDesignation = car
+        ? getCarDesignation(car)
+        : (contract ? getCarDesignation(state.cars.find(c => c.id === contract.carId)) : "");
 
       const result = await apiPostWithError("/invoice-lines", {
         id: lineId,
