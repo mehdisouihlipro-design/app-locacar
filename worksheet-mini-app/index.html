@@ -14123,12 +14123,15 @@
       const periodEnd = addDaysToIsoDate(periodStart, days);
       const lineId = uid("ILN");
 
+      const finalContractId = contractId || invoice.contractId || null;
+      const finalDesignation = car ? (car.model || car.brand || '') : (contract ? (state.cars.find(c=>c.id===contract.carId)?.model || '') : '');
+
       const result = await apiPostWithError("/invoice-lines", {
         id: lineId,
         invoice_id: invoiceId,
-        contract_id: contractId || null,
+        contract_id: finalContractId,
         car_plate:   car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
-        designation: car ? (car.model || "") : (contract ? (state.cars.find(c=>c.id===contract.carId)?.model || "") : ""),
+        designation: finalDesignation,
         amount_original: amountHt, currency: "TND",
         amount_ht: bd.amountHt, vat_amount: bd.vatAmount, daily_tax_amount: bd.dailyTaxAmount,
         days, period_start: periodStart, period_end: periodEnd, line_ttc: bd.lineTtc,
@@ -14143,9 +14146,9 @@
       const raw = result.data || {};
       (state.invoiceLines = state.invoiceLines || []).push({
         id: raw.id || lineId, invoiceId: String(invoiceId),
-        contractId: contractId || null,
+        contractId: finalContractId,
         carPlate:   car ? (car.plate || "") : (contract ? (contract.carPlate || "") : ""),
-        designation: car ? (car.model || "") : (contract ? (state.cars.find(c=>c.id===contract.carId)?.model || "") : ""),
+        designation: finalDesignation,
         amountOriginal: amountHt, currency: "TND",
         amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
         days, periodStart, periodEnd, lineTtc: bd.lineTtc,
