@@ -6907,7 +6907,9 @@
           const contractLine = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null;
           const lineCarId = (contractLine && contractLine.carId) || (lineContract && lineContract.carId) || null;
           const lineCar = lineCarId ? state.cars.find((c) => String(c.id) === String(lineCarId)) : null;
-          const lineDesignation = lineCar ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule") : (safe(contractLine && contractLine.designation) || "Véhicule");
+          const lineDesignation = (line.designation && String(line.designation).trim())
+            ? safe(line.designation)
+            : (lineCar ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule") : (safe(contractLine && contractLine.designation) || "Véhicule"));
           const linePlate = safe((lineCar && lineCar.plate) || (contractLine && contractLine.carPlate) || line.carPlate || "-");
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(lineContract ? (lineContract.contractNumber || lineContract.id) : (line.contractId || "-"))}</td>
