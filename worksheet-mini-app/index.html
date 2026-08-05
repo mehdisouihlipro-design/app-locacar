@@ -6911,12 +6911,16 @@
               ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule")
               : ((line.designation && String(line.designation).trim()) ? safe(line.designation) : "Véhicule");
           const linePlate = safe((lineCar && lineCar.plate) || (contractLine && contractLine.carPlate) || line.carPlate || "-");
+          // Normalize displayed periodEnd from periodStart + days to avoid inconsistencies coming from stored data
+          const displayStart = line.periodStart || invoice.periodStart || "";
+          const displayDays = Number(line.days || 0);
+          const displayEnd = displayStart ? addDaysToIsoDate(displayStart, displayDays) : (line.periodEnd || "");
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(line.periodStart) || "-"}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(line.periodEnd) || "-"}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${line.days || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(displayStart) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(displayEnd) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${displayDays || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(line.amountHt)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(line.vatAmount)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(line.lineTtc)}</td>
@@ -6930,12 +6934,15 @@
         const fallbackContract = state.contracts.find(c => String(c.id) === String(invoice.contractId || ''));
         const designation = car ? safe((((car.brand||"")+" "+(car.model||"")).trim()) || "Véhicule") : "Véhicule";
         const plate = car ? safe(car.plate || "-") : "-";
+        const displayStart = invoice.periodStart || "";
+        const displayDays = Number(days || 0);
+        const displayEnd = displayStart ? addDaysToIsoDate(displayStart, displayDays) : (invoice.periodEnd || "");
         lineRowsHtml = `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(invoice.periodStart) || "-"}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(invoice.periodEnd) || "-"}</td>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${days || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(displayStart) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(displayEnd) || "-"}</td>
+        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${displayDays || "-"}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountHt)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.vatAmount)}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:right;">${formatTnd(breakdown.amountTtc)}</td>
