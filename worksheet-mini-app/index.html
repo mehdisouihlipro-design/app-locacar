@@ -2341,7 +2341,7 @@
 
     <section id="maintenance" class="panel">
       <h3>Maintenance vehicules</h3>
-      <p class="small">Gestion simple des frais de reparation et lavage, affectes a chaque vehicule.</p>
+      <p class="small">Gestion simple des frais de reparation, lavage et transport, affectes a chaque vehicule.</p>
 
       <div class="actions" style="margin-bottom: 10px;">
         <button id="newMaintenanceBtn">Nouveau</button>
@@ -2361,6 +2361,7 @@
             <option value="">tous</option>
             <option value="reparation">reparation</option>
             <option value="lavage">lavage</option>
+            <option value="transport">transport</option>
           </select>
         </div>
         <div>
@@ -2380,7 +2381,7 @@
             <th data-col="carPlate">Vehicule</th>
             <th data-col="type">Type</th>
             <th data-col="date">Date</th>
-            <th data-col="amountOriginal">Montant original</th>
+            <th data-col="amountOriginal">Montant TTC</th>
             <th data-col="amountTnd">Montant (TND)</th>
             <th data-col="status">Statut</th>
             <th data-col="note">Description</th>
@@ -6873,7 +6874,6 @@
 
       let breakdown;
       let lineRowsHtml;
-      let contractsLabel;
 
       // Prefer relational invoice_lines; fall back to JSONB for legacy invoices
       const pdfLines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoiceId));
@@ -6898,21 +6898,20 @@
           totalLineDays,
           lineCount: usedLines.length,
         };
-        contractsLabel = [...new Set(usedLines.map((l) => {
-          const lc = state.contracts.find(c => String(c.id) === String(l.contractId || ''));
-          return lc ? (lc.contractNumber || lc.id) : (l.contractId || '-');
-        }))].join(', ');
         lineRowsHtml = usedLines.map((line) => {
           const lineContract = state.contracts.find((c) => String(c.id) === String(line.contractId || ""));
           const contractLine = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null;
           const lineCarId = (contractLine && contractLine.carId) || (lineContract && lineContract.carId) || null;
           const lineCar = lineCarId ? state.cars.find((c) => String(c.id) === String(lineCarId)) : null;
-          const lineDesignation = lineCar
-            ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule")
-            : (safe(contractLine && contractLine.designation) || ((line.designation && String(line.designation).trim()) ? safe(line.designation) : "Véhicule"));
+          const lineDesignation = contractLine
+            ? safe((contractLine.designation && String(contractLine.designation).trim())
+                ? contractLine.designation
+                : (getCarDesignation(lineCar) || (line.designation ? String(line.designation).trim() : "Véhicule")))
+            : lineCar
+              ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule")
+              : ((line.designation && String(line.designation).trim()) ? safe(line.designation) : "Véhicule");
           const linePlate = safe((lineCar && lineCar.plate) || (contractLine && contractLine.carPlate) || line.carPlate || "-");
           return `<tr>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(lineContract ? (lineContract.contractNumber || lineContract.id) : (line.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(line.periodStart) || "-"}</td>
@@ -6929,11 +6928,9 @@
           ? computeTtcFromHt(Number(invoice.amountHt), days)
           : computeHtFromTtc(amountTtcFallback, days);
         const fallbackContract = state.contracts.find(c => String(c.id) === String(invoice.contractId || ''));
-        contractsLabel = fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || '-');
         const designation = car ? safe((((car.brand||"")+" "+(car.model||"")).trim()) || "Véhicule") : "Véhicule";
         const plate = car ? safe(car.plate || "-") : "-";
         lineRowsHtml = `<tr>
-        <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(fallbackContract ? (fallbackContract.contractNumber || fallbackContract.id) : (invoice.contractId || "-"))}</td>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${fmtDate(invoice.periodStart) || "-"}</td>
@@ -7002,7 +6999,6 @@
       <td style="vertical-align:top;text-align:right;">
         <h2 style="font-size:14px;color:#1540c8;">FACTURE</h2>
         <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(invoice.invoiceNumber || invoice.id)}</strong></p>
-        <p style="font-size:10px;">Contrat(s)&nbsp;: <strong>${safe(contractsLabel)}</strong></p>
         <p style="font-size:10px;">Date&nbsp;: <strong>${fmtDate(invoice.dueDate) || fmtDate(new Date().toISOString().slice(0, 10))}</strong></p>
       </td>
     </tr>
@@ -7022,7 +7018,6 @@
   <table width="100%" style="font-size:9px;margin-bottom:14px;">
     <thead>
       <tr style="background:#0d244a;color:#fff;">
-        <th style="padding:6px;border:1px solid #0d244a;">Contrat</th>
         <th style="padding:6px;border:1px solid #0d244a;">Désignation</th>
         <th style="padding:6px;border:1px solid #0d244a;">Immatriculation</th>
         <th style="padding:6px;border:1px solid #0d244a;">DU</th>
@@ -9578,6 +9573,18 @@
         vatAmount: amountHt * (vatRate / 100),
         dailyTaxAmount,
         stampDutyAmount,
+        amountTtc: ttc,
+      };
+    }
+
+    function computeMaintenanceCostBreakdown(amountTtc) {
+      const vatRate = Number(state.settings.vatRate || 0);
+      const ttc = Number(amountTtc) || 0;
+      const amountHt = ttc / (1 + vatRate / 100);
+      const vatAmount = ttc - amountHt;
+      return {
+        amountHt: Math.round(amountHt * 100) / 100,
+        vatAmount: Math.round(vatAmount * 100) / 100,
         amountTtc: ttc,
       };
     }
@@ -13824,7 +13831,18 @@
         const tr = document.createElement("tr");
         tr.dataset.lineId = line.id || "";
         tr.innerHTML = `
-          <td style="padding:6px 8px;">${(() => { const _lc = state.contracts.find(c => c.id === line.contractId); const cLabel = _lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-"); const _cl = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null; const _car = _cl ? state.cars.find(c => c.id === _cl.carId) : null; const desig = _car ? ((((_car.brand||"")+" "+(_car.model||"")).trim()) || "") : (_cl && _cl.designation && _cl.designation !== line.carPlate ? _cl.designation : ""); return `${safe(cLabel)} &mdash; ${safe(line.carPlate || "-")}${desig ? ` <span style="color:var(--muted);font-size:11px;">${safe(desig)}</span>` : ""}`; })()}</td>
+          <td style="padding:6px 8px;">${(() => {
+            const _lc = state.contracts.find(c => c.id === line.contractId);
+            const cLabel = _lc ? (_lc.contractNumber || _lc.id) : (line.contractId || "-");
+            const _cl = line.contractLineId ? (state.contractLines || []).find(cl => cl.id === line.contractLineId) : null;
+            const _car = _cl ? state.cars.find(c => c.id === _cl.carId)
+              : (line.carPlate ? state.cars.find(c => c.plate === line.carPlate) : null);
+            const getCarDesignation = (car) => car ? (((car.brand || "") + " " + (car.model || "")).trim() || "") : "";
+            const desig = _cl
+              ? ((_cl.designation && String(_cl.designation).trim()) ? _cl.designation : (getCarDesignation(_car) || (line.designation ? String(line.designation).trim() : "")))
+              : (getCarDesignation(_car) || (line.designation ? String(line.designation).trim() : "Véhicule"));
+            return `${safe(cLabel)} &mdash; ${safe(line.carPlate || "-")}${desig ? ` <span style="color:var(--muted);font-size:11px;">${safe(desig)}</span>` : ""}`;
+          })()}</td>
           <td style="padding:6px 8px;">${fmtDate(line.periodStart) || "-"}</td>
           <td style="padding:6px 8px;text-align:right;">${line.days || 0}</td>
           <td style="padding:6px 8px;text-align:right;">${formatTnd(line.amountHt || 0)}</td>
@@ -15779,7 +15797,8 @@
       // Maintenance
       "maintenanceCosts.carId": "Véhicule", "maintenanceCosts.carPlate": "Immatriculation",
       "maintenanceCosts.type": "Type", "maintenanceCosts.date": "Date",
-      "maintenanceCosts.amountOriginal": "Montant", "maintenanceCosts.currency": "Devise",
+      "maintenanceCosts.amountOriginal": "Montant TTC", "maintenanceCosts.amountHt": "Montant HT",
+      "maintenanceCosts.vatAmount": "TVA", "maintenanceCosts.currency": "Devise",
       "maintenanceCosts.amountTnd": "Montant (TND)", "maintenanceCosts.status": "Statut",
       "maintenanceCosts.note": "Note", "maintenanceCosts.sourceKey": "Clé source",
       // Réservations
@@ -15825,7 +15844,7 @@
         "contracts.paymentMoment": ["debut", "fin"],
         "invoices.currency": ["TND", "EUR"],
         "payments.method": ["especes", "virement", "carte", "cheque"],
-        "maintenanceCosts.type": ["reparation", "lavage"],
+        "maintenanceCosts.type": ["reparation", "lavage", "transport"],
         "maintenanceCosts.currency": ["TND", "EUR"],
         "maintenanceCosts.status": ["paye", "a_payer"],
         "reservations.status": ["en_attente", "confirmee", "annulee", "terminee"],
@@ -15857,6 +15876,7 @@
         "reservations.customerId": state.customers.map((c) => ({ value: c.id, label: `${c.id} - ${c.name}` })),
         "reservations.carId": state.cars.map((c) => ({ value: c.id, label: `${c.id} - ${c.plate}` })),
         "maintenanceCosts.carId": state.cars.map((c) => ({ value: c.id, label: `${c.id} - ${c.plate}` })),
+        "maintenanceCosts.reservationId": state.reservations.map((r) => ({ value: r.id, label: `${r.id} - ${r.customerName} - ${r.carPlate}` })),
         "insurances.carId": state.cars.map((c) => ({ value: c.id, label: `${c.id} - ${c.plate}` })),
         "leasingContracts.carId": state.cars.map((c) => ({ value: c.id, label: `${c.id} - ${c.plate}` })),
         "vignettes.carId": state.cars.map((c) => ({ value: c.id, label: `${c.id} - ${c.plate}` })),
@@ -15866,7 +15886,7 @@
         contracts: ["quotientTnd", "totalAmountOriginal", "totalAmountTnd", "paymentPlan", "customerName", "carPlate"],
         invoices: ["amountTnd", "paidAmountTnd", "dueAmountTnd", "lines", "ribLabel"],
         payments: ["amountTnd", "contractType"],
-        maintenanceCosts: ["amountTnd", "carPlate"],
+        maintenanceCosts: ["amountTnd", "carPlate", "amountHt", "vatAmount"],
         reservations: ["customerName", "carPlate"],
         insurances: ["monthlyAmountTnd", "carPlate"],
         insuranceInstallments: ["amountTnd"],
@@ -15888,6 +15908,12 @@
         "reservations.endDate": "date",
         "reservations.startTime": "time",
         "reservations.endTime": "time",
+        "maintenanceCosts.amountOriginal": "number",
+        "maintenanceCosts.amountHt": "number",
+        "maintenanceCosts.vatAmount": "number",
+        "maintenanceCosts.pickupLocation": "text",
+        "maintenanceCosts.dropoffLocation": "text",
+        "maintenanceCosts.reservationId": "text",
         // Clients — champs date identification
         "customers.dob": "date",
         "customers.idIssuedDate": "date",
@@ -15990,6 +16016,9 @@
       if (entity === "maintenanceCosts") {
         record.amountOriginal = Number(record.amountOriginal || 0);
         record.amountTnd = convertToTnd(record.amountOriginal, record.currency || "TND", state.settings.eurToTnd);
+        const breakdown = computeMaintenanceCostBreakdown(record.amountOriginal);
+        record.amountHt = breakdown.amountHt;
+        record.vatAmount = breakdown.vatAmount;
         const car = state.cars.find((c) => String(c.id) === String(record.carId));
         if (car) record.carPlate = car.plate;
       }
