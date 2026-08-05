@@ -6494,12 +6494,16 @@
           const car = carPlate ? state.cars.find(c => c.plate === carPlate) : null;
           const amountHt = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
           const lineBreakdown = computeLineBreakdown(amountHt, days);
-          const periodEnd = addDaysToIsoDate(periodStart, days);
+          // Prefer contract-line end date when present, otherwise compute end inclusive
+          const periodEnd = contractLine && contractLine.periodEnd ? contractLine.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+          const lineDesignation = contractLine && contractLine.designation && String(contractLine.designation).trim()
+            ? contractLine.designation
+            : (car ? (car.model || "") : (""));
           lines.push({
             contractId,
             contractLineId,
             carPlate,
-            designation: car ? car.model || "" : "",
+            designation: lineDesignation,
             amountOriginal,
             currency,
             amountHt: lineBreakdown.amountHt,
@@ -6911,11 +6915,11 @@
               ? safe((((lineCar.brand||"")+" "+(lineCar.model||"")).trim()) || "Véhicule")
               : ((line.designation && String(line.designation).trim()) ? safe(line.designation) : "Véhicule");
           const linePlate = safe((lineCar && lineCar.plate) || (contractLine && contractLine.carPlate) || line.carPlate || "-");
-          // Normalize displayed periodEnd from periodStart + days to avoid inconsistencies coming from stored data
-          const displayStart = line.periodStart || invoice.periodStart || "";
+          const contractLineStart = contractLine && contractLine.periodStart ? contractLine.periodStart : null;
+          const contractLineEnd = contractLine && contractLine.periodEnd ? contractLine.periodEnd : null;
+          const displayStart = contractLineStart || line.periodStart || invoice.periodStart || "";
           const displayDays = Number(line.days || 0);
-          // Prefer the stored periodEnd when available (preserve original values), otherwise compute from start+days
-          const displayEnd = line.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, displayDays) : "");
+          const displayEnd = contractLineEnd || line.periodEnd || invoice.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, Math.max(0, displayDays - 1)) : "");
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
@@ -6937,7 +6941,7 @@
         const plate = car ? safe(car.plate || "-") : "-";
         const displayStart = invoice.periodStart || "";
         const displayDays = Number(days || 0);
-        const displayEnd = invoice.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, displayDays) : "");
+        const displayEnd = invoice.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, Math.max(0, displayDays - 1)) : "");
         lineRowsHtml = `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
@@ -13971,11 +13975,18 @@
       const contract = contractId ? state.contracts.find(c => c.id === contractId) : null;
       const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
       const bd       = computeLineBreakdown(amountHt, days);
-      const periodEnd = addDaysToIsoDate(periodStart, days);
+      // preserve contract-line dates/designation when available
+      const existingLine = (state.invoiceLines || [])[lineIdx] || {};
+      const existingContractLineId = existingLine.contractLineId || null;
+      const existingContractLine = existingContractLineId ? (state.contractLines || []).find(cl => cl.id === existingContractLineId) : null;
+      const periodEnd = existingContractLine && existingContractLine.periodEnd ? existingContractLine.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+      const lineDesignation = existingContractLine && existingContractLine.designation && String(existingContractLine.designation).trim()
+        ? existingContractLine.designation
+        : (car ? (car.model || "") : "");
       const result = await apiPutWithError(`/invoice-lines/${lineId}`, {
         contract_id: contractId || null,
         car_plate:   contract ? (contract.carPlate || "") : "",
-        designation: car      ? (car.model || "")        : "",
+        designation: lineDesignation,
         amount_original: amountHt, currency: "TND",
         amount_ht: bd.amountHt, vat_amount: bd.vatAmount, daily_tax_amount: bd.dailyTaxAmount,
         days, period_start: periodStart, period_end: periodEnd, line_ttc: bd.lineTtc,
@@ -13985,7 +13996,7 @@
         ...state.invoiceLines[lineIdx],
         contractId: contractId || null,
         carPlate: contract ? (contract.carPlate || "") : "",
-        designation: car ? (car.model || "") : "",
+        designation: lineDesignation,
         amountOriginal: amountHt, currency: "TND",
         amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
         days, periodStart, periodEnd, lineTtc: bd.lineTtc,
@@ -14148,7 +14159,8 @@
       const carSelVal = tr.querySelector('.ilCarSel')?.value || null;
       const car      = carSelVal ? state.cars.find(c => String(c.id) === String(carSelVal)) : (contract ? state.cars.find(c => c.id === contract.carId) : null);
       const bd       = computeLineBreakdown(amountHt, days);
-      const periodEnd = addDaysToIsoDate(periodStart, days);
+      // prefer contract-level end date when available, otherwise compute inclusive end
+      const periodEnd = contract && contract.periodEnd ? contract.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
       const lineId = uid("ILN");
 
       const finalContractId = contractId || invoice.contractId || null;
