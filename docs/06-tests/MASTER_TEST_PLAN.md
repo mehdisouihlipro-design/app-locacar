@@ -330,6 +330,9 @@
 - [ ] **PDF correct** : toutes les lignes visibles (lues depuis `invoice_lines`, fallback JSONB si ancienne facture), totaux HT/TVA/taxe/timbre/TTC cohérents
 - [ ] **Timbre fiscal une seule fois** : pour une facture multi-lignes, le timbre n'apparaît qu'une fois dans les totaux
 - [ ] **RIB affiché** : le PDF contient les coordonnées bancaires (RIB figé à la création — UC-INV-5)
+- [ ] **Ligne libre avec véhicule sur facture contrat** : sur une facture générée depuis un contrat, ajouter une ligne libre en sélectionnant un véhicule différent du véhicule du contrat → le PDF affiche la plaque/désignation du véhicule **sélectionné sur la ligne** (pas celui du contrat parent)
+- [ ] **Priorité désignation** : désignation stockée sur la ligne > désignation de la ligne de contrat associée > modèle du véhicule (jamais "Véhicule" générique si une de ces trois infos existe)
+- [ ] **Priorité dates** : dates (DU/AU) stockées sur la ligne > dates de la ligne de contrat associée > calculées depuis la date de début, jour de début inclus (`AU = DU + jours - 1`)
 
 ### UC-INV-8 : Statuts de facture et recouvrement
 - [ ] **Statuts** : `brouillon` → `en_attente` → `partiellement_payee` → `payee` (progression)
