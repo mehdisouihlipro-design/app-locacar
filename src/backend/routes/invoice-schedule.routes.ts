@@ -139,6 +139,19 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
     }, req);
     await global.db.post('/invoices', invoiceBody, { headers: { Prefer: 'resolution=merge-duplicates' } });
 
+    // Désignation par ligne : designation de la ligne de contrat > marque+modèle du véhicule
+    const carIds = [...new Set(contractLines.map(cl => cl.car_id).filter(Boolean))];
+    const carsById: Record<string, { brand?: string; model?: string }> = {};
+    if (carIds.length) {
+      const carsRes = await global.db.get(`/cars?id=in.(${carIds.join(',')})&select=id,brand,model`);
+      for (const c of (carsRes.data || [])) carsById[c.id] = c;
+    }
+    const lineDesignation = (cl: any): string => {
+      if (cl.designation && String(cl.designation).trim()) return String(cl.designation).trim();
+      const car = cl.car_id ? carsById[cl.car_id] : null;
+      return car ? `${car.brand || ''} ${car.model || ''}`.trim() : '';
+    };
+
     // Créer les lignes de facture (une par contract_line)
     // Chaque ligne reçoit : sa part du HT/TVA + dailyTaxTnd × jours (taxe par véhicule)
     const lineDailyTax = Math.round(dailyTaxTnd * periodDays * 1000) / 1000;
@@ -153,7 +166,7 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
         contract_id: entry.contract_id,
         contract_line_id: cl.id || null,
         car_plate: cl.car_plate || '',
-        designation: cl.car_plate || '',
+        designation: lineDesignation(cl),
         amount_original: Number(cl.amount_ht || 0) / nbLines,
         currency: 'TND',
         amount_ht: lineAmountHt,
