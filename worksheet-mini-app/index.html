@@ -17478,7 +17478,7 @@
         const badgeHtml = `<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.color};">${badge.label}</span>`;
         let actionHtml = "";
         if (s.status === "planifie") {
-          actionHtml = `<button class="secondary" style="font-size:11px;padding:3px 10px;" onclick="generateInvoiceFromSchedule('${safe(s.id)}','${safe(contractId)}')">Générer facture</button>`;
+          actionHtml = `<button class="secondary" style="font-size:11px;padding:3px 10px;" onclick="generateInvoiceFromSchedule('${safe(s.id)}','${safe(contractId)}', this)">Générer facture</button>`;
         } else if (s.status === "brouillon" && s.invoiceId) {
           actionHtml = `<a href="#" class="xref" onclick="openInvoiceEditModal('${safe(s.invoiceId)}');return false;" style="font-size:11px;">Voir brouillon →</a>`;
         } else if (s.status === "confirme" && s.invoiceId) {
@@ -17497,9 +17497,13 @@
       }).join("");
     }
 
-    async function generateInvoiceFromSchedule(scheduleId, contractId) {
+    async function generateInvoiceFromSchedule(scheduleId, contractId, btn) {
+      // Empêche un double-clic (ou un clic pendant que la requête précédente est en cours)
+      // de déclencher deux générations pour la même échéance.
+      if (btn) { if (btn.disabled) return; btn.disabled = true; }
       const res = await apiPostWithError(`/invoice-schedule/${scheduleId}/generate`, {});
       if (!res.ok) {
+        if (btn) btn.disabled = false;
         alert(res.errorMsg || "Erreur lors de la génération de la facture.");
         return;
       }

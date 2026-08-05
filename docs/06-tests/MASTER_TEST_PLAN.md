@@ -222,6 +222,8 @@
 - [ ] **Lignes générées** : la facture brouillon contient les lignes issues des `contract_lines` actives (une par véhicule)
 - [ ] **Entrée déjà générée** : tenter de régénérer une entrée `brouillon` → message d'erreur "Cette entrée est au statut brouillon, pas planifie"
 - [ ] **Persistance** : F5 → facture brouillon toujours présente, entrée d'échéancier en statut `brouillon`
+- [ ] **Pas de double génération (clic multiple / requêtes concurrentes)** : double-cliquer rapidement sur "Générer facture" (ou envoyer 2 `POST /invoice-schedule/:id/generate` en parallèle pour la même entrée) → une seule facture est créée ; la seconde requête échoue en 422 "Cette entrée vient déjà d'être générée". Le bouton est désactivé dès le premier clic côté UI.
+- [ ] **Libération de la souche à la suppression** : générer et confirmer une facture (elle obtient un numéro, ex. `2026-0005`) → supprimer cette facture (`DELETE /invoices/:id`) → créer/confirmer une nouvelle facture → elle reprend le numéro `2026-0005` (le numéro n'est pas perdu, la souche n'avance pas indéfiniment)
 
 ---
 

@@ -3,7 +3,7 @@ import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { stampCreate, stampUpdate } from '../utils/audit';
-import { nextSequenceNumber } from '../utils/number-sequence';
+import { nextSequenceNumber, releaseSequenceOnDelete } from '../utils/number-sequence';
 
 const router = Router();
 
@@ -80,7 +80,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=id,status`);
+    const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=id,status,invoice_number`);
     const inv = check.data?.[0];
     if (!inv) return res.status(404).json({ success: false, message: 'Invoice not found' });
     if (['payee', 'partiel'].includes(inv.status))
@@ -95,6 +95,10 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       await global.db.patch(`/invoice_schedule?id=eq.${s.id}`, { status: 'planifie', invoice_id: null }, { headers: { Prefer: 'return=minimal' } });
     }
     await global.db.delete(`/invoices?id=eq.${req.params.id}`);
+    // Si la facture supprimée avait un numéro de souche, libérer ce numéro pour qu'il
+    // soit réutilisé par la prochaine facture confirmée (ex. suppression d'une facture
+    // en double générée par erreur).
+    if (inv.invoice_number) releaseSequenceOnDelete('invoices').catch(() => {});
     res.json({ success: true, message: 'Invoice deleted', data: { id: req.params.id } });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

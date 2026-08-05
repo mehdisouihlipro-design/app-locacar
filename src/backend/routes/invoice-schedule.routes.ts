@@ -76,6 +76,19 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
     if (entry.status !== 'planifie')
       return res.status(422).json({ success: false, message: `Cette entrée est au statut "${entry.status}", pas "planifie".` });
 
+    // Verrou atomique : ne fait passer l'entrée à "brouillon" que si elle est encore
+    // "planifie" au moment de l'update SQL. Si deux clics (ou deux requêtes) arrivent en
+    // même temps, un seul UPDATE peut matcher status=eq.planifie → l'autre reçoit 0 ligne
+    // et échoue proprement, au lieu de générer deux factures pour la même échéance.
+    const claimRes = await global.db.patch(
+      `/invoice_schedule?id=eq.${req.params.id}&status=eq.planifie`,
+      stampUpdate({ status: 'brouillon' }, req),
+      { headers: { Prefer: 'return=representation' } }
+    );
+    if (!claimRes.data || claimRes.data.length === 0) {
+      return res.status(422).json({ success: false, message: 'Cette entrée vient déjà d\'être générée (ou n\'est plus au statut "planifie").' });
+    }
+
     const contractRes = await global.db.get(`/contracts?id=eq.${entry.contract_id}&select=*`);
     const contract = contractRes.data?.[0];
     if (!contract) return res.status(404).json({ success: false, message: 'Contrat introuvable.' });
@@ -179,15 +192,26 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
       }, req), { headers: { Prefer: 'return=minimal' } });
     }
 
-    // Mettre à jour l'entrée d'échéancier
+    // Lier l'entrée d'échéancier à la facture créée (le statut "brouillon" est déjà posé par le verrou ci-dessus)
     await global.db.patch(
       `/invoice_schedule?id=eq.${entry.id}`,
-      stampUpdate({ status: 'brouillon', invoice_id: invoiceId }, req),
+      stampUpdate({ invoice_id: invoiceId }, req),
       { headers: { Prefer: 'return=minimal' } }
     );
 
     res.status(201).json({ success: true, data: { invoiceId, scheduleId: entry.id } });
-  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+  } catch (err) {
+    // Si le verrou a été posé mais la génération a échoué en cours de route,
+    // remettre l'entrée en "planifie" pour ne pas la bloquer indéfiniment.
+    try {
+      await global.db.patch(
+        `/invoice_schedule?id=eq.${req.params.id}&status=eq.brouillon&invoice_id=is.null`,
+        { status: 'planifie' },
+        { headers: { Prefer: 'return=minimal' } }
+      );
+    } catch (_) { /* best-effort */ }
+    res.status(500).json({ success: false, error: String(err) });
+  }
 });
 
 // ── Helpers internes ──────────────────────────────────────────────────────────
