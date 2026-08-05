@@ -13908,12 +13908,18 @@
 
       const contractOpts = state.contracts
         .map(c => `<option value="${safe(c.id)}"${String(c.id) === String(line.contractId || "") ? " selected" : ""}>${safe(c.id)} &mdash; ${safe(c.customerName)}</option>`).join("");
+      const existingCar = line.carPlate ? state.cars.find(c => c.plate === line.carPlate) : null;
+      const carOpts = state.cars
+        .map(car => `<option value="${safe(car.id)}"${existingCar && String(existingCar.id) === String(car.id) ? " selected" : ""}>${safe(car.plate)} — ${safe(car.model || car.brand || '')}</option>`).join("");
 
       tr.style.background = "#fffbea";
       tr.innerHTML = `
         <td style="padding:4px 6px;" colspan="2">
           <select class="ilContractSel" style="width:100%;font-size:12px;">
             <option value="">— Contrat —</option>${contractOpts}
+          </select>
+          <select class="ilCarSel" style="width:100%;margin-top:3px;font-size:12px;">
+            <option value="">— Vehicule (optionnel) —</option>${carOpts}
           </select>
           <input class="ilPeriodStart" type="date" style="width:100%;margin-top:3px;font-size:12px;" value="${safe(line.periodStart || "")}" />
         </td>
@@ -13964,6 +13970,24 @@
       tr.querySelector(".ilAmountHt").oninput = recompute;
       tr.querySelector(".ilDays").oninput      = recompute;
       tr.querySelector(".ilTtc").oninput       = recomputeFromTtc;
+
+      // Quand on choisit un contrat mono-véhicule, pré-remplir / verrouiller la voiture associée
+      const contractSel = tr.querySelector('.ilContractSel');
+      const carSel = tr.querySelector('.ilCarSel');
+      contractSel.addEventListener('change', () => {
+        const cid = contractSel.value || null;
+        if (!cid) {
+          carSel.disabled = false;
+          return;
+        }
+        const contract = state.contracts.find(c => c.id === cid);
+        if (contract && contract.carId) {
+          carSel.value = contract.carId;
+          carSel.disabled = true;
+        } else {
+          carSel.disabled = false;
+        }
+      });
     };
 
     window.saveInvoiceLineEdit = async function(invoiceId, lineId, tr) {
@@ -13976,19 +14000,24 @@
       const amountHt    = Number(tr.querySelector(".ilAmountHt").value || 0);
       if (!periodStart || days < 1 || amountHt <= 0) { alert("Date de début, jours et montant HT requis."); return; }
       const contract = contractId ? state.contracts.find(c => c.id === contractId) : null;
-      const car      = contract   ? state.cars.find(c => c.id === contract.carId)  : null;
+      // Véhicule : sélection explicite sur la ligne > véhicule du contrat choisi
+      const carSelVal = tr.querySelector(".ilCarSel") ? tr.querySelector(".ilCarSel").value : "";
+      const carId = carSelVal || (contract ? contract.carId : null);
+      const car = carId ? state.cars.find(c => String(c.id) === String(carId)) : null;
       const bd       = computeLineBreakdown(amountHt, days);
       // preserve contract-line dates/designation when available
       const existingLine = (state.invoiceLines || [])[lineIdx] || {};
       const existingContractLineId = existingLine.contractLineId || null;
       const existingContractLine = existingContractLineId ? (state.contractLines || []).find(cl => cl.id === existingContractLineId) : null;
       const periodEnd = existingContractLine && existingContractLine.periodEnd ? existingContractLine.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+      const getCarDesignation = (c) => c ? (((c.brand || "") + " " + (c.model || "")).trim() || "") : "";
       const lineDesignation = existingContractLine && existingContractLine.designation && String(existingContractLine.designation).trim()
         ? existingContractLine.designation
-        : (car ? (car.model || "") : "");
+        : getCarDesignation(car);
+      const linePlate = car ? (car.plate || "") : (contract ? (contract.carPlate || "") : "");
       const result = await apiPutWithError(`/invoice-lines/${lineId}`, {
         contract_id: contractId || null,
-        car_plate:   contract ? (contract.carPlate || "") : "",
+        car_plate:   linePlate,
         designation: lineDesignation,
         amount_original: amountHt, currency: "TND",
         amount_ht: bd.amountHt, vat_amount: bd.vatAmount, daily_tax_amount: bd.dailyTaxAmount,
@@ -13998,7 +14027,7 @@
       state.invoiceLines[lineIdx] = {
         ...state.invoiceLines[lineIdx],
         contractId: contractId || null,
-        carPlate: contract ? (contract.carPlate || "") : "",
+        carPlate: linePlate,
         designation: lineDesignation,
         amountOriginal: amountHt, currency: "TND",
         amountHt: bd.amountHt, vatAmount: bd.vatAmount, dailyTaxAmount: bd.dailyTaxAmount,
