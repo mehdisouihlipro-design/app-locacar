@@ -6494,8 +6494,8 @@
           const car = carPlate ? state.cars.find(c => c.plate === carPlate) : null;
           const amountHt = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
           const lineBreakdown = computeLineBreakdown(amountHt, days);
-          // Prefer contract-line end date when present, otherwise compute end inclusive
-          const periodEnd = contractLine && contractLine.periodEnd ? contractLine.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+          // Date de fin de l'échéance facturée (pas la fin du contrat, sauf si la ligne couvre tout le contrat)
+          const periodEnd = resolveLineEndDate(contractLine, periodStart, days);
           const lineDesignation = contractLine && contractLine.designation && String(contractLine.designation).trim()
             ? contractLine.designation
             : (car ? (car.model || "") : (""));
@@ -6918,11 +6918,10 @@
             ? String(contractLine.designation).trim() : "";
           const lineDesignation = safe(storedDesignation || contractLineDesignation || getCarDesignation(lineCar) || "Véhicule");
           const linePlate = safe((lineCar && lineCar.plate) || line.carPlate || (contractLine && contractLine.carPlate) || "-");
-          // Dates : stockées sur la ligne > dates de la ligne de contrat > calculées depuis la date de début (jour de début inclus)
+          // Dates : stockées sur la ligne > dates de la ligne de contrat (si la ligne couvre tout le contrat) > calculées depuis la date de début (jour de début inclus)
           const displayStart = line.periodStart || (contractLine && contractLine.periodStart) || invoice.periodStart || "";
           const displayDays = Number(line.days || 0);
-          const displayEnd = line.periodEnd || (contractLine && contractLine.periodEnd)
-            || (displayStart ? addDaysToIsoDate(displayStart, Math.max(0, displayDays - 1)) : "");
+          const displayEnd = line.periodEnd || resolveLineEndDate(contractLine, displayStart, displayDays);
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
@@ -11585,6 +11584,18 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     }
 
+    // Date de fin d'une ligne de facture : la ligne de contrat ne fait foi que si cette
+    // facture couvre exactement toute sa durée (même periodStart, même nb de jours) —
+    // sinon on facture une échéance partielle et il faut calculer periodStart + jours - 1,
+    // jamais reprendre la date de fin de tout le contrat.
+    function resolveLineEndDate(contractLine, periodStart, days) {
+      const computedEnd = periodStart ? addDaysToIsoDate(periodStart, Math.max(0, Number(days || 0) - 1)) : "";
+      const coversFullContractLine = contractLine && contractLine.periodEnd
+        && contractLine.periodStart === periodStart
+        && Number(contractLine.days || 0) === Number(days || 0);
+      return coversFullContractLine ? contractLine.periodEnd : computedEnd;
+    }
+
     // ── Gantt quick-create ────────────────────────────────────────────────────────
 
     function handleGanttTrackHover(e, trackEl) {
@@ -14009,7 +14020,7 @@
       const existingLine = (state.invoiceLines || [])[lineIdx] || {};
       const existingContractLineId = existingLine.contractLineId || null;
       const existingContractLine = existingContractLineId ? (state.contractLines || []).find(cl => cl.id === existingContractLineId) : null;
-      const periodEnd = existingContractLine && existingContractLine.periodEnd ? existingContractLine.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+      const periodEnd = resolveLineEndDate(existingContractLine, periodStart, days);
       const getCarDesignation = (c) => c ? (((c.brand || "") + " " + (c.model || "")).trim() || "") : "";
       const lineDesignation = existingContractLine && existingContractLine.designation && String(existingContractLine.designation).trim()
         ? existingContractLine.designation
@@ -14191,8 +14202,8 @@
       const carSelVal = tr.querySelector('.ilCarSel')?.value || null;
       const car      = carSelVal ? state.cars.find(c => String(c.id) === String(carSelVal)) : (contract ? state.cars.find(c => c.id === contract.carId) : null);
       const bd       = computeLineBreakdown(amountHt, days);
-      // prefer contract-level end date when available, otherwise compute inclusive end
-      const periodEnd = contract && contract.periodEnd ? contract.periodEnd : addDaysToIsoDate(periodStart, Math.max(0, days - 1));
+      // Date de fin de l'échéance facturée (pas la fin du contrat, sauf si la ligne couvre tout le contrat)
+      const periodEnd = resolveLineEndDate(contract, periodStart, days);
       const lineId = uid("ILN");
 
       const finalContractId = contractId || invoice.contractId || null;
