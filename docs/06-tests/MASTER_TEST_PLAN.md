@@ -298,7 +298,8 @@
 
 - [ ] **Ouvrir le modal** : double-clic sur une facture → modal "Facture XXX" s'ouvre, lignes affichées avec colonnes Libellé/Contrat, Début période, Jours, HT, TVA, Taxe+Timbre, TTC, Actions (✏ ✕)
 - [ ] **Ajouter une ligne** : cliquer "+ Ajouter une ligne" → ligne inline bleue apparaît ; saisir Contrat + Jours + HT → TVA/Taxe/TTC calculés en temps réel → ✓ → ligne sauvegardée via `POST /invoice-lines`, totaux de la facture recalculés, ligne apparaît dans la grille
-- [ ] **Modifier une ligne** : cliquer ✏ sur une ligne → ligne passe en mode édition (fond ambré) avec tous les champs éditables ; modifier le montant HT → TTC recalculé ; ✓ → `PUT /invoice-lines/:id`, totaux mis à jour, grille rafraîchie
+- [ ] **Modifier une ligne** : cliquer ✏ sur une ligne → ligne passe en mode édition (fond ambré) avec tous les champs éditables (dont le sélecteur Véhicule) ; modifier le montant HT → TTC recalculé ; ✓ → `PUT /invoice-lines/:id`, totaux mis à jour, grille rafraîchie
+- [ ] **Sélectionner un véhicule en édition (ligne libre)** : éditer une ligne sans contrat associé → choisir un véhicule dans le sélecteur → ✓ → `car_plate`/`designation` de la ligne persistés ; régénérer le PDF → plaque et désignation du véhicule choisi affichées (pas de fallback générique "Véhicule")
 - [ ] **Supprimer une ligne (non dernière)** : cliquer ✕ sur une ligne quand la facture en a 2+ → confirmation → `DELETE /invoice-lines/:id` → ligne retirée, totaux recalculés
 - [ ] **Supprimer la dernière ligne** : cliquer ✕ sur la seule ligne d'une facture → message d'erreur "Une facture doit avoir au moins une ligne.", ligne conservée
 - [ ] **Persistance** : fermer le modal, rouvrir → les modifications sont toujours présentes (rechargement API au close du modal)
