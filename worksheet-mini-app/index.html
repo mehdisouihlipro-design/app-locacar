@@ -6914,7 +6914,8 @@
           // Normalize displayed periodEnd from periodStart + days to avoid inconsistencies coming from stored data
           const displayStart = line.periodStart || invoice.periodStart || "";
           const displayDays = Number(line.days || 0);
-          const displayEnd = displayStart ? addDaysToIsoDate(displayStart, displayDays) : (line.periodEnd || "");
+          // Prefer the stored periodEnd when available (preserve original values), otherwise compute from start+days
+          const displayEnd = line.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, displayDays) : "");
           return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${lineDesignation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${linePlate}</td>
@@ -6936,7 +6937,7 @@
         const plate = car ? safe(car.plate || "-") : "-";
         const displayStart = invoice.periodStart || "";
         const displayDays = Number(days || 0);
-        const displayEnd = displayStart ? addDaysToIsoDate(displayStart, displayDays) : (invoice.periodEnd || "");
+        const displayEnd = invoice.periodEnd || (displayStart ? addDaysToIsoDate(displayStart, displayDays) : "");
         lineRowsHtml = `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${plate}</td>
