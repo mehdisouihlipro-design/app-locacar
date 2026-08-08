@@ -1612,12 +1612,12 @@
           </select>
         </div>
         <div id="custParticulierFields">
-          <label>Nom</label>
-          <input id="custFirstName" placeholder="Ben Ali" oninput="updateCustFullName()" />
+          <label>Prénom</label>
+          <input id="custFirstName" placeholder="Mohamed" oninput="updateCustFullName()" />
         </div>
         <div id="custParticulierFieldsPrenom">
-          <label>Prénom</label>
-          <input id="custLastName" placeholder="Mohamed" oninput="updateCustFullName()" />
+          <label>Nom</label>
+          <input id="custLastName" placeholder="Ben Ali" oninput="updateCustFullName()" />
         </div>
         <div id="custFullNamePreview">
           <label>Nom complet (auto)</label>
@@ -6294,7 +6294,7 @@
       const lastName  = type === "particulier" ? (byId("custLastName")?.value.trim()  || "") : "";
       const name      = type === "entreprise"
         ? (byId("custName")?.value.trim() || "")
-        : [lastName, firstName].filter(Boolean).join(" "); // prénom + nom
+        : [firstName, lastName].filter(Boolean).join(" "); // prénom + nom
       const phone   = byId("custPhone").value.trim();
       const email   = byId("custEmail").value.trim();
       const address = byId("custAddress").value.trim();
@@ -7980,8 +7980,8 @@
     }
 
     function updateCustFullName() {
-      const prenom = byId("custLastName")?.value.trim() || "";
-      const nom    = byId("custFirstName")?.value.trim() || "";
+      const prenom = byId("custFirstName")?.value.trim() || "";
+      const nom    = byId("custLastName")?.value.trim() || "";
       const full   = [prenom, nom].filter(Boolean).join(" ");
       if (byId("custFullName")) byId("custFullName").value = full;
     }
@@ -13876,9 +13876,12 @@
             const _car = _cl ? state.cars.find(c => c.id === _cl.carId)
               : (line.carPlate ? state.cars.find(c => c.plate === line.carPlate) : null);
             const getCarDesignation = (car) => car ? (((car.brand || "") + " " + (car.model || "")).trim() || "") : "";
-            const desig = _cl
-              ? ((_cl.designation && String(_cl.designation).trim()) ? _cl.designation : (getCarDesignation(_car) || (line.designation ? String(line.designation).trim() : "")))
-              : (getCarDesignation(_car) || (line.designation ? String(line.designation).trim() : "Véhicule"));
+            // Désignation : figée sur la ligne (au moment de la facturation) > ligne de contrat > modèle du véhicule.
+            // Ne jamais recalculer depuis le véhicule *actuel* de la ligne de contrat, qui a pu changer depuis
+            // (ex. véhicule remplacé) — sinon une facture historique afficherait un véhicule qu'elle n'a jamais eu.
+            const storedDesig = line.designation && String(line.designation).trim() ? String(line.designation).trim() : "";
+            const clDesig = _cl && _cl.designation && String(_cl.designation).trim() ? String(_cl.designation).trim() : "";
+            const desig = storedDesig || clDesig || getCarDesignation(_car);
             return `${safe(cLabel)} &mdash; ${safe(line.carPlate || "-")}${desig ? ` <span style="color:var(--muted);font-size:11px;">${safe(desig)}</span>` : ""}`;
           })()}</td>
           <td style="padding:6px 8px;">${fmtDate(line.periodStart) || "-"}</td>
@@ -14076,26 +14079,23 @@
     };
 
     async function saveInvoiceLinesTotals(invoice) {
-      const lines = (state.invoiceLines || []).filter(l => l.invoiceId === String(invoice.id));
-      const totalHt  = lines.reduce((s, l) => s + (l.amountHt || 0), 0);
-      const totalVat = lines.reduce((s, l) => s + (l.vatAmount || 0), 0);
-      const totalTax = lines.reduce((s, l) => s + (l.dailyTaxAmount || 0), 0);
-      const stamp    = Number(invoice.stampDutyAmount || state.settings.stampDutyTnd || 0);
-      const totalDays = lines.reduce((s, l) => s + (l.days || 0), 0);
-      const totalTtc  = totalHt + totalVat + totalTax + stamp;
-      const periodStart = lines.reduce((mn, l) => (!mn || (l.periodStart && l.periodStart < mn) ? l.periodStart : mn), "");
-      const periodEnd   = lines.reduce((mx, l) => (!mx || (l.periodEnd && l.periodEnd > mx) ? l.periodEnd : mx), "");
-      invoice.amountHt = totalHt; invoice.vatAmount = totalVat;
-      invoice.dailyTaxAmount = totalTax; invoice.stampDutyAmount = stamp;
-      invoice.amountTnd = totalTtc;
-      invoice.dueAmountTnd = Math.max(0, totalTtc - Number(invoice.paidAmountTnd || 0));
-      invoice.rentalDays = totalDays; invoice.periodStart = periodStart; invoice.periodEnd = periodEnd;
-      await apiPut(`/invoices/${invoice.id}`, {
-        amount_ht: totalHt, vat_amount: totalVat, daily_tax_amount: totalTax,
-        stamp_duty_amount: stamp, amount_tnd: totalTtc,
-        due_amount_tnd: invoice.dueAmountTnd, rental_days: totalDays,
-        period_start: periodStart || null, period_end: periodEnd || null,
-      });
+      // Les routes /invoice-lines (POST/PUT/DELETE) recalculent déjà les totaux de
+      // l'entête côté backend (recalcInvoiceTotals) à chaque mutation de ligne. Recalculer
+      // à nouveau ici en local puis PUT par-dessus créait un double calcul divergent —
+      // notamment un timbre fiscal à 0 légitime silencieusement écrasé par la valeur par
+      // défaut des paramètres (`stampDutyAmount || state.settings.stampDutyTnd`). On se
+      // contente désormais de relire la facture déjà à jour en base.
+      const fresh = await apiGet(`/invoices/${invoice.id}`);
+      if (!fresh) return;
+      invoice.amountHt = Number(fresh.amount_ht || 0);
+      invoice.vatAmount = Number(fresh.vat_amount || 0);
+      invoice.dailyTaxAmount = Number(fresh.daily_tax_amount || 0);
+      invoice.stampDutyAmount = Number(fresh.stamp_duty_amount || 0);
+      invoice.amountTnd = Number(fresh.amount_tnd || 0);
+      invoice.dueAmountTnd = Number(fresh.due_amount_tnd || 0);
+      invoice.rentalDays = Number(fresh.rental_days || 0);
+      invoice.periodStart = fresh.period_start || "";
+      invoice.periodEnd = fresh.period_end || "";
     }
 
     function appendInlineInvoiceLineRow(invoiceId) {
@@ -14363,19 +14363,19 @@
         ieConfirmBtn.textContent = "✓ Confirmer la facture";
         ieConfirmBtn.onclick = async () => {
           if (!confirm("Confirmer cette facture ? Elle ne pourra plus être supprimée après confirmation.")) return;
-          // Si la facture a déjà un numéro (généré à la création), on le conserve sans incrémenter la souche
-          let invoiceNumber = invoice.invoiceNumber || null;
-          if (!invoiceNumber) {
-            invoiceNumber = await fetchNextSequenceNumber('invoices');
-            if (!invoiceNumber) { alert("Impossible de générer le numéro de facture. Vérifiez la configuration des souches."); return; }
-          }
-          const res = await apiPutWithError(`/invoices/${invoice.id}`, { status: "en_attente", invoice_number: invoiceNumber });
+          // Utilise la route backend atomique (verrou sur le statut + RPC FOR UPDATE pour la
+          // souche) au lieu de l'ancien chemin non-atomique (fetchNextSequenceNumber + PUT
+          // séparé), qui pouvait consommer/dupliquer un numéro en cas de double-clic.
+          ieConfirmBtn.disabled = true;
+          const res = await apiPostWithError(`/invoices/${invoice.id}/confirm`, {});
+          ieConfirmBtn.disabled = false;
           if (!res.ok) { alert(res.errorMsg || "Erreur lors de la confirmation."); return; }
+          const invoiceNumber = res.data && res.data.invoice_number;
           const idx = state.invoices.findIndex(i => String(i.id) === String(invoice.id));
           if (idx >= 0) { state.invoices[idx].status = "en_attente"; state.invoices[idx].invoiceNumber = invoiceNumber; }
           if (invoice.scheduleId) {
             const sIdx = (state.invoiceSchedule || []).findIndex(s => s.id === invoice.scheduleId);
-            if (sIdx >= 0) { state.invoiceSchedule[sIdx].status = "confirme"; await apiPut(`/invoice-schedule/${invoice.scheduleId}`, { status: "confirme" }); }
+            if (sIdx >= 0) state.invoiceSchedule[sIdx].status = "confirme";
           }
           ieConfirmBtn.style.display = "none";
           ieDeleteBtn.style.display = "none";
@@ -16055,6 +16055,16 @@
         if (customer) record.customerName = customer.name;
         const car = state.cars.find((c) => String(c.id) === String(record.carId));
         if (car) record.carPlate = car.plate;
+      }
+
+      if (entity === "customers") {
+        // customers.name est copié partout comme customer_name (contrats, devis, factures,
+        // réservations, paiements) — sans ce recalcul, corriger une faute de frappe dans
+        // Prénom/Nom via l'éditeur générique n'aurait aucun effet visible ailleurs dans l'app.
+        if (record.type !== "entreprise") {
+          const full = [record.firstName, record.lastName].filter(v => v && String(v).trim()).join(" ");
+          if (full) record.name = full;
+        }
       }
 
       if (entity === "invoices") {

@@ -108,22 +108,37 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 // ── Confirmer un brouillon → en_attente + attribution du numéro séquentiel ───
 // POST /invoices/:id/confirm
 router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
+  let claimed = false;
   try {
-    const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=*`);
-    const invoice = check.data?.[0];
-    if (!invoice) return res.status(404).json({ success: false, message: 'Facture introuvable.' });
-    if (invoice.status !== 'brouillon')
-      return res.status(422).json({ success: false, message: `Cette facture est au statut "${invoice.status}", pas "brouillon".` });
-
-    // Générer le numéro séquentiel via la souche (atomique, FOR UPDATE)
-    const invoiceNumber = await nextSequenceNumber('invoices');
-
-    // Mettre à jour la facture
-    const result = await global.db.patch(
-      `/invoices?id=eq.${req.params.id}`,
-      stampUpdate({ status: 'en_attente', invoice_number: invoiceNumber }, req),
+    // Verrou atomique : ne bascule "brouillon" -> "en_attente" que si le statut est encore
+    // "brouillon" au moment de l'UPDATE SQL. Empêche un double-clic (ou deux requêtes
+    // concurrentes) de confirmer deux fois la même facture et de consommer deux numéros.
+    const claimRes = await global.db.patch(
+      `/invoices?id=eq.${req.params.id}&status=eq.brouillon`,
+      stampUpdate({ status: 'en_attente' }, req),
       { headers: { Prefer: 'return=representation' } }
     );
+    const invoice = claimRes.data?.[0];
+    if (!invoice) {
+      const check = await global.db.get(`/invoices?id=eq.${req.params.id}&select=id,status`);
+      const existing = check.data?.[0];
+      if (!existing) return res.status(404).json({ success: false, message: 'Facture introuvable.' });
+      return res.status(422).json({ success: false, message: `Cette facture est au statut "${existing.status}", pas "brouillon".` });
+    }
+    claimed = true;
+
+    // Si la facture a déjà un numéro (généré à la création via l'échéancier), le conserver
+    // sans consommer un nouveau numéro de souche.
+    let invoiceNumber: string | null = invoice.invoice_number || null;
+    if (!invoiceNumber) {
+      invoiceNumber = await nextSequenceNumber('invoices');
+      await global.db.patch(
+        `/invoices?id=eq.${req.params.id}`,
+        stampUpdate({ invoice_number: invoiceNumber }, req),
+        { headers: { Prefer: 'return=minimal' } }
+      );
+      invoice.invoice_number = invoiceNumber;
+    }
 
     // Si la facture vient d'un échéancier, mettre à jour son statut
     if (invoice.schedule_id) {
@@ -134,8 +149,17 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
       );
     }
 
-    res.json({ success: true, data: result.data?.[0], invoiceNumber });
+    res.json({ success: true, data: invoice, invoiceNumber });
   } catch (err) {
+    if (claimed) {
+      try {
+        await global.db.patch(
+          `/invoices?id=eq.${req.params.id}&status=eq.en_attente`,
+          stampUpdate({ status: 'brouillon' }, req),
+          { headers: { Prefer: 'return=minimal' } }
+        );
+      } catch (_) { /* best-effort */ }
+    }
     res.status(500).json({ success: false, error: String(err) });
   }
 });
