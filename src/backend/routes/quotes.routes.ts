@@ -12,6 +12,15 @@ function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
+// Interrompt le handler avec un statut/payload donné, à capturer par le catch englobant
+// (utilisé pour déclencher le rollback du verrou avant de répondre à l'appelant).
+function validateFail(statusCode: number, payload: any): never {
+  const err: any = new Error(payload?.message || 'validate_failed');
+  err.statusCode = statusCode;
+  err.payload = payload;
+  throw err;
+}
+
 function calcMonthlyAmountFn(monthlyRate: number, periodStart: string, periodEnd: string): number {
   if (!periodStart || !periodEnd || periodEnd < periodStart) return 0;
   const s = new Date(`${periodStart}T00:00:00`);
@@ -152,6 +161,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 // ── Validation → Contrat (BR27) ───────────────────────────────────────────────
 
 router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
+  let locked = false;
+  let originalStatus = '';
   try {
     const quoteRes = await global.db.get(`/quotes?id=eq.${req.params.id}&select=*`);
     const quote = quoteRes.data?.[0];
@@ -159,6 +170,25 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     if (!['brouillon', 'envoye'].includes(quote.status)) {
       return res.status(422).json({ success: false, message: `Ce devis est déjà ${quote.status}.` });
     }
+    originalStatus = quote.status;
+
+    // Le contractId est généré localement (pas d'appel DB) afin de pouvoir être posé
+    // dès le verrou ci-dessous, avant même que le contrat n'existe.
+    const contractId = uid('CTR');
+
+    // Verrou atomique : ne fait passer le devis à "valide" que si son statut est encore
+    // "brouillon"/"envoye" au moment de l'update SQL. Si deux validations concurrentes
+    // arrivent en même temps, un seul PATCH peut matcher → l'autre reçoit 0 ligne et échoue
+    // proprement (422), au lieu de créer deux contrats pour le même devis.
+    const claimRes = await global.db.patch(
+      `/quotes?id=eq.${req.params.id}&status=in.(brouillon,envoye)`,
+      stampUpdate({ status: 'valide', converted_contract_id: contractId }, req),
+      { headers: { Prefer: 'return=representation' } }
+    );
+    if (!claimRes.data || claimRes.data.length === 0) {
+      return res.status(422).json({ success: false, message: 'Ce devis vient déjà d\'être validé (ou n\'est plus au statut "brouillon"/"envoye").' });
+    }
+    locked = true;
 
     const linesRes = await global.db.get(`/quote_lines?quote_id=eq.${req.params.id}&select=*&order=created_at.asc`);
     const quoteLines: any[] = linesRes.data || [];
@@ -167,7 +197,7 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     for (const ql of quoteLines) {
       if (!ql.car_id || !ql.period_start || !ql.period_end) continue;
       const conflict = await findOverlap(ql.car_id, ql.period_start, ql.period_end);
-      if (conflict) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: conflict });
+      if (conflict) validateFail(409, { success: false, error: 'vehicle_overlap', message: conflict });
     }
 
     // Lire le taux de TVA pour les recalculs mensuel
@@ -179,7 +209,6 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
     } catch (_) {}
 
     // Créer le contrat entête
-    const contractId = uid('CTR');
     const contractDate = new Date().toISOString().split('T')[0];
     const contractType = quote.type || 'court';
     const paymentPlan = contractType === 'long' ? 'mensualite' : 'paiement client debut';
@@ -246,15 +275,22 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       throw lineErr;
     }
 
-    // Marquer le devis comme validé
-    await global.db.patch(
-      `/quotes?id=eq.${req.params.id}`,
-      stampUpdate({ status: 'valide', converted_contract_id: contractId }, req),
-      { headers: { Prefer: 'return=minimal' } }
-    );
+    // Le devis est déjà passé à "valide" (avec converted_contract_id) par le verrou ci-dessus
 
     res.json({ success: true, contractId, data: { contractId, lines: createdLines, reservations: createdReservations } });
-  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+  } catch (err: any) {
+    if (locked) {
+      await global.db.patch(
+        `/quotes?id=eq.${req.params.id}&status=eq.valide`,
+        { status: originalStatus, converted_contract_id: null },
+        { headers: { Prefer: 'return=minimal' } }
+      ).catch(() => {});
+    }
+    if (err && typeof err.statusCode === 'number' && err.payload) {
+      return res.status(err.statusCode).json(err.payload);
+    }
+    res.status(500).json({ success: false, error: String(err) });
+  }
 });
 
 export default router;

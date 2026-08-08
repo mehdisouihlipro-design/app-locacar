@@ -6,6 +6,15 @@ import { nextSequenceNumber, releaseSequenceOnDelete } from '../utils/number-seq
 
 const router = Router();
 
+// Interrompt le handler avec un statut/payload donné, à capturer par le catch englobant
+// (utilisé pour déclencher le rollback du verrou avant de répondre à l'appelant).
+function confirmFail(statusCode: number, payload: any): never {
+  const err: any = new Error(payload?.message || 'confirm_failed');
+  err.statusCode = statusCode;
+  err.payload = payload;
+  throw err;
+}
+
 router.get('/', async (_req: AuthRequest, res: Response) => {
   try {
     const result = await global.db.get('/contracts?select=*&order=created_at.desc');
@@ -71,6 +80,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 // Phase 5 (BR20) : confirmation d'un contrat brouillon → active
 // BR19 pour chaque ligne, puis BR25, puis PATCH statuts
 router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
+  let locked = false;
   try {
     const contractRes = await global.db.get(`/contracts?id=eq.${req.params.id}&select=*`);
     const contract = contractRes.data?.[0];
@@ -79,10 +89,24 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
       return res.status(422).json({ success: false, message: `Ce contrat est au statut "${contract.status}", pas "brouillon".` });
     }
 
+    // Verrou atomique : ne fait passer le contrat à "active" que si son statut est encore
+    // "brouillon" au moment de l'update SQL. Si deux confirmations concurrentes arrivent en
+    // même temps, un seul PATCH peut matcher status=eq.brouillon → l'autre reçoit 0 ligne et
+    // échoue proprement (422), au lieu de dupliquer les lignes/réservations du contrat.
+    const claimRes = await global.db.patch(
+      `/contracts?id=eq.${req.params.id}&status=eq.brouillon`,
+      stampUpdate({ status: 'active' }, req),
+      { headers: { Prefer: 'return=representation' } }
+    );
+    if (!claimRes.data || claimRes.data.length === 0) {
+      return res.status(422).json({ success: false, message: 'Ce contrat vient déjà d\'être confirmé (ou n\'est plus au statut "brouillon").' });
+    }
+    locked = true;
+
     const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${req.params.id}&status=eq.brouillon&select=*&order=created_at.asc`);
     const lines: any[] = linesRes.data || [];
     if (lines.length === 0) {
-      return res.status(422).json({ success: false, message: 'Ce contrat n\'a aucune ligne brouillon à confirmer.' });
+      confirmFail(422, { success: false, message: 'Ce contrat n\'a aucune ligne brouillon à confirmer.' });
     }
 
     // BR19 : vérifier les chevauchements pour toutes les lignes avant d'écrire quoi que ce soit
@@ -95,7 +119,7 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
         line.period_start <= l.period_end && line.period_end >= l.period_start
       );
       if (overlap) {
-        return res.status(409).json({
+        confirmFail(409, {
           success: false, error: 'vehicle_overlap',
           message: `⚠ Le véhicule ${overlap.car_plate} est déjà engagé du ${overlap.period_start} au ${overlap.period_end} sur le contrat ${overlap.contract_id}. La ligne ${line.id} est en conflit.`,
           conflictLineId: line.id,
@@ -111,7 +135,7 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
         line.period_start <= r.end_date && line.period_end >= r.start_date
       );
       if (rsvOverlap) {
-        return res.status(409).json({
+        confirmFail(409, {
           success: false, error: 'vehicle_overlap',
           message: `⚠ Le véhicule ${rsvOverlap.car_plate} est déjà réservé du ${rsvOverlap.start_date} au ${rsvOverlap.end_date} (réservation ${rsvOverlap.id}).`,
           conflictLineId: line.id,
@@ -128,12 +152,7 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
       );
     }
 
-    // Passer le contrat à active
-    await global.db.patch(
-      `/contracts?id=eq.${req.params.id}`,
-      stampUpdate({ status: 'active' }, req),
-      { headers: { Prefer: 'return=minimal' } }
-    );
+    // Le contrat est déjà passé à "active" par le verrou ci-dessus
 
     // BR25 : créer/lier réservations pour chaque ligne
     const reservations: any[] = [];
@@ -170,7 +189,19 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
     }
 
     res.json({ success: true, linesConfirmed: lines.length, reservations });
-  } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
+  } catch (err: any) {
+    if (locked) {
+      await global.db.patch(
+        `/contracts?id=eq.${req.params.id}&status=eq.active`,
+        { status: 'brouillon' },
+        { headers: { Prefer: 'return=minimal' } }
+      ).catch(() => {});
+    }
+    if (err && typeof err.statusCode === 'number' && err.payload) {
+      return res.status(err.statusCode).json(err.payload);
+    }
+    res.status(500).json({ success: false, error: String(err) });
+  }
 });
 
 // BR27 : générer l'échéancier mensuel d'un contrat long terme

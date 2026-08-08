@@ -265,6 +265,7 @@
 - [ ] **Navigation post-validation** : lien "Voir le contrat {id}" dans l'entête du devis → clic ouvre le détail du contrat créé
 - [ ] **Devis validé → lecture seule** : aucun bouton d'édition de lignes ni d'entête
 - [ ] **Validation avec conflit BR19** : valider un devis dont une ligne chevauche désormais un contrat actif → erreur rouge inline, rollback complet (aucun contrat créé en base), devis reste `envoye`/`brouillon`
+- [ ] **Pas de double validation (clic multiple / requêtes concurrentes)** : envoyer 2 `POST /quotes/:id/validate` en parallèle pour le même devis → un seul contrat est créé ; la seconde requête échoue en 422 "Ce devis vient déjà d'être validé". Le devis ne reste pas bloqué en `valide` sans contrat si la validation échoue en cours de route (rollback vers son statut d'origine)
 
 ### UC-QUO-6 : Devis long terme → proposition d'échéancier (BR27+BR32)
 **En tant qu'agent commercial**, je veux que la validation d'un devis long terme propose directement la génération de l'échéancier.
