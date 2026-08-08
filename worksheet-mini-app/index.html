@@ -5213,7 +5213,7 @@
       openTab("customers");
     });
     byId("kpiContracts").parentElement.addEventListener("click", () => {
-      applyContractsFilter({ type: "", query: "actif" });
+      applyContractsFilter({ type: "", query: "active" });
       openTab("contracts");
     });
     byId("kpiOutstanding").parentElement.addEventListener("click", () => {
@@ -7536,14 +7536,20 @@
         return;
       }
 
-      const restTnd = Math.max(0, Number(invoice.amountTnd) - Number(invoice.paidAmountTnd || 0));
-      if (amountTnd > restTnd) {
+      // Arrondi au millime pour éviter qu'une dérive flottante (accumulée par les += successifs
+      // sur paidAmountTnd) ne rejette à tort un règlement final légitime.
+      const restTnd = Math.round(Math.max(0, Number(invoice.amountTnd) - Number(invoice.paidAmountTnd || 0)) * 1000) / 1000;
+      if (Math.round(amountTnd * 1000) / 1000 > restTnd) {
         alert(`Montant superieur au restant (${restTnd.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} TND).`);
         return;
       }
 
-      invoice.paidAmountTnd = Number(invoice.paidAmountTnd || 0) + amountTnd;
-      invoice.dueAmountTnd = Math.max(0, Number(invoice.amountTnd) - Number(invoice.paidAmountTnd));
+      invoice.paidAmountTnd = Math.round((Number(invoice.paidAmountTnd || 0) + amountTnd) * 1000) / 1000;
+      invoice.dueAmountTnd = Math.round(Math.max(0, Number(invoice.amountTnd) - Number(invoice.paidAmountTnd)) * 1000) / 1000;
+      // Faire refléter le règlement sur le statut réel de la facture (pas seulement le badge
+      // calculé à l'affichage) pour que les autres écrans qui lisent invoice.status directement
+      // (ex. bouton Supprimer du modal détail) restent cohérents.
+      invoice.status = invoice.dueAmountTnd <= 0 ? "payee" : "partiel";
 
       const contract = state.contracts.find((c) => c.id === invoice.contractId);
 
@@ -7561,6 +7567,12 @@
         date,
         reconciliationStatus: "rapproche",
         contractType: contract ? contract.type : "-",
+      });
+
+      await apiPut(`/invoices/${invoiceId}`, {
+        paid_amount_tnd: invoice.paidAmountTnd,
+        due_amount_tnd: invoice.dueAmountTnd,
+        status: invoice.status,
       });
 
       saveAndRender();
@@ -11856,7 +11868,7 @@
     function renderKpis() {
       byId("kpiCars").textContent = state.cars.length;
       byId("kpiCustomers").textContent = state.customers.length;
-      byId("kpiContracts").textContent = state.contracts.filter((c) => c.status === "actif").length;
+      byId("kpiContracts").textContent = state.contracts.filter((c) => c.status === "active").length;
       const outstandingTnd = state.invoices.reduce((sum, i) => sum + Number(i.dueAmountTnd || 0), 0);
       byId("kpiOutstanding").textContent = outstandingTnd.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " TND";
     }
@@ -15818,7 +15830,7 @@
       "cars.gpsLat": "GPS Latitude", "cars.gpsLng": "GPS Longitude",
       "cars.gpsSpeed": "GPS Vitesse (km/h)", "cars.gpsUpdatedAt": "GPS Mis à jour le",
       // Clients
-      "customers.name": "Nom complet", "customers.firstName": "Nom", "customers.lastName": "Prénom",
+      "customers.name": "Nom complet", "customers.firstName": "Prénom", "customers.lastName": "Nom",
       "customers.phone": "Téléphone", "customers.email": "E-mail",
       "customers.address": "Adresse", "customers.city": "Ville",
       "customers.postalCode": "Code postal", "customers.country": "Pays",

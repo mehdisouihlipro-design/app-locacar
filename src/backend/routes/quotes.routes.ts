@@ -160,6 +160,20 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       return res.status(422).json({ success: false, message: `Ce devis est déjà ${quote.status}.` });
     }
 
+    // "Débloquer ce devis" remet le statut à envoye et vide converted_contract_id, mais NE
+    // supprime PAS le contrat déjà généré (contracts.quote_id le référence toujours). Sans ce
+    // contrôle, revalider créerait un second contrat en doublon pendant que le premier reste actif.
+    const existingContractRes = await global.db.get(
+      `/contracts?quote_id=eq.${req.params.id}&status=neq.resilie&select=id,contract_number&limit=1`
+    );
+    const existingContract = existingContractRes.data?.[0];
+    if (existingContract) {
+      return res.status(422).json({
+        success: false,
+        message: `Ce devis a déjà généré le contrat ${existingContract.contract_number || existingContract.id}, toujours actif. Résiliez-le avant de revalider ce devis.`,
+      });
+    }
+
     const linesRes = await global.db.get(`/quote_lines?quote_id=eq.${req.params.id}&select=*&order=created_at.asc`);
     const quoteLines: any[] = linesRes.data || [];
 
@@ -244,6 +258,29 @@ router.post('/:id/validate', async (req: AuthRequest, res: Response) => {
       }
       await global.db.delete(`/contracts?id=eq.${contractId}`).catch(() => {});
       throw lineErr;
+    }
+
+    // Reporter le véhicule/montant réels sur l'entête contrat (elle a été créée à 0/null
+    // faute de les connaître avant l'insertion des lignes) — sans ça le contrat apparaît
+    // à 0 TND / sans véhicule sur les listes et le graphique de rentabilité par véhicule
+    // l'ignore complètement.
+    const totalAmountTnd = createdLines.reduce((sum, l) => sum + Number(l.amount_ht || 0), 0);
+    const firstLine = createdLines[0];
+    if (firstLine) {
+      await global.db.patch(
+        `/contracts?id=eq.${contractId}`,
+        {
+          total_amount_original: totalAmountTnd,
+          total_amount_tnd: totalAmountTnd,
+          car_id: firstLine.car_id,
+          car_plate: firstLine.car_plate || '',
+          days: firstLine.days || 0,
+          months: firstLine.months || 0,
+          rate: firstLine.rate || 0,
+          rate_currency: firstLine.rate_currency || 'TND',
+        },
+        { headers: { Prefer: 'return=minimal' } }
+      );
     }
 
     // Marquer le devis comme validé

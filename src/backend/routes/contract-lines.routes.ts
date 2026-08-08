@@ -101,6 +101,36 @@ function isExclusionViolation(err: any): boolean {
   return err?.response?.data?.code === '23P01';
 }
 
+// Recalcule les totaux de l'entête contrat à partir de la somme des lignes.
+// Remet aussi à jour car_id/car_plate/days/months/rate depuis la première ligne
+// pour les écrans/KPI historiques qui lisent encore ces colonnes sur l'entête
+// (même convention que POST /contracts/with-lines).
+async function recalcContractTotals(contractId: string): Promise<void> {
+  const linesRes = await global.db.get(
+    `/contract_lines?contract_id=eq.${contractId}&select=amount_ht,car_id,car_plate,days,months,rate,rate_currency&order=created_at.asc`
+  );
+  const lines: any[] = linesRes.data || [];
+  const totalAmountTnd = lines.reduce((sum, l) => sum + Number(l.amount_ht || 0), 0);
+  const firstLine = lines[0] || {};
+
+  await global.db.patch(
+    `/contracts?id=eq.${contractId}`,
+    {
+      total_amount_original: totalAmountTnd,
+      total_amount_tnd: totalAmountTnd,
+      ...(firstLine.car_id ? {
+        car_id: firstLine.car_id,
+        car_plate: firstLine.car_plate || '',
+        days: firstLine.days || 0,
+        months: firstLine.months || 0,
+        rate: firstLine.rate || 0,
+        rate_currency: firstLine.rate_currency || 'TND',
+      } : {}),
+    },
+    { headers: { Prefer: 'return=minimal' } }
+  );
+}
+
 // BR25 : après insertion d'une ligne active, recherche ou crée une réservation liée.
 // Si reservationIdToLink est fourni, lien direct sans recherche (workflow réservation → contrat).
 // Retourne la réservation retenue/créée, ou null en cas d'erreur (non bloquant).
@@ -256,6 +286,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       if (reservation) line.reservation_id = reservation.id;
     }
 
+    await recalcContractTotals(String(line.contract_id));
+
     res.status(201).json({ success: true, data: { line, reservation } });
   } catch (err) {
     if (isExclusionViolation(err)) return res.status(409).json({ success: false, error: 'vehicle_overlap', message: 'Ce véhicule est déjà engagé sur cette période.' });
@@ -296,6 +328,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         );
       } catch (_) { /* non-bloquant */ }
     }
+
+    await recalcContractTotals(String(current.contract_id));
 
     res.json({ success: true, data: Array.isArray(result.data) ? result.data[0] : result.data });
   } catch (err) {
@@ -352,6 +386,8 @@ router.post('/:id/terminate', async (req: AuthRequest, res: Response) => {
       } catch (e: any) { console.warn('[BR26] reservation update:', e?.message); }
     }
 
+    await recalcContractTotals(String(line.contract_id));
+
     const updatedRes = await global.db.get(`/contract_lines?id=eq.${req.params.id}&select=*`);
     res.json({ success: true, data: updatedRes.data?.[0] || null });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
@@ -359,12 +395,22 @@ router.post('/:id/terminate', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    // Récupérer la ligne pour connaître la réservation liée avant suppression
-    const lineRes = await global.db.get(`/contract_lines?id=eq.${req.params.id}&select=reservation_id`);
-    const reservationId = lineRes.data?.[0]?.reservation_id || null;
+    // Récupérer la ligne pour connaître la réservation liée et le contrat parent avant suppression
+    const lineRes = await global.db.get(`/contract_lines?id=eq.${req.params.id}&select=reservation_id,contract_id`);
+    if (!lineRes.data?.[0]) return res.status(404).json({ success: false, message: 'Ligne de contrat introuvable.' });
+    const reservationId = lineRes.data[0].reservation_id || null;
+    const contractId = lineRes.data[0].contract_id || null;
+
+    if (contractId) {
+      const countRes = await global.db.get(`/contract_lines?contract_id=eq.${contractId}&select=id`);
+      if ((countRes.data || []).length <= 1) {
+        return res.status(422).json({ success: false, message: 'Un contrat doit avoir au moins une ligne.' });
+      }
+    }
 
     // Supprimer la ligne (ON DELETE SET NULL sur reservations.contract_line_id s'exécute automatiquement)
     await global.db.delete(`/contract_lines?id=eq.${req.params.id}`);
+    if (contractId) await recalcContractTotals(contractId);
 
     // Si une réservation était liée, la supprimer (elle a été créée par BR25)
     if (reservationId) {

@@ -5,6 +5,22 @@ import { stampCreate, stampUpdate } from '../utils/audit';
 
 const router = Router();
 
+// Un devis verrouillé (converti en contrat, refusé...) ne doit plus voir ses lignes
+// modifiées côté API — seul le frontend désactivait ces actions jusqu'ici, ce qui
+// laissait passer tout appel direct et faisait diverger le devis du contrat produit.
+async function assertQuoteEditable(quoteId: string): Promise<{ error: true; message: string } | { error: false }> {
+  const quoteRes = await global.db.get(`/quotes?id=eq.${quoteId}&select=status,converted_contract_id`);
+  const quote = quoteRes.data?.[0];
+  if (!quote) return { error: true, message: 'Devis introuvable.' };
+  if (quote.converted_contract_id) {
+    return { error: true, message: 'Ce devis a déjà été converti en contrat ; ses lignes ne peuvent plus être modifiées.' };
+  }
+  if (!['brouillon', 'envoye'].includes(quote.status)) {
+    return { error: true, message: `Ce devis est au statut "${quote.status}" ; ses lignes ne peuvent plus être modifiées.` };
+  }
+  return { error: false };
+}
+
 async function recalcQuoteTotals(quoteId: string): Promise<void> {
   const linesRes = await global.db.get(`/quote_lines?quote_id=eq.${quoteId}&select=amount_ht,vat_amount,amount_ttc`);
   const lines: any[] = linesRes.data || [];
@@ -87,6 +103,10 @@ async function findQuoteOverlap(
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
+    if (req.body.quote_id) {
+      const guard = await assertQuoteEditable(req.body.quote_id);
+      if (guard.error) return res.status(422).json({ success: false, message: guard.message });
+    }
     const { car_id, period_start, period_end, pickup_time, return_time } = req.body;
     if (car_id && period_start && period_end) {
       const overlap = await findQuoteOverlap(car_id, period_start, period_end, pickup_time || null, return_time || null);
@@ -104,6 +124,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const check = await global.db.get(`/quote_lines?id=eq.${req.params.id}&select=id,quote_id`);
     if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Ligne introuvable.' });
+    const guard = await assertQuoteEditable(check.data[0].quote_id);
+    if (guard.error) return res.status(422).json({ success: false, message: guard.message });
     const { car_id, period_start, period_end, pickup_time, return_time } = req.body;
     if (car_id && period_start && period_end) {
       const overlap = await findQuoteOverlap(car_id, period_start, period_end, pickup_time || null, return_time || null, req.params.id);
@@ -120,7 +142,19 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const check = await global.db.get(`/quote_lines?id=eq.${req.params.id}&select=id,quote_id`);
-    const quoteId = check.data?.[0]?.quote_id || null;
+    if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Ligne introuvable.' });
+    const quoteId = check.data[0].quote_id;
+
+    if (quoteId) {
+      const guard = await assertQuoteEditable(quoteId);
+      if (guard.error) return res.status(422).json({ success: false, message: guard.message });
+
+      const countRes = await global.db.get(`/quote_lines?quote_id=eq.${quoteId}&select=id`);
+      if ((countRes.data || []).length <= 1) {
+        return res.status(422).json({ success: false, message: 'Un devis doit avoir au moins une ligne.' });
+      }
+    }
+
     await global.db.delete(`/quote_lines?id=eq.${req.params.id}`);
     if (quoteId) await recalcQuoteTotals(quoteId);
     res.json({ success: true, message: 'Ligne de devis supprimée.' });
