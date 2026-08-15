@@ -1561,15 +1561,6 @@
 
       <div class="row">
         <div>
-          <label>Filtre statut</label>
-          <select id="carsFilterStatus">
-            <option value="">tous</option>
-            <option value="dispo">dispo</option>
-            <option value="loue">loue</option>
-            <option value="maintenance">maintenance</option>
-          </select>
-        </div>
-        <div>
           <label>Recherche</label>
           <input id="carsFilterQuery" placeholder="Immatriculation, modele, agence" />
         </div>
@@ -3825,7 +3816,7 @@
       inspections: "",
     };
     const dashboardFilters = {
-      cars: { status: "", query: "" },
+      cars: { query: "" },
       customers: { type: "", query: "" },
       contracts: { type: "", query: "", quoteId: "", dateFrom: "", dateTo: "" },
       reservations: { status: "" },
@@ -4917,10 +4908,8 @@
       saveInspectionDraft();
     }
 
-    function applyCarsFilter({ status = "", query = "" } = {}) {
-      dashboardFilters.cars.status = status;
+    function applyCarsFilter({ query = "" } = {}) {
       dashboardFilters.cars.query = query;
-      if (byId("carsFilterStatus")) byId("carsFilterStatus").value = status;
       if (byId("carsFilterQuery")) byId("carsFilterQuery").value = query;
       renderCars();
     }
@@ -5019,19 +5008,14 @@
       if (forecastEl) forecastEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    if (byId("carsFilterStatus")) {
-      byId("carsFilterStatus").addEventListener("change", (e) => {
-        applyCarsFilter({ status: e.target.value, query: dashboardFilters.cars.query });
-      });
-    }
     if (byId("carsFilterQuery")) {
       byId("carsFilterQuery").addEventListener("input", (e) => {
-        applyCarsFilter({ status: dashboardFilters.cars.status, query: e.target.value || "" });
+        applyCarsFilter({ query: e.target.value || "" });
       });
     }
     if (byId("carsClearFiltersBtn")) {
       byId("carsClearFiltersBtn").addEventListener("click", () => {
-        applyCarsFilter({ status: "", query: "" });
+        applyCarsFilter({ query: "" });
       });
     }
 
@@ -5989,7 +5973,6 @@
         fuelType: c.fuel_type || "",
         odometerKm: Number(c.odometer_km || 0),
         agency: c.location || c.agency || "",
-        status: c.status === "disponible" ? "dispo" : (c.status || "dispo"),
         ownerName: c.owner_name || "",
         purchasePrice: c.purchase_price ? Number(c.purchase_price) : null,
         purchaseDate: c.purchase_date || "",
@@ -6401,7 +6384,7 @@
       const initialStatus = isBrouillon ? "brouillon" : "active";
 
       const contractNumber = await fetchNextSequenceNumber('contracts');
-      const savedContract = await apiPost("/contracts", {
+      const contractRes = await apiPostWithError("/contracts", {
         id: contractId,
         contract_number: contractNumber,
         customer_id: customerId,
@@ -6416,6 +6399,11 @@
         days: 0, months: 0, rate: 0, quotient: 0,
         total_amount_original: 0, total_amount_tnd: 0,
       });
+      if (!contractRes.ok) {
+        alert(`Erreur lors de la création du contrat : ${contractRes.errorMsg}`);
+        return;
+      }
+      const savedContract = contractRes.data;
       if (savedContract && savedContract.id) contractId = savedContract.id;
 
       state.contracts.push({
@@ -6569,7 +6557,7 @@
         const primaryContractId = lines[0].contractId || null;
 
         let invId = uid("FAC");
-        const savedInv = await apiPost("/invoices", {
+        const invRes = await apiPostWithError("/invoices", {
           id: invId,
           contract_id: primaryContractId,
           customer_name: customer.name,
@@ -6593,6 +6581,11 @@
           rib,
           rib_label: ribLabel,
         });
+        if (!invRes.ok) {
+          alert(`Erreur lors de la création de la facture : ${invRes.errorMsg}`);
+          return;
+        }
+        const savedInv = invRes.data;
         if (savedInv && savedInv.id) invId = savedInv.id;
 
         // Fetch invoice_lines created by backend (BR21)
@@ -7585,17 +7578,21 @@
         return;
       }
 
-      invoice.paidAmountTnd = Math.round((Number(invoice.paidAmountTnd || 0) + amountTnd) * 1000) / 1000;
-      invoice.dueAmountTnd = Math.round(Math.max(0, Number(invoice.amountTnd) - Number(invoice.paidAmountTnd)) * 1000) / 1000;
-      // Faire refléter le règlement sur le statut réel de la facture (pas seulement le badge
-      // calculé à l'affichage) pour que les autres écrans qui lisent invoice.status directement
-      // (ex. bouton Supprimer du modal détail) restent cohérents.
-      invoice.status = invoice.dueAmountTnd <= 0 ? "payee" : "partiel";
+      // Calculés localement, appliqués à `invoice` seulement après création réussie du paiement
+      // (pour ne pas faire dériver l'état local si l'appel API échoue).
+      const newPaidAmountTnd = Math.round((Number(invoice.paidAmountTnd || 0) + amountTnd) * 1000) / 1000;
+      const newDueAmountTnd = Math.round(Math.max(0, Number(invoice.amountTnd) - Number(newPaidAmountTnd)) * 1000) / 1000;
+      const newStatus = newDueAmountTnd <= 0 ? "payee" : "partiel";
 
       const contract = state.contracts.find((c) => c.id === invoice.contractId);
 
       let payId = uid("PAY");
-      const savedPay = await apiPost("/payments", { id: payId, invoice_id: invoiceId, contract_id: invoice.contractId, customer_name: invoice.customerName, contract_type: contract ? contract.type : "", payment_date: date, amount_original: amountTnd, currency: "TND", amount_tnd: amountTnd, method });
+      const payRes = await apiPostWithError("/payments", { id: payId, invoice_id: invoiceId, contract_id: invoice.contractId, customer_name: invoice.customerName, contract_type: contract ? contract.type : "", payment_date: date, amount_original: amountTnd, currency: "TND", amount_tnd: amountTnd, method });
+      if (!payRes.ok) {
+        alert(`Erreur lors de l'enregistrement du paiement : ${payRes.errorMsg}`);
+        return;
+      }
+      const savedPay = payRes.data;
       if (savedPay && savedPay.id) payId = savedPay.id;
 
       state.payments.push({
@@ -7610,11 +7607,20 @@
         contractType: contract ? contract.type : "-",
       });
 
-      await apiPut(`/invoices/${invoiceId}`, {
-        paid_amount_tnd: invoice.paidAmountTnd,
-        due_amount_tnd: invoice.dueAmountTnd,
-        status: invoice.status,
+      // Le paiement est déjà créé côté serveur à ce stade : une erreur ici est un avertissement
+      // (solde de la facture pas encore reflété), pas une raison d'annuler le paiement.
+      const invPatchRes = await apiPutWithError(`/invoices/${invoiceId}`, {
+        paid_amount_tnd: newPaidAmountTnd,
+        due_amount_tnd: newDueAmountTnd,
+        status: newStatus,
       });
+      if (invPatchRes.ok) {
+        invoice.paidAmountTnd = newPaidAmountTnd;
+        invoice.dueAmountTnd = newDueAmountTnd;
+        invoice.status = newStatus;
+      } else {
+        alert(`Paiement enregistré, mais la mise à jour du solde de la facture a échoué (${invPatchRes.errorMsg}). Rechargez la page pour vérifier le solde.`);
+      }
 
       saveAndRender();
     });
@@ -7665,7 +7671,12 @@
       }
 
       let resId = uid("RES");
-      const savedRes = await apiPost("/reservations", { id: resId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status, pickup_location: pickupLocation || null, dropoff_location: dropoffLocation || null });
+      const resRes = await apiPostWithError("/reservations", { id: resId, customer_id: customerId, car_id: carId, customer_name: customer.name, car_plate: car.plate, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, status, pickup_location: pickupLocation || null, dropoff_location: dropoffLocation || null });
+      if (!resRes.ok) {
+        alert(`Erreur lors de la création de la réservation : ${resRes.errorMsg}`);
+        return;
+      }
+      const savedRes = resRes.data;
       if (savedRes && savedRes.id) resId = savedRes.id;
 
       state.reservations.push({
@@ -7710,7 +7721,12 @@
 
         let mntId = uid("MNT");
         const amountTnd = convertToTnd(amountOriginal, currency, state.settings.eurToTnd);
-        const savedMnt = await apiPost("/maintenance", { id: mntId, car_id: carId, car_plate: car.plate, type, date, amount_original: amountOriginal, currency, amount_tnd: amountTnd, status, note, source_key: "" });
+        const mntRes = await apiPostWithError("/maintenance", { id: mntId, car_id: carId, car_plate: car.plate, type, date, amount_original: amountOriginal, currency, amount_tnd: amountTnd, status, note, source_key: "" });
+        if (!mntRes.ok) {
+          alert(`Erreur lors de la création : ${mntRes.errorMsg}`);
+          return;
+        }
+        const savedMnt = mntRes.data;
         if (savedMnt && savedMnt.id) mntId = savedMnt.id;
 
         state.maintenanceCosts.push({
@@ -7739,6 +7755,7 @@
         }
 
         let created = 0;
+        let failed = 0;
         const groups = new Map();
         state.reservations
           .filter((r) => r.status !== "annulee")
@@ -7750,7 +7767,9 @@
             groups.set(key, list);
           });
 
-        groups.forEach(async (list, carId) => {
+        // for...of + await (pas .forEach(async …), qui ne serait pas attendu) pour que le
+        // récap final (created/failed) reflète bien tout le travail terminé.
+        for (const [carId, list] of groups) {
           const sorted = [...list].sort((a, b) => getReservationStartTs(a) - getReservationStartTs(b));
           for (let i = 0; i < sorted.length - 1; i += 1) {
             const prev = sorted[i];
@@ -7765,7 +7784,13 @@
             const car = state.cars.find((c) => String(c.id) === String(carId));
             const carPlateWash = car ? car.plate : (prev.carPlate || carId);
             let washId = uid("MNT");
-            const savedWash = await apiPost("/maintenance", { id: washId, car_id: carId, car_plate: carPlateWash, type: "lavage", date: prev.endDate, amount_original: defaultCostTnd, currency: "TND", amount_tnd: defaultCostTnd, status: "a_payer", note: `Lavage auto entre ${prev.id} et ${next.id}`, source_key: sourceKey });
+            const washRes = await apiPostWithError("/maintenance", { id: washId, car_id: carId, car_plate: carPlateWash, type: "lavage", date: prev.endDate, amount_original: defaultCostTnd, currency: "TND", amount_tnd: defaultCostTnd, status: "a_payer", note: `Lavage auto entre ${prev.id} et ${next.id}`, source_key: sourceKey });
+            if (!washRes.ok) {
+              failed += 1;
+              console.error("[generateWashCosts]", sourceKey, washRes.errorMsg);
+              continue;
+            }
+            const savedWash = washRes.data;
             if (savedWash && savedWash.id) washId = savedWash.id;
             state.maintenanceCosts.push({
               id: washId,
@@ -7782,10 +7807,12 @@
             });
             created += 1;
           }
-        });
+        }
 
         saveAndRender();
-        alert(`${created} lavage(s) auto ajoute(s).`);
+        alert(failed > 0
+          ? `${created} lavage(s) auto ajoute(s). ${failed} echec(s) — voir la console pour le detail.`
+          : `${created} lavage(s) auto ajoute(s).`);
       });
     }
 
@@ -7871,7 +7898,12 @@
           state.inspections[editIndex] = previous;
         };
       } else {
-        const savedIns = await apiPost("/inspections", { id: inspectionRecord.id, type: inspectionRecord.type || "sortie", contract_id: inspectionRecord.contractId || null, car_id: inspectionRecord.carId, car_plate: inspectionRecord.carPlate || "", date: inspectionRecord.date || today, time: inspectionRecord.time || "00:00", odometer_km: inspectionRecord.odometerKm || null, fuel_level: inspectionRecord.fuelLevel || null, condition_note: inspectionRecord.conditionNote || null, observation: inspectionRecord.observation || "" });
+        const insRes = await apiPostWithError("/inspections", { id: inspectionRecord.id, type: inspectionRecord.type || "sortie", contract_id: inspectionRecord.contractId || null, car_id: inspectionRecord.carId, car_plate: inspectionRecord.carPlate || "", date: inspectionRecord.date || today, time: inspectionRecord.time || "00:00", odometer_km: inspectionRecord.odometerKm || null, fuel_level: inspectionRecord.fuelLevel || null, condition_note: inspectionRecord.conditionNote || null, observation: inspectionRecord.observation || "" });
+        if (!insRes.ok) {
+          alert(`Erreur lors de la création de l'état des lieux : ${insRes.errorMsg}`);
+          return;
+        }
+        const savedIns = insRes.data;
         if (savedIns && savedIns.id) inspectionRecord.id = savedIns.id;
         state.inspections.push(inspectionRecord);
         rollback = () => {
@@ -7982,7 +8014,9 @@
           if (idx >= 0) {
             state.inspections[idx] = updated;
           } else {
-            const savedInsD = await apiPost("/inspections", { id: updated.id, type: updated.type || "sortie", contract_id: updated.contractId || null, car_id: updated.carId, car_plate: updated.carPlate || "", date: updated.date || today, time: updated.time || "00:00", odometer_km: updated.odometerKm || null, fuel_level: updated.fuelLevel || null, condition_note: updated.conditionNote || null, observation: updated.observation || "" });
+            const insDRes = await apiPostWithError("/inspections", { id: updated.id, type: updated.type || "sortie", contract_id: updated.contractId || null, car_id: updated.carId, car_plate: updated.carPlate || "", date: updated.date || today, time: updated.time || "00:00", odometer_km: updated.odometerKm || null, fuel_level: updated.fuelLevel || null, condition_note: updated.conditionNote || null, observation: updated.observation || "" });
+            if (!insDRes.ok) throw new Error(insDRes.errorMsg);
+            const savedInsD = insDRes.data;
             if (savedInsD && savedInsD.id) updated.id = savedInsD.id;
             state.inspections.push(updated);
           }
@@ -8010,7 +8044,7 @@
           plate: "", model: "", brand: "", color: "", vin: "",
           registrationNumber: "", registrationDate: "",
           fuelType: "", odometerKm: 0,
-          status: "dispo", agency: "", ownerName: "",
+          agency: "", ownerName: "",
           purchasePrice: 0, purchaseDate: "",
           openingCashTnd: 0, notes: "",
           photoUrl: "", siteVisible: false, sitePriceDay: 0,
@@ -8331,7 +8365,12 @@
 
       const attachment = await readAttachmentFile(attachmentInput);
       let insuranceId = uid("INS");
-      const savedIns = await apiPost("/insurances", { id: insuranceId, car_id: carId, car_plate: car.plate, insurance_company: provider, policy_number: policyNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      const insRes = await apiPostWithError("/insurances", { id: insuranceId, car_id: carId, car_plate: car.plate, insurance_company: provider, policy_number: policyNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      if (!insRes.ok) {
+        alert(`Erreur lors de la création : ${insRes.errorMsg}`);
+        return;
+      }
+      const savedIns = insRes.data;
       if (savedIns && savedIns.id) insuranceId = savedIns.id;
 
       state.insurances.push({
@@ -8397,7 +8436,12 @@
 
       const attachment = await readAttachmentFile(attachmentInput);
       let leasingId = uid("LEA");
-      const savedLea = await apiPost("/leasing", { id: leasingId, car_id: carId, car_plate: car.plate, leasing_company: lender, contract_number: contractNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      const leaRes = await apiPostWithError("/leasing", { id: leasingId, car_id: carId, car_plate: car.plate, leasing_company: lender, contract_number: contractNumber, start_date: startDate, end_date: endDate, monthly_amount: monthlyAmount, currency, monthly_amount_tnd: convertToTnd(monthlyAmount, currency, state.settings.eurToTnd), status: "active" });
+      if (!leaRes.ok) {
+        alert(`Erreur lors de la création : ${leaRes.errorMsg}`);
+        return;
+      }
+      const savedLea = leaRes.data;
       if (savedLea && savedLea.id) leasingId = savedLea.id;
 
       state.leasingContracts.push({
@@ -8464,7 +8508,12 @@
 
       const attachment = await readAttachmentFile(attachmentInput);
       let vigId = uid("VIG");
-      const savedVig = await apiPost("/vignettes", { id: vigId, car_id: carId, car_plate: car.plate, fiscal_year: fiscalYear, amount_original: amount, currency, amount_tnd: convertToTnd(amount, currency, state.settings.eurToTnd), due_date: dueDate, status: "a_payer" });
+      const vigRes = await apiPostWithError("/vignettes", { id: vigId, car_id: carId, car_plate: car.plate, fiscal_year: fiscalYear, amount_original: amount, currency, amount_tnd: convertToTnd(amount, currency, state.settings.eurToTnd), due_date: dueDate, status: "a_payer" });
+      if (!vigRes.ok) {
+        alert(`Erreur lors de la création : ${vigRes.errorMsg}`);
+        return;
+      }
+      const savedVig = vigRes.data;
       if (savedVig && savedVig.id) vigId = savedVig.id;
 
       state.vignettes.push({
@@ -9132,7 +9181,6 @@
       r.cars = await upsertMany("/cars", state.cars, c => ({
         id: c.id, plate: c.plate, model: c.model,
         location: c.agency || c.location || "",
-        status: c.status === "dispo" ? "disponible" : (c.status || "disponible"),
       }));
 
       r.customers = await upsertMany("/customers", state.customers, c => ({
@@ -9347,24 +9395,7 @@
       if (!Number.isFinite(dailyTaxTnd) || dailyTaxTnd < 0) return { ok: false, message: "❌ La taxe par jour doit etre >= 0." };
       if (!Number.isFinite(stampDutyTnd) || stampDutyTnd < 0) return { ok: false, message: "❌ Le timbre fiscal doit etre >= 0." };
 
-      state.settings.eurToTnd = eurToTnd;
-      state.settings.openingCashTnd = openingCashTnd;
-      state.settings.reservationBufferHours = reservationBufferHours;
-      state.settings.rentalToleranceHours = rentalToleranceHours;
-      state.settings.vatRate = vatRate;
-      state.settings.dailyTaxTnd = dailyTaxTnd;
-      state.settings.stampDutyTnd = stampDutyTnd;
-      state.settings.companyAddress = companyAddress;
-      state.settings.companyPhone = companyPhone;
-      state.settings.companyRibLabel = companyRibLabel;
-      state.settings.companyRib = companyRib;
-      state.settings.companyRib2Label = companyRib2Label;
-      state.settings.companyRib2 = companyRib2;
-      state.settings.companyTaxId = companyTaxId;
-      saveAndRender();
-      applyBranding(logoUrl, companyName);
-
-      const saved = await apiPut("/settings", {
+      const settingsRes = await apiPutWithError("/settings", {
         eur_to_tnd: eurToTnd,
         opening_cash_tnd: openingCashTnd,
         reservation_buffer_hours: reservationBufferHours,
@@ -9382,8 +9413,28 @@
         company_name: companyName,
         logo_url: logoUrl,
       });
+      if (!settingsRes.ok) {
+        return { ok: false, message: `❌ Erreur lors de l'enregistrement : ${settingsRes.errorMsg}` };
+      }
 
-      return { ok: true, message: saved ? "✅ Parametres enregistres et synchronises." : "⚠️ Parametres enregistres localement (synchronisation serveur indisponible)." };
+      state.settings.eurToTnd = eurToTnd;
+      state.settings.openingCashTnd = openingCashTnd;
+      state.settings.reservationBufferHours = reservationBufferHours;
+      state.settings.rentalToleranceHours = rentalToleranceHours;
+      state.settings.vatRate = vatRate;
+      state.settings.dailyTaxTnd = dailyTaxTnd;
+      state.settings.stampDutyTnd = stampDutyTnd;
+      state.settings.companyAddress = companyAddress;
+      state.settings.companyPhone = companyPhone;
+      state.settings.companyRibLabel = companyRibLabel;
+      state.settings.companyRib = companyRib;
+      state.settings.companyRib2Label = companyRib2Label;
+      state.settings.companyRib2 = companyRib2;
+      state.settings.companyTaxId = companyTaxId;
+      saveAndRender();
+      applyBranding(logoUrl, companyName);
+
+      return { ok: true, message: "✅ Parametres enregistres et synchronises." };
     }
 
     function showSettingsModalStatus(message, ok) {
@@ -9493,7 +9544,6 @@
         fuel_type: c.fuelType || null,
         odometer_km: Number(c.odometerKm || 0),
         location: c.agency || c.location || null,
-        status: c.status === "dispo" ? "disponible" : (c.status || "disponible"),
         owner_name: c.ownerName || null,
         purchase_price: c.purchasePrice ? Number(c.purchasePrice) : null,
         purchase_date: c.purchaseDate || null,
@@ -10311,8 +10361,23 @@
       });
     }
 
+    // Véhicules réellement engagés aujourd'hui, calculé depuis les lignes de contrat
+    // actives (même source que le contrôle de chevauchement BR19) — remplace l'ancien
+    // champ cars.status (dispo/loue/maintenance), jamais tenu à jour automatiquement.
+    function getCarsRentedTodaySet() {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const ids = new Set();
+      (state.contractLines || []).forEach((l) => {
+        if (l.status === "active" && l.carId && l.periodStart && l.periodEnd && l.periodStart <= todayStr && l.periodEnd >= todayStr) {
+          ids.add(l.carId);
+        }
+      });
+      return ids;
+    }
+
     function renderHomeDashboard() {
-      const availableCars = state.cars.filter((c) => c.status === "dispo").length;
+      const rentedTodayIds = getCarsRentedTodaySet();
+      const availableCars = state.cars.filter((c) => !rentedTodayIds.has(c.id)).length;
       const activeReservations = state.reservations.filter((r) => ["en_attente", "confirmee"].includes(r.status)).length;
       const treasury = computeTreasurySnapshot(TREASURY_HORIZON_DAYS);
       const allAlerts = collectAlerts();
@@ -10354,19 +10419,16 @@
         const fleetCanvas = cjsCanvas("cjsFleet", "fleetBars");
         if (fleetCanvas) cjsSave("cjsFleet", new Chart(fleetCanvas, {
           type: "doughnut",
-          data: { labels: fleet.map(s => s.label), datasets: [{ data: fleet.map(s => s.value), backgroundColor: ["#16a34a","#2563eb","#f97316","#dc2626"], borderWidth: 2, borderColor: "#fff" }] },
+          data: { labels: fleet.map(s => s.label), datasets: [{ data: fleet.map(s => s.value), backgroundColor: ["#16a34a","#2563eb"], borderWidth: 2, borderColor: "#fff" }] },
           options: {
             responsive: true, cutout: "65%",
             plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
             onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
             onClick(e, elements) {
               if (!elements.length) return;
-              const label = fleet[elements[0].index]?.label;
-              if (!label) return;
               e.native?.stopPropagation();
               history.pushState({ tab: "cars" }, "", "#cars");
               switchToTab("cars");
-              applyCarsFilter({ status: label });
             }
           }
         }));
@@ -10881,10 +10943,12 @@
     }
 
     function getFleetSeries() {
+      const rentedTodayIds = getCarsRentedTodaySet();
+      const rented = state.cars.filter((c) => rentedTodayIds.has(c.id)).length;
+      const free = state.cars.length - rented;
       return [
-        { label: "dispo", value: state.cars.filter((c) => c.status === "dispo").length },
-        { label: "loue", value: state.cars.filter((c) => c.status === "loue").length },
-        { label: "maintenance", value: state.cars.filter((c) => c.status === "maintenance").length },
+        { label: "libre", value: free },
+        { label: "loué aujourd'hui", value: rented },
       ];
     }
 
@@ -10897,7 +10961,7 @@
     }
 
     function getOccupancySeries(months = 6) {
-      const activeCars = (state.cars || []).filter(c => c.status !== 'indisponible');
+      const activeCars = state.cars || [];
       const totalCars = activeCars.length;
       if (!totalCars) return [];
 
@@ -11932,7 +11996,6 @@
         { key: "registrationDate",   label: "Date immat.",          render: c => safe(c.registrationDate || "") },
         { key: "fuelType",           label: "Carburant",            render: c => safe(c.fuelType || "") },
         { key: "odometerKm",         label: "Kilométrage",          render: c => c.odometerKm ? `${Number(c.odometerKm).toLocaleString("fr-FR")} km` : "" },
-        { key: "status",             label: "Statut",               render: c => `<span class="pill ${safe(c.status)}">${safe(c.status)}</span>` },
         { key: "agency",             label: "Agence",               render: c => safe(c.agency || "") },
         { key: "ownerName",          label: "Propriétaire",         render: c => safe(c.ownerName || "") },
         { key: "purchasePrice",      label: "Prix d'achat",         render: c => c.purchasePrice ? `${Number(c.purchasePrice).toLocaleString("fr-FR")} TND` : "" },
@@ -12038,7 +12101,7 @@
     };
 
     const DEFAULT_COLS = {
-      cars:             ["plate", "model", "status", "agency"],
+      cars:             ["plate", "model", "agency"],
       customers:        ["name", "phone", "email", "type"],
       maintenance:      ["carPlate", "type", "date", "amountTnd", "status"],
       payments:         ["customerName", "contractId", "date", "amountTnd", "method"],
@@ -12131,7 +12194,6 @@
       { key: "plate" },
       { key: "model" },
       { key: "agency" },
-      { key: "status", filterType: "select", options: ["dispo", "loue", "maintenance"] },
       { key: "actions", sortable: false, filterable: false },
     ];
 
@@ -12168,10 +12230,8 @@
       });
 
       // Filter + sort data
-      const statusFilter = dashboardFilters.cars.status;
       const query = String(dashboardFilters.cars.query || "").trim().toLowerCase();
       let filtered = state.cars.filter(car => {
-        if (statusFilter && car.status !== statusFilter) return false;
         const hay = `${car.plate||""} ${car.model||""} ${car.brand||""} ${car.agency||""} ${car.color||""} ${car.vin||""}`.toLowerCase();
         if (query && !hay.includes(query)) return false;
         for (const col of activeDefs) {
@@ -12637,7 +12697,6 @@
         customerSelect.appendChild(opt);
       });
       state.cars
-        .filter((c) => c.status === "dispo")
         .forEach((car) => {
           const opt = document.createElement("option");
           opt.value = car.id;
@@ -12886,11 +12945,15 @@
           const customerId = byId("qdEClient").value;
           const customer = state.customers.find(c => c.id === customerId);
           const newRateType = byId("qdERateType").value || "daily";
-          await apiPut(`/quotes/${quoteId}`, {
+          const qRes = await apiPutWithError(`/quotes/${quoteId}`, {
             customer_id: customerId, customer_name: customer ? customer.name : q.customerName,
             status: byId("qdEStatus").value, notes: byId("qdENotes").value,
             rate_type: newRateType,
           });
+          if (!qRes.ok) {
+            alert(`Erreur lors de l'enregistrement : ${qRes.errorMsg}`);
+            return;
+          }
           const idx = state.quotes.findIndex(x => x.id === quoteId);
           if (idx >= 0) Object.assign(state.quotes[idx], {
             customerId, customerName: customer ? customer.name : q.customerName,
@@ -13530,14 +13593,16 @@
       byId("qdValidateBtn").disabled = false;
       byId("qdValidateBtn").textContent = "✓ Valider → Contrat";
       byId("qdSendBtn").onclick   = async () => {
-        await apiPut(`/quotes/${quoteId}`, { status: "envoye" });
+        const res = await apiPutWithError(`/quotes/${quoteId}`, { status: "envoye" });
+        if (!res.ok) { alert(`Erreur lors de l'envoi : ${res.errorMsg}`); return; }
         const idx = state.quotes.findIndex(x => x.id === quoteId);
         if (idx >= 0) state.quotes[idx].status = "envoye";
         renderQuoteDetailHeader(quoteId, false); renderQuotes();
       };
       byId("qdRefuseBtn").onclick = async () => {
         if (!confirm("Marquer ce devis comme refusé ?")) return;
-        await apiPut(`/quotes/${quoteId}`, { status: "refuse" });
+        const res = await apiPutWithError(`/quotes/${quoteId}`, { status: "refuse" });
+        if (!res.ok) { alert(`Erreur lors du refus : ${res.errorMsg}`); return; }
         const idx = state.quotes.findIndex(x => x.id === quoteId);
         if (idx >= 0) state.quotes[idx].status = "refuse";
         renderQuoteDetailHeader(quoteId, false); renderQuotes();
@@ -13608,14 +13673,20 @@
         if (!customerId) { alert("Client requis."); return; }
         if (!quoteDate || !validityDate) { alert("Dates requises."); return; }
         const customer = state.customers.find(c => c.id === customerId);
-        const quoteId = uid("QUO");
+        let quoteId = uid("QUO");
         const quoteNumber = await fetchNextSequenceNumber('quotes');
-        const saved = await apiPost("/quotes", {
+        const quoteRes = await apiPostWithError("/quotes", {
           id: quoteId, quote_number: quoteNumber, customer_id: customerId,
           customer_name: customer ? customer.name : "",
           quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
           type: quoteType, rate_type: quoteRateType,
         });
+        if (!quoteRes.ok) {
+          alert(`Erreur lors de la création du devis : ${quoteRes.errorMsg}`);
+          return;
+        }
+        const saved = quoteRes.data;
+        if (saved && saved.id) quoteId = saved.id;
         state.quotes.push({
           id: quoteId, quoteNumber, customerId, customerName: customer ? customer.name : "",
           quoteDate, validityDate, status: "brouillon", notes, type: quoteType, rateType: quoteRateType,
@@ -13874,14 +13945,14 @@
           const ribLabel = ribOpt ? ribOpt.label.split(" - ")[0] : "";
           const st = byId("ieHdrSaveStatus");
           st.textContent = "Enregistrement..."; st.style.color = "#0369a1";
-          const res = await apiPut(`/invoices/${invoiceId}`, { label, due_date: dueDate, status, rib: ribVal, rib_label: ribLabel });
-          if (res) {
+          const res = await apiPutWithError(`/invoices/${invoiceId}`, { label, due_date: dueDate, status, rib: ribVal, rib_label: ribLabel });
+          if (res.ok) {
             const idx = state.invoices.findIndex(i => String(i.id) === String(invoiceId));
             if (idx >= 0) Object.assign(state.invoices[idx], { label, dueDate, status, rib: ribVal, ribLabel });
             renderInvoiceDetailHeader(invoiceId, false);
             renderInvoices();
           } else {
-            st.textContent = "Erreur lors de l'enregistrement."; st.style.color = "#c53030";
+            st.textContent = `Erreur lors de l'enregistrement : ${res.errorMsg}`; st.style.color = "#c53030";
           }
         };
         cancelBtn.style.display = "";
@@ -14485,21 +14556,29 @@
       s.style.background = "#f0f9ff"; s.style.color = "#0369a1";
 
       const delta = breakdown.amountTtc - Number(invoice.amountTnd || 0);
+      const newDueAmountTnd = Math.max(0, Number(invoice.dueAmountTnd || 0) + delta);
+
+      const invRes = await apiPutWithError(`/invoices/${invoice.id}`, {
+        amount_ht: breakdown.amountHt,
+        vat_amount: breakdown.vatAmount,
+        daily_tax_amount: breakdown.dailyTaxAmount,
+        stamp_duty_amount: breakdown.stampDutyAmount,
+        amount_tnd: breakdown.amountTtc,
+        due_amount_tnd: newDueAmountTnd,
+      });
+      if (!invRes.ok) {
+        s.textContent = `Erreur lors de l'enregistrement : ${invRes.errorMsg}`;
+        s.style.background = "#fee2e2"; s.style.color = "#b91c1c";
+        return;
+      }
+
       invoice.amountHt = breakdown.amountHt;
       invoice.vatAmount = breakdown.vatAmount;
       invoice.dailyTaxAmount = breakdown.dailyTaxAmount;
       invoice.stampDutyAmount = breakdown.stampDutyAmount;
       invoice.amountTnd = breakdown.amountTtc;
-      invoice.dueAmountTnd = Math.max(0, Number(invoice.dueAmountTnd || 0) + delta);
+      invoice.dueAmountTnd = newDueAmountTnd;
 
-      await apiPut(`/invoices/${invoice.id}`, {
-        amount_ht: invoice.amountHt,
-        vat_amount: invoice.vatAmount,
-        daily_tax_amount: invoice.dailyTaxAmount,
-        stamp_duty_amount: invoice.stampDutyAmount,
-        amount_tnd: invoice.amountTnd,
-        due_amount_tnd: invoice.dueAmountTnd,
-      });
       s.textContent = "✅ Facture mise a jour.";
       s.style.background = "#dcfce7"; s.style.color = "#166534";
       saveAndRender();
@@ -15862,7 +15941,7 @@
       "cars.color": "Couleur", "cars.vin": "Numéro VIN",
       "cars.registrationNumber": "N° carte grise", "cars.registrationDate": "Date d'immatriculation",
       "cars.fuelType": "Type de carburant", "cars.odometerKm": "Kilométrage (km)",
-      "cars.status": "Statut", "cars.agency": "Agence / Lieu",
+      "cars.agency": "Agence / Lieu",
       "cars.ownerName": "Nom du propriétaire",
       "cars.purchasePrice": "Prix d'achat (TND)", "cars.purchaseDate": "Date d'achat",
       "cars.openingCashTnd": "Trésorerie initiale (TND)",
@@ -15951,7 +16030,6 @@
 
     function getEditorFieldConfig(entity, key, currentValue) {
       const enumMap = {
-        "cars.status": ["dispo", "loue", "maintenance"],
         "customers.type": ["particulier", "entreprise"],
         "contracts.type": ["court", "long", "autre"],
         "contracts.status": ["actif", "termine", "annule", "brouillon"],
@@ -15978,7 +16056,6 @@
       const lookupMap = {
         "contracts.customerId": state.customers.map((c) => ({ value: c.id, label: `${c.id} - ${c.name}` })),
         "contracts.carId": state.cars
-          .filter((c) => c.status === "dispo" || c.id === currentValue)
           .map((c) => ({ value: c.id, label: `${c.id} - ${c.plate} (${c.model})` })),
         "invoices.contractId": state.contracts.map((c) => ({ value: c.id, label: `${c.id} - ${c.customerName}` })),
         // BR22 : meme choix RIB1/RIB2 qu'a la creation de facture (#invoiceRib),
@@ -17283,10 +17360,8 @@
       const periodStart    = lines.reduce((m, l) => (!m || (l.periodStart && l.periodStart < m) ? l.periodStart : m), "");
       const periodEnd      = lines.reduce((m, l) => (!m || (l.periodEnd   && l.periodEnd   > m) ? l.periodEnd   : m), "");
 
-      byId("contractDetailModal").style.display = "none";
-
       let invId = uid("FAC");
-      const savedInv = await apiPost("/invoices", {
+      const invRes = await apiPostWithError("/invoices", {
         id: invId,
         contract_id: contractId,
         customer_name: customer ? customer.name : (contract.customerName || ""),
@@ -17310,6 +17385,12 @@
         rib,
         rib_label: ribLabel,
       });
+      if (!invRes.ok) {
+        alert(`Erreur lors de la création de la facture : ${invRes.errorMsg}`);
+        return;
+      }
+      byId("contractDetailModal").style.display = "none";
+      const savedInv = invRes.data;
       if (savedInv && savedInv.id) invId = savedInv.id;
 
       // Charger les invoice_lines créées par le backend
@@ -17723,6 +17804,7 @@
     // (les colonnes contract_id/invoice_id en base sont mises a jour via ON UPDATE CASCADE).
     async function cascadeIdChange(entity, oldId, newId) {
       if (entity === "contracts") {
+        const failed = [];
         for (const inv of state.invoices) {
           let changed = false;
           if (String(inv.contractId) === String(oldId)) { inv.contractId = newId; changed = true; }
@@ -17732,8 +17814,12 @@
             });
           }
           if (changed && ENTITY_API_PUT.invoices) {
-            await apiPut(`${ENTITY_API_PUT.invoices.path}/${inv.id}`, ENTITY_API_PUT.invoices.toApi(inv));
+            const res = await apiPutWithError(`${ENTITY_API_PUT.invoices.path}/${inv.id}`, ENTITY_API_PUT.invoices.toApi(inv));
+            if (!res.ok) failed.push(`${inv.id} (${res.errorMsg})`);
           }
+        }
+        if (failed.length > 0) {
+          alert(`Id du contrat modifié, mais la mise à jour de ${failed.length} facture(s) liée(s) a échoué : ${failed.join(", ")}. Rechargez la page et vérifiez ces factures.`);
         }
         state.payments.forEach((p) => { if (String(p.contractId) === String(oldId)) p.contractId = newId; });
         state.inspections.forEach((x) => { if (String(x.contractId) === String(oldId)) x.contractId = newId; });
@@ -17810,7 +17896,12 @@
 
       if (editorState.isNew && entity === "maintenanceCosts") {
         const m = record;
-        const savedMntE = await apiPost("/maintenance", { id: m.id, car_id: m.carId, car_plate: m.carPlate || "", type: m.type || "", date: m.date || today, amount_original: m.amountOriginal || 0, currency: m.currency || "TND", amount_tnd: m.amountTnd || 0, status: m.status || "paye", note: m.note || "", source_key: m.sourceKey || "" });
+        const res = await apiPostWithError("/maintenance", { id: m.id, car_id: m.carId, car_plate: m.carPlate || "", type: m.type || "", date: m.date || today, amount_original: m.amountOriginal || 0, currency: m.currency || "TND", amount_tnd: m.amountTnd || 0, status: m.status || "paye", note: m.note || "", source_key: m.sourceKey || "" });
+        if (!res.ok) {
+          alert(`Erreur lors de la création : ${res.errorMsg}`);
+          return;
+        }
+        const savedMntE = res.data;
         if (savedMntE && savedMntE.id && savedMntE.id !== m.id) {
           const idx = collection.findIndex((r) => String(r.id) === String(m.id));
           if (idx >= 0) collection[idx].id = savedMntE.id;
@@ -17823,7 +17914,12 @@
           alert("L'immatriculation et le modèle sont obligatoires.");
           return;
         }
-        const savedCar = await apiPost("/cars", { ...mapCarToApi(record), id: record.id });
+        const res = await apiPostWithError("/cars", { ...mapCarToApi(record), id: record.id });
+        if (!res.ok) {
+          alert(`Erreur lors de la création : ${res.errorMsg}`);
+          return;
+        }
+        const savedCar = res.data;
         if (savedCar && savedCar.id && String(savedCar.id) !== String(record.id)) {
           const idx = collection.findIndex((r) => String(r.id) === String(record.id));
           if (idx >= 0) collection[idx].id = savedCar.id;
@@ -17837,16 +17933,20 @@
       const apiEntry = !editorState.isNew && ENTITY_API_PUT[entity];
       if (apiEntry) {
         if (idChanged) {
-          const result = await apiPut(`${apiEntry.path}/${oldId}`, { ...apiEntry.toApi(record), id: record.id });
-          if (!result) {
-            alert("Erreur: impossible de modifier l'Id (verifiez la connexion a la base de donnees).");
+          const result = await apiPutWithError(`${apiEntry.path}/${oldId}`, { ...apiEntry.toApi(record), id: record.id });
+          if (!result.ok) {
+            alert(`Erreur lors de la modification de l'Id : ${result.errorMsg}`);
             record.id = oldId;
             return;
           }
           await cascadeIdChange(entity, oldId, record.id);
           editorState.id = record.id;
         } else {
-          await apiPut(`${apiEntry.path}/${record.id}`, apiEntry.toApi(record));
+          const res = await apiPutWithError(`${apiEntry.path}/${record.id}`, apiEntry.toApi(record));
+          if (!res.ok) {
+            alert(`Erreur lors de l'enregistrement : ${res.errorMsg}`);
+            return;
+          }
         }
       }
 
