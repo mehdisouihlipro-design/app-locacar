@@ -3693,6 +3693,8 @@
         el.dataset.frDate = "1";
         const origIso = nativeGet.call(el);
         el.type = "text";
+        el.setAttribute("inputmode", "numeric");
+        el.setAttribute("autocomplete", "off");
         el.placeholder = el.placeholder || "jj/mm/aaaa";
         el.maxLength = 10;
         if (origIso) nativeSet.call(el, isoToFr(origIso));
@@ -3700,6 +3702,28 @@
           get() { const r = nativeGet.call(this); return frToIso(r) || r; },
           set(v) { nativeSet.call(this, v ? (isoToFr(String(v)) || String(v)) : ""); },
           configurable: true, enumerable: true,
+        });
+        // Formatage au fil de la frappe : l'utilisateur tape uniquement des chiffres
+        // (ex. "15082026"), les "/" sont insérés automatiquement ("15/08/2026").
+        // Si le formatage change le texte affiché, on redispatch un "input" de synthèse
+        // (avec garde anti-boucle) pour que les handlers .oninput déjà branchés sur ce
+        // champ (recalcul de durée, etc.) relisent la valeur fraîchement reformatée
+        // plutôt que le texte brut du tout dernier caractère tapé.
+        el.addEventListener("input", () => {
+          if (el.dataset.frDateGuard === "1") return;
+          const raw = nativeGet.call(el);
+          const digits = raw.replace(/\D/g, "").slice(0, 8);
+          let formatted = digits;
+          if (digits.length > 4) formatted = digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+          else if (digits.length > 2) formatted = digits.slice(0, 2) + "/" + digits.slice(2);
+          if (formatted === raw) return;
+          const distFromEnd = raw.length - (el.selectionStart ?? raw.length);
+          nativeSet.call(el, formatted);
+          const pos = Math.max(0, formatted.length - distFromEnd);
+          try { el.setSelectionRange(pos, pos); } catch (_) {}
+          el.dataset.frDateGuard = "1";
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          delete el.dataset.frDateGuard;
         });
         el.addEventListener("blur", () => {
           const raw = nativeGet.call(el);
@@ -5897,7 +5921,7 @@
     }
 
     async function loadDataFromAPI() {
-      const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, invoiceLinesRaw, invoiceScheduleRaw, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows] = await Promise.all([
+      const [cars, customers, contracts, contractLinesRaw, quotesRaw, quoteLinesRaw, invoices, invoiceLinesRaw, invoiceScheduleRaw, payments, maintenance, vignettes, reservations, leasingContracts, insurances, settingsRow, usersRows, inspectionsRaw] = await Promise.all([
         apiGet("/cars"), apiGet("/customers"), apiGet("/contracts"),
         apiGet("/contract-lines"),
         apiGet("/quotes"), apiGet("/quote-lines"),
@@ -5905,8 +5929,25 @@
         apiGet("/payments"), apiGet("/maintenance"),
         apiGet("/vignettes"), apiGet("/reservations"),
         apiGet("/leasing"), apiGet("/insurances"), apiGet("/settings"),
-        apiGet("/users"),
+        apiGet("/users"), apiGet("/inspections"),
       ]);
+
+      // Sans ce chargement, les états des lieux enregistrés (POST /inspections) n'étaient
+      // jamais relus : ils disparaissaient de l'onglet "Etat des lieux" au premier F5.
+      if (inspectionsRaw) state.inspections = inspectionsRaw.map(i => ({
+        id: i.id, type: i.type || "sortie",
+        contractId: i.contract_id || "", carId: i.car_id || "", carPlate: i.car_plate || "",
+        date: i.date || "", time: i.time || "",
+        odometerKm: i.odometer_km, fuelLevel: i.fuel_level,
+        conditionNote: i.condition_note || "", observation: i.observation || "",
+        checklistDetails: i.checklistDetails || {},
+        checklist: Object.fromEntries(
+          Object.entries(i.checklistDetails || {}).map(([key, d]) => [key, Number(d?.rating || 5) >= 4])
+        ),
+        photos: [],
+        createdAt: i.created_at || "", createdBy: i.created_by || null,
+        updatedAt: i.updated_at || "", updatedBy: i.updated_by || null,
+      }));
 
       // BR23 : annuaire des utilisateurs pour resoudre created_by/updated_by en noms lisibles
       // (apiGet renvoie null si role non-admin -> state.users reste [], resolveUserName retombe sur l'ID)
