@@ -127,6 +127,27 @@ Un même champ doit utiliser **le même type de contrôle à la création et dan
 - Pour les enregistrements existants dont la valeur figée ne correspond plus aux options actuelles (paramètres modifiés depuis), `openRecordEditor` réinjecte automatiquement la valeur stockée comme option supplémentaire — ne pas la perdre.
 - Exemple appliqué : `invoices.rib`/`invoices.ribLabel` (sélecteur RIB1/RIB2, cf. BR22) utilisent désormais le même sélecteur qu'à la création de facture (`#invoiceRib`).
 
+### Blocage sur erreur à l'enregistrement (règle absolue)
+**Dans tous les écrans, quelle que soit l'entité**, une erreur lors de la création ou modification d'un enregistrement doit **bloquer avec un message d'erreur visible** — jamais fermer silencieusement le formulaire/modal en laissant croire que l'enregistrement a été créé alors qu'il ne l'a pas été.
+
+Règles concrètes :
+- **Jamais `apiPost`/`apiPut` seuls pour une création/modification déclenchée par l'utilisateur.** Ces deux helpers (définis vers `index.html` ~5808/5822) avalent silencieusement toute erreur réseau ou backend et retournent `null` — ils ne doivent être utilisés que pour de la synchronisation best-effort en arrière-plan, jamais pour un bouton "Enregistrer"/"Nouveau X".
+- **Toujours utiliser `apiPostWithError`/`apiPutWithError`/`apiDeleteWithError`**, qui retournent `{ ok, data, status, errorMsg }`, et **vérifier `.ok` avant de continuer** :
+  ```js
+  const res = await apiPostWithError("/entite", payload);
+  if (!res.ok) {
+    alert(`Erreur lors de la création : ${res.errorMsg}`);
+    return; // ne pas fermer le modal, ne pas pousser dans state, ne pas re-render
+  }
+  const saved = res.data;
+  ```
+- Ne fermer le modal/formulaire, ne pousser l'enregistrement dans `state.<entité>`, et ne rafraîchir l'affichage **qu'après** avoir confirmé `res.ok`.
+- Si une opération dépend d'un enregistrement déjà créé avec succès juste avant (ex. mise à jour du solde d'une facture après un paiement), une erreur sur cette étape secondaire est un **avertissement** (l'enregistrement principal existe déjà côté serveur) — informer l'utilisateur clairement, mais ne pas annuler l'opération principale déjà réussie.
+- Pour une création en lot (boucle sur plusieurs enregistrements), ne pas utiliser `.forEach(async ...)` (les erreurs et l'ordre de complétion ne sont pas fiables) — utiliser `for...of` avec `await`, comptabiliser succès/échecs, et afficher un récapitulatif incluant les échecs.
+- **S'applique identiquement à la création ET à la modification** : un bouton "✓ Enregistrer" sur un entête existant (contrat, devis, facture, paramètres, changement de statut…) suit exactement la même règle qu'un bouton "Nouveau X" — ne jamais muter `state`/fermer le mode édition avant d'avoir confirmé `res.ok`.
+- **Exception volontaire** : les préférences d'affichage pures (ex. `saveDashboardLayout` → `/preferences/dashboard-layout`) ne sont pas des enregistrements métier — les laisser en synchronisation silencieuse best-effort (`apiPut` + `try/catch` + `console.warn`) reste correct ; ne pas ajouter d'`alert()` bloquante sur un simple drag/resize de widget.
+- **Repère d'audit** : chercher `await apiPost(` et `await apiPut(` (sans `WithError`) dans `worksheet-mini-app/index.html` — tout appel trouvé en dehors de la synchronisation best-effort (`syncStateToAPI`, préférences d'affichage) est une régression potentielle.
+
 ## Architecture rapide
 
 - **App principale** : `worksheet-mini-app/index.html` + `serve.js` (port 3000)
