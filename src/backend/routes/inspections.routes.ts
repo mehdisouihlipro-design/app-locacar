@@ -9,7 +9,28 @@ const router = Router();
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const result = await global.db.get('/inspections?select=*&order=created_at.desc');
-    res.json({ success: true, data: result.data });
+    const inspections: any[] = result.data || [];
+
+    // Rattache les points de checklist en un seul aller-retour (pas de N+1) pour que
+    // la liste chargée au démarrage soit exploitable telle quelle (édition, impression,
+    // comparaison sortie/entrée) sans re-fetch par état des lieux.
+    if (inspections.length > 0) {
+      const detailsRes = await global.db.get('/inspection_details?select=*');
+      const byInspection: Record<string, any> = {};
+      for (const detail of detailsRes.data || []) {
+        const bucket = (byInspection[detail.inspection_id] ||= {});
+        bucket[detail.point_key] = {
+          rating: detail.rating,
+          observation: detail.observation,
+          photo: { name: detail.photo_name, type: detail.photo_type, mediaRef: detail.media_ref },
+        };
+      }
+      for (const inspection of inspections) {
+        inspection.checklistDetails = byInspection[inspection.id] || {};
+      }
+    }
+
+    res.json({ success: true, data: inspections });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }
