@@ -632,7 +632,7 @@ Performance optimization indexes for common queries:
 ```sql
 CREATE INDEX idx_customers_name ON customers(name);
 CREATE INDEX idx_cars_plate ON cars(plate);
-CREATE INDEX idx_cars_status ON cars(status);
+CREATE INDEX idx_cars_status ON cars(status); -- colonne conservée en base mais plus lue/écrite par l'app depuis 2026-08 (cf. UC-CAR-3) ; index inutile désormais, laissé pour ne pas migrer
 CREATE INDEX idx_reservations_customer ON reservations(customer_id);
 CREATE INDEX idx_reservations_car ON reservations(car_id);
 CREATE INDEX idx_reservations_status ON reservations(status);

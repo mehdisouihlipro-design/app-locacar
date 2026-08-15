@@ -52,7 +52,7 @@
 ### UC-CAR-1 : Ajouter un véhicule
 **En tant que gestionnaire**, je veux ajouter un nouveau véhicule au parc avec tous ses détails.
 
-- [ ] **Modal de création** : cliquer "Nouveau" → le modal "Nouveau véhicule" (même modal que l'éditeur de détail) s'ouvre avec tous les champs vides : Immatriculation, Modèle, Marque, Couleur, VIN, N° carte grise, Date d'immatriculation, Type de carburant (select), Kilométrage, Statut, Agence, Propriétaire, Prix d'achat, Date d'achat, Trésorerie initiale, Notes
+- [ ] **Modal de création** : cliquer "Nouveau" → le modal "Nouveau véhicule" (même modal que l'éditeur de détail) s'ouvre avec tous les champs vides : Immatriculation, Modèle, Marque, Couleur, VIN, N° carte grise, Date d'immatriculation, Type de carburant (select), Kilométrage, Agence, Propriétaire, Prix d'achat, Date d'achat, Trésorerie initiale, Notes
 - [ ] **Libellés en français** : chaque champ du modal affiche son libellé en français (pas le nom camelCase de la propriété JS)
 - [ ] **Champs obligatoires** : cliquer "Enregistrer" sans Immatriculation ou sans Modèle → alerte "L'immatriculation et le modèle sont obligatoires", aucun appel API
 - [ ] **Création réussie** : remplir immatriculation + modèle (au minimum) → `POST /cars` avec tous les champs renseignés → modal se ferme, voiture apparaît dans la grille, rechargement F5 la confirme en base avec tous les champs persistés
@@ -63,15 +63,17 @@
 ### UC-CAR-2 : Modifier un véhicule
 - [ ] **Double-clic → éditeur** : double-cliquer sur une ligne de la grille → éditeur générique s'ouvre avec tous les champs en français
 - [ ] **Libellés éditeur** : les noms des champs dans l'éditeur sont en français (ex. "Kilométrage (km)" au lieu de "odometerKm", "Trésorerie initiale (TND)" au lieu de "openingCashTnd")
-- [ ] **Statut via sélecteur** : le champ "Statut" dans l'éditeur est un `<select>` (dispo/loue/maintenance), pas une saisie libre
 - [ ] **Carburant via sélecteur** : le champ "Type de carburant" dans l'éditeur est un `<select>` avec les mêmes options que dans le formulaire de création
 - [ ] **Modification enregistrée** : changer la couleur, enregistrer → `PUT /cars/:id` → valeur persistée, visible après F5
 - [ ] **Annulation** : modifier un champ puis annuler → valeur d'origine restaurée, aucun appel API
 
-### UC-CAR-3 : Statuts et disponibilité
-- [ ] **Badge statut coloré** : `dispo` → vert, `loue` → rouge/orange, `maintenance` → jaune, cohérent sur toutes les grilles et widgets
-- [ ] **Filtre par statut** : filtrer la colonne "Statut" sur "dispo" → seuls les véhicules disponibles apparaissent
-- [ ] **Voiture hors-service invisible au planning** : une voiture `hors-service` n'apparaît pas comme disponible dans le sélecteur de véhicule lors d'une nouvelle réservation/contrat
+### UC-CAR-3 : Disponibilité calculée (plus de statut manuel)
+**En tant que gestionnaire**, je veux que la disponibilité d'un véhicule reflète la réalité des locations, sans devoir la mettre à jour moi-même.
+
+> **Historique** : jusqu'à mi-2026, `cars.status` (dispo/loue/maintenance) était un champ saisi manuellement, jamais synchronisé avec les contrats/réservations réels — retiré de l'app (formulaire, grille, éditeur générique, KPI) car trompeur. La colonne reste en base (non migrée) mais n'est plus lue ni écrite par l'application.
+- [ ] **Aucun champ "Statut" sur le véhicule** : ni dans le formulaire de création, ni dans l'éditeur générique (double-clic), ni comme colonne de la grille Voitures
+- [ ] **Disponibilité = calcul en direct** : un véhicule est considéré "loué aujourd'hui" s'il a une `contract_line` au statut `active` dont la période couvre la date du jour (même source que le contrôle de chevauchement BR19) ; sinon il est "libre"
+- [ ] **Sélecteurs de véhicule non filtrés artificiellement** : le sélecteur de véhicule dans l'éditeur générique d'un contrat (`contracts.carId`) propose tous les véhicules du parc ; un conflit réel de disponibilité est détecté à l'enregistrement (BR19, `409 vehicle_overlap`), pas en amont par un champ statut périmé
 
 ### UC-CAR-4 : Liens croisés depuis une voiture
 - [ ] **Navigation vers les réservations** : depuis la grille Voitures, cliquer sur la plaque d'un véhicule → navigue vers Réservations filtré sur cette plaque (ou comportement documenté équivalent)
@@ -459,21 +461,19 @@
 ### UC-DASH-1 : Indicateurs clés
 **En tant que directeur**, je veux voir les métriques essentielles en un coup d'œil.
 
-- [ ] **KPI Véhicules** : "Véhicules dispo", "En location", "En maintenance" — chiffres corrects (somme par statut)
+- [ ] **KPI Véhicules** : "Véhicules disponibles" — calculé en direct (véhicules du parc sans `contract_line` active couvrant la date du jour), pas depuis un champ statut manuel (cf. UC-CAR-3)
 - [ ] **KPI Financier** : "CA du mois", "Factures impayées", "Trésorerie prévisionnelle"
 - [ ] **KPI Contrats** : "Contrats actifs", "Réservations à venir"
 - [ ] **Cohérence** : les KPIs correspondent aux données réelles (vérifier manuellement sur un jeu de données connu)
 
 ### UC-DASH-2 : Navigation depuis les KPIs (widgets cliquables)
-- [ ] **KPI "Véhicules dispo"** → navigue vers `#cars` filtré `status=dispo`
-- [ ] **KPI "En location"** → navigue vers `#cars` filtré `status=loue`
 - [ ] **KPI "Contrats actifs"** → navigue vers `#contracts` filtré `status=active`
 - [ ] **KPI "Factures impayées"** → navigue vers `#invoices` filtré sur statut impayé
 - [ ] **Filtre visible** : après navigation depuis un KPI, le filtre pré-rempli est visible dans la ligne de filtres de la grille cible
 
 ### UC-DASH-3 : Graphiques interactifs
 - [ ] **Graphique CA mensuel** : affiche les 12 derniers mois, barres ou lignes correctes
-- [ ] **Graphique répartition véhicules** : pie chart ou barres des statuts
+- [ ] **Graphique répartition véhicules** : doughnut "Libre" / "Loué aujourd'hui", calculé en direct depuis les lignes de contrat actives (pas depuis un champ statut manuel) ; clic sur un segment → navigue vers `#cars` (sans filtre pré-rempli, la disponibilité n'étant plus une colonne filtrable)
 - [ ] **Clic sur barre graphique** : cliquer sur un mois du graphique → navigue vers les données détaillées de ce mois avec filtre appliqué
 - [ ] **Prévision de trésorerie** : tableau des 365 prochains jours avec revenus/dépenses prévisionnels
 
