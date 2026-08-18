@@ -287,6 +287,7 @@
 - [ ] **Formulaire facture** : Client, Contrat (optionnel), Libellé, Devise, Date d'échéance
 - [ ] **Lignes de facturation** : bouton "+ Ajouter une ligne" → ligne avec Véhicule, Période début/fin, Jours, Montant HT
 - [ ] **Calcul automatique** (BR15bis) : HT → TVA calculée + taxe journalière (par ligne) + timbre (une fois pour la facture)
+- [ ] **Statut brouillon à la création** (BR27) : une facture créée manuellement est en statut `brouillon`, sans numéro — elle suit le même circuit de confirmation que les factures générées depuis l'échéancier (UC-INV-9), pas de statut `en_attente` direct sans numéro
 - [ ] **Facture sans ligne → bloquée** : tenter d'enregistrer sans aucune ligne → message "Une facture doit contenir au moins une ligne"
 
 ### UC-INV-2 : Créer une facture avec lignes relationnelles (BR21)

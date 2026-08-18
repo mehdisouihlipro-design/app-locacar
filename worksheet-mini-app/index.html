@@ -6581,7 +6581,10 @@
           due_amount_tnd: totalTnd,
           label,
           due_date: dueDate,
-          status: "en_attente",
+          // Brouillon, comme les factures générées depuis l'échéancier : sans ça, la facture
+          // n'obtenait jamais de numéro de souche (le bouton "Confirmer" ne s'affiche que
+          // pour le statut brouillon) et restait indéfiniment "en_attente" sans numéro.
+          status: "brouillon",
           reminder_count: 0,
           rib,
           rib_label: ribLabel,
@@ -6627,6 +6630,8 @@
           dueAmountTnd: totalTnd,
           label,
           dueDate,
+          status: "brouillon",
+          invoiceNumber: null,
           lastReminderAt: "",
           reminderCount: 0,
           rib,
