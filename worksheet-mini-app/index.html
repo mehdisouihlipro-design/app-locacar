@@ -6581,10 +6581,11 @@
           due_amount_tnd: totalTnd,
           label,
           due_date: dueDate,
-          // Brouillon, comme les factures générées depuis l'échéancier : sans ça, la facture
-          // n'obtenait jamais de numéro de souche (le bouton "Confirmer" ne s'affiche que
-          // pour le statut brouillon) et restait indéfiniment "en_attente" sans numéro.
-          status: "brouillon",
+          // Pas de brouillon ici : ce formulaire n'a pas de bouton de confirmation dédié,
+          // le numéro de souche doit être attribué directement à la création (le backend
+          // POST /invoices le génère maintenant atomiquement quand aucun n'est fourni et
+          // que le statut n'est pas "brouillon").
+          status: "en_attente",
           reminder_count: 0,
           rib,
           rib_label: ribLabel,
@@ -6595,6 +6596,7 @@
         }
         const savedInv = invRes.data;
         if (savedInv && savedInv.id) invId = savedInv.id;
+        const invoiceNumber = (savedInv && savedInv.invoice_number) || null;
 
         // Fetch invoice_lines created by backend (BR21)
         const createdInvLines = await apiGet(`/invoice-lines?invoice_id=${encodeURIComponent(invId)}`);
@@ -6630,8 +6632,8 @@
           dueAmountTnd: totalTnd,
           label,
           dueDate,
-          status: "brouillon",
-          invoiceNumber: null,
+          status: "en_attente",
+          invoiceNumber,
           lastReminderAt: "",
           reminderCount: 0,
           rib,
@@ -17405,6 +17407,7 @@
       byId("contractDetailModal").style.display = "none";
       const savedInv = invRes.data;
       if (savedInv && savedInv.id) invId = savedInv.id;
+      const invoiceNumber = (savedInv && savedInv.invoice_number) || null;
 
       // Charger les invoice_lines créées par le backend
       const createdLines = await apiGet(`/invoice-lines?invoice_id=${encodeURIComponent(invId)}`);
@@ -17428,7 +17431,7 @@
         dailyTaxAmount: totalDailyTax, stampDutyAmount,
         rentalDays: totalDays, periodStart, periodEnd,
         lines: [], paidAmountTnd: 0, dueAmountTnd: totalTnd,
-        label: `Facture – ${contractId}`, dueDate, status: "en_attente",
+        label: `Facture – ${contractId}`, dueDate, status: "en_attente", invoiceNumber,
         reminderCount: 0, rib, ribLabel,
       });
 

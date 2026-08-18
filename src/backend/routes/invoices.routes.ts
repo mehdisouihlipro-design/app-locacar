@@ -35,7 +35,17 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     const id = invoiceBody.id || uuidv4();
-    const body = stampCreate({ ...invoiceBody, id, status: invoiceBody.status || 'en_attente', lines: [] }, req);
+    const status = invoiceBody.status || 'en_attente';
+    // Attribuer le numéro de souche directement à la création pour les factures qui ne
+    // passent pas par le circuit brouillon → confirmation (ex. "Créer facture" depuis un
+    // contrat court terme) : sans numéro fourni ET sans statut "brouillon", on en génère un
+    // tout de suite, atomiquement (RPC FOR UPDATE), au lieu de laisser la facture sans
+    // numéro indéfiniment (l'écran retombait alors sur l'id interne aléatoire à l'affichage).
+    let invoiceNumber = invoiceBody.invoice_number || null;
+    if (!invoiceNumber && status !== 'brouillon') {
+      invoiceNumber = await nextSequenceNumber('invoices');
+    }
+    const body = stampCreate({ ...invoiceBody, id, status, invoice_number: invoiceNumber, lines: [] }, req);
     await global.db.post('/invoices', body, { headers: { Prefer: 'resolution=merge-duplicates' } });
 
     // Insert each line into invoice_lines table (BR21)
