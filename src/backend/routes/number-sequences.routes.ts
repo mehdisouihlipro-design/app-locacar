@@ -95,12 +95,16 @@ router.get('/:id/audit', async (req: AuthRequest, res: Response) => {
     const seq = seqRes.data?.[0];
     if (!seq) return res.status(404).json({ success: false, message: 'Souche introuvable.' });
 
+    // Ne garder que les `digits` derniers chiffres (le compteur), pas tout le bloc de
+    // chiffres final : sans séparateur entre année et compteur (ex. "CTR20260010"), le
+    // bloc complet inclurait l'année et fausserait l'audit (cf. migration 028).
+    const digits = Number(seq.digits) || 4;
     const recsRes = await global.db.get(`/${target.table}?${target.col}=not.is.null&select=${target.col}&order=${target.col}.asc`);
     const numbers: number[] = (recsRes.data || [])
       .map((r: any) => {
         const raw: string = r[target.col] || '';
         const match = raw.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : null;
+        return match ? parseInt(match[1].slice(-digits), 10) : null;
       })
       .filter((n: number | null): n is number => n !== null)
       .sort((a: number, b: number) => a - b);

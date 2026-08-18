@@ -72,11 +72,18 @@ export async function releaseSequenceOnDelete(sequenceId: string): Promise<void>
   if (!target) return;
 
   try {
+    // Nécessaire pour ne garder que les `digits` derniers chiffres du numéro (le compteur),
+    // pas tout le bloc de chiffres final : sans séparateur entre année et compteur
+    // (ex. "CTR20260010"), le bloc final complet ("20260010") inclurait l'année et
+    // corromprait last_number (cf. migration 028).
+    const seqRes = await global.db.get(`/number_sequences?id=eq.${sequenceId}&select=digits`);
+    const digits = Number(seqRes.data?.[0]?.digits) || 4;
+
     const records = await global.db.get(`/${target.table}?${target.col}=not.is.null&select=${target.col}&limit=2000`);
     const nums: number[] = (records.data || [])
       .map((r: any) => {
         const m = String(r[target.col] || '').match(/(\d+)$/);
-        return m ? parseInt(m[1], 10) : 0;
+        return m ? parseInt(m[1].slice(-digits), 10) : 0;
       })
       .filter((n: number) => n > 0);
     const maxNum = nums.length > 0 ? Math.max(...nums) : 0;

@@ -6383,10 +6383,14 @@
       const isBrouillon = byId("contractIsBrouillon") && byId("contractIsBrouillon").checked;
       const initialStatus = isBrouillon ? "brouillon" : "active";
 
-      const contractNumber = await fetchNextSequenceNumber('contracts');
+      // Ne pas générer le numéro côté client (fetchNextSequenceNumber tapait sur un
+      // endpoint non-atomique de serve.js) : deux créations quasi simultanées pouvaient
+      // recevoir le même numéro, la seconde échouant alors sur la contrainte UNIQUE
+      // contract_number ("Erreur lors de la création du contrat"). Le backend
+      // POST /contracts génère déjà le numéro de façon atomique (RPC FOR UPDATE)
+      // quand contract_number n'est pas fourni.
       const contractRes = await apiPostWithError("/contracts", {
         id: contractId,
-        contract_number: contractNumber,
         customer_id: customerId,
         customer_name: customer.name,
         contract_date: contractDate,
@@ -6405,6 +6409,7 @@
       }
       const savedContract = contractRes.data;
       if (savedContract && savedContract.id) contractId = savedContract.id;
+      const contractNumber = (savedContract && savedContract.contract_number) || null;
 
       state.contracts.push({
         id: contractId, contractNumber,
@@ -13674,9 +13679,11 @@
         if (!quoteDate || !validityDate) { alert("Dates requises."); return; }
         const customer = state.customers.find(c => c.id === customerId);
         let quoteId = uid("QUO");
-        const quoteNumber = await fetchNextSequenceNumber('quotes');
+        // Numéro généré côté backend (atomique) plutôt que via fetchNextSequenceNumber
+        // (endpoint non-atomique de serve.js) — même risque de doublon/erreur que sur
+        // la création de contrat en cas de créations quasi simultanées.
         const quoteRes = await apiPostWithError("/quotes", {
-          id: quoteId, quote_number: quoteNumber, customer_id: customerId,
+          id: quoteId, customer_id: customerId,
           customer_name: customer ? customer.name : "",
           quote_date: quoteDate, validity_date: validityDate, notes, status: "brouillon",
           type: quoteType, rate_type: quoteRateType,
@@ -13687,6 +13694,7 @@
         }
         const saved = quoteRes.data;
         if (saved && saved.id) quoteId = saved.id;
+        const quoteNumber = (saved && saved.quote_number) || null;
         state.quotes.push({
           id: quoteId, quoteNumber, customerId, customerName: customer ? customer.name : "",
           quoteDate, validityDate, status: "brouillon", notes, type: quoteType, rateType: quoteRateType,
@@ -18195,7 +18203,10 @@
       _nsCurrentId = seqId;
       byId("nsEditTitle").textContent = `Configurer — ${s.label}`;
       byId("nsEditPrefix").value = s.prefix || '';
-      byId("nsEditSeparator").value = s.separator || '-';
+      // s.separator peut légitimement être "" (option "Aucun") — ne pas utiliser `||`
+      // qui traiterait "" comme absent et re-sélectionnerait "Tiret" par erreur, risquant
+      // d'écraser silencieusement "aucun séparateur" en "-" au prochain Enregistrer.
+      byId("nsEditSeparator").value = (s.separator != null ? s.separator : '-');
       byId("nsEditDigits").value = s.digits || 4;
       byId("nsEditIncludeYear").value = s.include_year ? 'true' : 'false';
       byId("nsEditResetAnnually").value = s.reset_annually ? 'true' : 'false';
