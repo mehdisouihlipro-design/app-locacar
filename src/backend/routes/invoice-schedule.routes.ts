@@ -122,9 +122,12 @@ router.post('/:id/generate', async (req: AuthRequest, res: Response) => {
 
     const invoiceId = `FAC-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-    // Attribuer le numéro de facture via la souche configurée
-    let invoiceNumber: string | null = null;
-    try { invoiceNumber = await nextSequenceNumber('invoices'); } catch (e) { console.error('[schedule/generate] nextSequenceNumber invoices:', e); }
+    // Attribuer le numéro de facture via la souche configurée. Ne JAMAIS avaler l'erreur
+    // ici : sans ça, un échec silencieux laissait invoiceNumber à null et la facture se
+    // créait quand même avec son id interne aléatoire ("FAC-XXXXX") affiché à la place
+    // d'un vrai numéro de souche — l'erreur doit remonter au catch englobant, qui annule
+    // le verrou (remet l'entrée en "planifie") plutôt que de créer une facture non numérotée.
+    const invoiceNumber = await nextSequenceNumber('invoices');
 
     // Créer la facture brouillon avec numéro de souche
     const invoiceBody = stampCreate({
