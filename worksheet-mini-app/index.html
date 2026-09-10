@@ -13626,7 +13626,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Devis ${safe(q.id)}</title>
+  <title>Devis ${safe(q.quoteNumber || q.id)}</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #0d244a; margin: 0; padding: 24px 30px; line-height: 1.4; }
@@ -13668,7 +13668,7 @@
       </td>
       <td style="vertical-align:top;text-align:right;">
         <h2 style="font-size:14px;color:#1540c8;">DEVIS</h2>
-        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(q.id)}</strong></p>
+        <p style="font-size:10px;margin-top:3px;">N&deg; <strong>${safe(q.quoteNumber || q.id)}</strong></p>
         <p style="font-size:10px;">Date&nbsp;: <strong>${fmtDate(quoteDate) || safe(quoteDate)}</strong></p>
       </td>
     </tr>
