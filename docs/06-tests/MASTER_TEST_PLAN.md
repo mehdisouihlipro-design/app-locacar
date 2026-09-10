@@ -242,7 +242,13 @@
 - [ ] **Persistance** : F5 → devis visible dans la grille
 
 ### UC-QUO-2 : Ajouter des lignes à un devis
-- [ ] **Ajout inline** : "+ Ajouter une ligne" → sélecteur véhicule + dates + tarif → HT/TTC synchronisés (BR18)
+**En tant qu'agent commercial**, je veux que la saisie d'une ligne de devis fonctionne exactement comme une ligne de contrat (BR18), pour ne pas avoir deux logiques de calcul différentes dans l'app.
+
+- [ ] **Ajout inline** : "+ Ajouter une ligne" → sélecteur véhicule + désignation (auto, éditable) + dates + tarif → HT/TTC synchronisés (BR18)
+- [ ] **4 champs bidirectionnels** : saisir Tarif HT (jour ou mois selon la négociation du devis), Tarif TTC, Sous-total (HT+TVA), ou Total TTC → les 3 autres se recalculent automatiquement, identique au comportement d'une ligne de contrat (mêmes fonctions `computeContractLineTtc`/`computeContractLineHt`)
+- [ ] **Tarif journalier vs mensuel** : le placeholder et le calcul des champs respectent `quotes.rateType` (Journalier/Mensuel, choisi à la création ou modifiable via "✏ Modifier entête") — y compris dans la modale de détail du devis, pas seulement au moment de la création
+- [ ] **Taxe journalière et timbre fiscal inclus** : le Total TTC affiché et enregistré inclut la taxe journalière (jours × taux paramétré) et le timbre fiscal (par ligne, comme les lignes de contrat) — visibles en colonnes "T/j" et "Tmb" dans le tableau des lignes
+- [ ] **Édition d'une ligne existante** : bouton ✏️ → mêmes 4 champs bidirectionnels pré-remplis, mêmes colonnes T/j et Tmb
 - [ ] **Aucun contrôle de chevauchement** : ajouter une ligne sur un véhicule/période déjà engagé par un contrat actif → **aucun blocage** (un devis ne réserve pas)
 - [ ] **Aucune réservation créée** : après ajout de la ligne, aucune `reservations` n'apparaît en base pour cette ligne
 - [ ] **Totaux mis à jour** : Total HT et TTC dans l'entête recalculés après chaque ajout/suppression de ligne
@@ -256,6 +262,7 @@
 ### UC-QUO-4 : Générer le PDF du devis
 - [ ] **Bouton "🖨 PDF"** : génère un document imprimable
 - [ ] **Contenu PDF** : en-tête agence (nom, adresse, RIB), informations client, tableau des lignes (véhicule/immatriculation/période/jours/HT/TVA/TTC), totaux, **date de validité mise en évidence**
+- [ ] **Détail taxe/timbre dans les totaux** : la section totaux affiche "Taxe X dt/j (Nj)" et "Timbre fiscal" en lignes séparées avant le Total TTC, cohérent avec les montants calculés dans les lignes du devis (BR18)
 - [ ] **PDF d'un devis avec 0 ligne** : comportement documenté (PDF vide propre ou message d'erreur, pas de crash)
 
 ### UC-QUO-5 : Valider un devis → Contrat

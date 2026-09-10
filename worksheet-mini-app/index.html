@@ -1939,9 +1939,11 @@
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT/j</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif TTC/j</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Sous-total</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
-                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Montant TTC</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">T/j</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tmb</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Total TTC</th>
                 <th style="text-align:center;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);"></th>
               </tr>
             </thead>
@@ -6079,7 +6081,7 @@
       }));
 
       if (quoteLinesRaw) state.quoteLines = quoteLinesRaw.map(l => ({
-        id: l.id, quoteId: l.quote_id, carId: l.car_id, carPlate: l.car_plate || "",
+        id: l.id, quoteId: l.quote_id, carId: l.car_id, carPlate: l.car_plate || "", designation: l.designation || "",
         periodStart: l.period_start || "", periodEnd: l.period_end || "",
         pickupTime: l.pickup_time || null, returnTime: l.return_time || null,
         days: l.days || 0, months: l.months || 0,
@@ -12997,27 +12999,33 @@
       const q = state.quotes.find(x => x.id === quoteId);
       const isQuoteLocked = q && !!q.convertedContractId;
       const isEditable = !isQuoteLocked && q && !["valide", "refuse"].includes(q.status);
-      let sumHt = 0, sumTtc = 0;
+      const linesStamp = Number(state.settings.stampDutyTnd || 0);
+      let sumHt = 0, sumVat = 0, sumTtc = 0;
       lines.forEach(l => {
-        sumHt  += l.amountHt  || 0;
-        sumTtc += l.amountTtc || 0;
+        if (l.status !== "annule") { sumHt += l.amountHt || 0; sumVat += l.vatAmount || 0; sumTtc += l.amountTtc || 0; }
         const dur = l.days > 0 ? `${l.days}j` : l.months > 0 ? `${l.months} mois` : "-";
         const tr = document.createElement("tr");
         const vatRate = Number(state.settings.vatRate || 19) / 100;
         const rateTtc = l.rateTtc != null ? l.rateTtc : Math.round(l.rate * (1 + vatRate) * 100) / 100;
+        const lDailyTaxAmt = Math.round((l.days || 0) * Number(state.settings.dailyTaxTnd || 0) * 100) / 100;
+        const lcar = state.cars.find(c => c.id === l.carId);
+        const designation = l.designation || (lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()) : "");
         const actionBtns = isQuoteLocked ? "" : isEditable
           ? `<button class="ql-edit-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">✏️</button>
              <button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`
           : `<button class="ql-delete-btn secondary" style="padding:2px 6px;font-size:12px;" data-line-id="${safe(l.id)}">🗑</button>`;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
+          <td style="color:var(--muted);font-size:12px;">${safe(designation)}</td>
           <td style="white-space:nowrap;">${fmtDate(l.periodStart) || "-"}${l.pickupTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.pickupTime.slice(0,5)}</span>` : ""} → ${fmtDate(l.periodEnd) || "-"}${l.returnTime ? ` <span style="font-size:10px;color:#4d6a97;">${l.returnTime.slice(0,5)}</span>` : ""}</td>
           <td style="text-align:right;">${dur}</td>
-          <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
-          <td style="text-align:right;">${rateTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
-          <td style="text-align:right;">${(l.amountHt||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
-          <td style="text-align:right;">${(l.vatAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
-          <td style="text-align:right;">${(l.amountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</td>
+          <td style="text-align:right;">${(l.rate||0).toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;">${rateTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;">${((l.amountHt||0)+(l.vatAmount||0)).toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;">${(l.vatAmount||0).toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;">${lDailyTaxAmt.toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;">${linesStamp.toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
+          <td style="text-align:right;font-weight:600;">${(l.amountTtc||0).toLocaleString("fr-FR",{maximumFractionDigits:2})}</td>
           <td style="text-align:center;white-space:nowrap;">${actionBtns}</td>
         `;
         tr.querySelectorAll("[data-goto-tab]").forEach(a => a.addEventListener("click", e => {
@@ -13033,7 +13041,7 @@
       const tfoot = byId("qdLinesFoot");
       if (tfoot) {
         tfoot.innerHTML = lines.length
-          ? `<tr><td colspan="5"><strong>Total</strong></td><td style="text-align:right;padding:6px 8px;"><strong>${sumHt.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})} TND</strong></td><td></td></tr>`
+          ? `<tr><td colspan="6" style="padding:6px 8px;"><strong>Total</strong></td><td></td><td style="text-align:right;padding:6px 8px;color:var(--muted);font-size:12px;">${sumVat.toLocaleString("fr-FR",{maximumFractionDigits:2})}</td><td></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR",{maximumFractionDigits:2})}</strong></td><td></td></tr>`
           : "";
       }
     }
@@ -13048,12 +13056,14 @@
       ).join("");
       const quote = (state.quotes || []).find(q => q.id === quoteId);
       const isShortTermQ = !quote || quote.type === "court";
+      const rateType = quote?.rateType || "daily";
 
       const tr = document.createElement("tr");
       tr.className = "ql-inline-new";
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:4px;"><select id="qlCar" style="width:100%;min-width:110px;font-size:12px;"><option value="">— véhicule —</option>${carOptions}</select></td>
+        <td style="padding:4px;"><input id="qlDesig" type="text" placeholder="Désignation (auto)" style="width:120px;font-size:12px;" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <input id="qlStart" type="date" style="width:108px;font-size:12px;" />
           ${isShortTermQ ? `<input id="qlPickup" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de sortie" />` : ""}
@@ -13062,11 +13072,13 @@
           ${isShortTermQ ? `<input id="qlReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="qlDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="HT/j" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlHt" type="number" step="0.01" readonly tabindex="-1" placeholder="0" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:72px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="qlTtc" type="number" step="0.01" readonly tabindex="-1" placeholder="0" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlRate" type="number" step="0.01" min="0" placeholder="${rateType === "monthly" ? "HT/mois" : "HT/j"}" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlRateTtc" type="number" step="0.01" min="0" placeholder="${rateType === "monthly" ? "TTC/mois" : "TTC/j"}" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlSubtotal" type="number" step="0.01" min="0" placeholder="HT+TVA" style="width:78px;font-size:12px;text-align:right;" /><input id="qlHt" type="hidden" value="0" /></td>
+        <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qlTtc" type="number" step="0.01" min="0" placeholder="0" style="width:78px;font-size:12px;text-align:right;" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <button id="qlSaveBtn" style="padding:3px 10px;font-size:13px;">✓</button>
           <button id="qlCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;">✗</button>
@@ -13075,47 +13087,85 @@
       `;
       tbody.appendChild(tr);
 
-      const vatRate = () => Number(state.settings.vatRate || 19) / 100;
-      const getDays = () => {
+      // ── Recalculs bidirectionnels (identique aux lignes de contrat) ────────
+      const getVatRate = () => Number(state.settings.vatRate || 19);
+      const getDurData = () => {
         const s = byId("qlStart").value, e = byId("qlEnd").value;
-        if (s && e && e >= s) return calcLineDuration(s, e).days;
-        return 0;
+        if (!s || !e || e < s) return { days: 0, mult: 1 };
+        const pt = isShortTermQ ? (byId("qlPickup")?.value || null) : null;
+        const rt = isShortTermQ ? (byId("qlReturn")?.value || null) : null;
+        const { days } = calcLineDuration(s, e, pt, rt);
+        const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
+        return { days, mult };
       };
-      const recalcMontants = () => {
-        const rHt  = Number(byId("qlRate").value    || 0);
-        const rTtc = Number(byId("qlRateTtc").value || 0);
-        const days = getDays();
-        const isMonthly = (byId("quoteRateType") || {}).value === "monthly";
-        const s = byId("qlStart").value, e = byId("qlEnd").value;
-        let amtHt, amtTtc;
-        if (isMonthly && rHt > 0 && s && e) {
-          amtHt  = calcMonthlyAmountJS(rHt, s, e);
-          amtTtc = Math.round(amtHt * (1 + vatRate()) * 100) / 100;
-        } else {
-          amtHt  = Math.round(rHt  * days * 100) / 100;
-          amtTtc = Math.round(rTtc * days * 100) / 100;
+      const syncFromHt = (ht, days, mult) => {
+        const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
+        const htRounded = Math.round(ht * 100) / 100;
+        byId("qlHt").value       = htRounded.toFixed(2);
+        byId("qlSubtotal").value = (Math.round((htRounded + vatAmount) * 100) / 100).toFixed(2);
+        byId("qlVat").value      = vatAmount.toFixed(2);
+        byId("qlDaily").value    = dailyTaxAmount.toFixed(2);
+        byId("qlStamp").value    = stampAmount.toFixed(2);
+        byId("qlTtc").value      = amountTtc.toFixed(2);
+        if (htRounded > 0 && mult > 0) {
+          const rate = Math.round(htRounded / mult * 100) / 100;
+          const vr = getVatRate();
+          byId("qlRate").value    = rate.toFixed(2);
+          byId("qlRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
         }
-        const vat = Math.round((amtTtc - amtHt) * 100) / 100;
-        byId("qlHt").value  = days ? amtHt.toFixed(2)  : "";
-        byId("qlTtc").value = days ? amtTtc.toFixed(2) : "";
-        byId("qlVat").value = days ? vat.toFixed(2)    : "";
+      };
+      const recomputeFromRate = () => {
+        const rate = Number(byId("qlRate").value || 0);
+        if (rate <= 0) return;
+        const vr = getVatRate();
+        const { days, mult } = getDurData();
+        byId("qlRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const ht = rateType === "monthly"
+          ? calcMonthlyAmountJS(rate, byId("qlStart").value, byId("qlEnd").value)
+          : Math.round(rate * mult * 100) / 100;
+        syncFromHt(ht, days, mult);
+      };
+      const recomputeFromRateTtc = () => {
+        const rateTtc = Number(byId("qlRateTtc").value || 0);
+        if (rateTtc <= 0) return;
+        const vr = getVatRate();
+        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
+        byId("qlRate").value = rate.toFixed(2);
+        recomputeFromRate();
+      };
+      const recomputeSubtotal = () => {
+        const subtotal = Number(byId("qlSubtotal").value || 0);
+        const vr = getVatRate();
+        const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
+        const { days, mult } = getDurData();
+        syncFromHt(ht, days, mult);
+      };
+      const recomputeTtc = () => {
+        const { days, mult } = getDurData();
+        const { amountHt } = computeContractLineHt(Number(byId("qlTtc").value || 0), days);
+        syncFromHt(amountHt, days, mult);
+      };
+      const updateDur = () => {
+        const s = byId("qlStart").value, e = byId("qlEnd").value;
+        if (s && e && e >= s) {
+          const pt = isShortTermQ ? (byId("qlPickup")?.value || null) : null;
+          const rt = isShortTermQ ? (byId("qlReturn")?.value || null) : null;
+          const { days } = calcLineDuration(s, e, pt, rt);
+          byId("qlDur").textContent = days + "j";
+          if (Number(byId("qlRate").value || 0) > 0) recomputeFromRate();
+        } else { byId("qlDur").textContent = "—"; }
       };
       const clearQlError = () => { byId("qlError").style.display = "none"; };
-      byId("qlRate").oninput = () => {
-        const rHt = Number(byId("qlRate").value || 0);
-        byId("qlRateTtc").value = (Math.round(rHt * (1 + vatRate()) * 100) / 100).toFixed(2);
-        recalcMontants(); clearQlError();
-      };
-      byId("qlRateTtc").oninput = () => {
-        const rTtc = Number(byId("qlRateTtc").value || 0);
-        byId("qlRate").value = (Math.round(rTtc / (1 + vatRate()) * 100) / 100).toFixed(2);
-        recalcMontants(); clearQlError();
-      };
-      byId("qlStart").oninput = () => { recalcMontants(); clearQlError(); };
-      byId("qlEnd").oninput   = () => { recalcMontants(); clearQlError(); };
-      byId("qlCar").onchange  = clearQlError;
-      if (isShortTermQ && byId("qlPickup")) byId("qlPickup").oninput = clearQlError;
-      if (isShortTermQ && byId("qlReturn")) byId("qlReturn").oninput = clearQlError;
+      byId("qlRate").oninput      = () => { recomputeFromRate(); clearQlError(); };
+      byId("qlRateTtc").oninput   = () => { recomputeFromRateTtc(); clearQlError(); };
+      byId("qlSubtotal").onchange = () => { recomputeSubtotal(); clearQlError(); };
+      byId("qlTtc").onchange      = () => { recomputeTtc(); clearQlError(); };
+      byId("qlStart").oninput = () => { updateDur(); clearQlError(); };
+      byId("qlEnd").oninput   = () => { updateDur(); clearQlError(); };
+      byId("qlCar").onchange  = () => { clearQlError(); const sc = state.cars.find(c => c.id === byId("qlCar").value); const di = byId("qlDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
+      byId("qlDesig")?.addEventListener("input", () => { if (byId("qlDesig")) byId("qlDesig").dataset.edited = "1"; });
+      if (isShortTermQ && byId("qlPickup")) ["input","change"].forEach(ev => byId("qlPickup").addEventListener(ev, () => { updateDur(); clearQlError(); }));
+      if (isShortTermQ && byId("qlReturn")) ["input","change"].forEach(ev => byId("qlReturn").addEventListener(ev, () => { updateDur(); clearQlError(); }));
       byId("qlSaveBtn").onclick   = () => submitInlineQuoteLine(quoteId, tr);
       byId("qlCancelBtn").onclick = () => { tr.remove(); byId("qdAddLineBtn").textContent = "+ Ajouter une ligne"; renderQuoteDetailLines(quoteId); };
       byId("qlCar").focus();
@@ -13126,26 +13176,40 @@
       if (!line) return;
       // Annuler toute autre ligne en cours d'édition
       byId("qdLinesBody").querySelectorAll(".ql-inline-edit").forEach(r => r.remove());
+      const quote = (state.quotes || []).find(q => q.id === quoteId);
+      const rateType = quote?.rateType || "daily";
+      const isShortTermQ = !quote || quote.type === "court";
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand||c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
-      const vatRate = () => Number(state.settings.vatRate || 19) / 100;
+      const vatRateQ = Number(state.settings.vatRate || 19);
+      const dailyTaxQ = Number(state.settings.dailyTaxTnd || 0);
+      const stampQ = Number(state.settings.stampDutyTnd || 0);
+      const initDailyAmt = ((line.days || 0) * dailyTaxQ).toFixed(2);
+      const initStampAmt = stampQ.toFixed(2);
+      const initRateTtc = line.rate ? (Math.round(line.rate * (1 + vatRateQ / 100) * 100) / 100).toFixed(2) : "";
+      const initSubtotal = line.amountHt ? (Math.round(line.amountHt * (1 + vatRateQ / 100) * 100) / 100).toFixed(2) : "";
       const editTr = document.createElement("tr");
       editTr.className = "ql-inline-edit";
       editTr.style.cssText = "background:#fffbeb;border:2px solid #f59e0b;";
       editTr.innerHTML = `
         <td style="padding:4px;"><select id="qleqCar" style="width:100%;min-width:110px;font-size:12px;"><option value="">— véhicule —</option>${carOptions}</select></td>
+        <td style="padding:4px;"><input id="qleqDesig" type="text" placeholder="Désignation (auto)" value="${safe(line.designation || (() => { const lcar = state.cars.find(c => c.id === line.carId); return lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()) : ""; })())}" style="width:120px;font-size:12px;" /></td>
         <td style="padding:4px;white-space:nowrap;">
-          <input id="qleqStart" type="date" value="${safe(line.periodStart)}" style="width:108px;font-size:12px;" />
-          <span style="margin:0 2px;">→</span>
-          <input id="qleqEnd" type="date" value="${safe(line.periodEnd)}" style="width:108px;font-size:12px;" />
+          <input id="qleqStart" type="date" value="${safe(line.periodStart)}" style="width:105px;font-size:12px;" />
+          ${isShortTermQ ? `<input id="qleqPickup" type="time" value="${safe(line.pickupTime||"")}" style="width:75px;font-size:12px;margin-left:2px;" />` : ""}
+          <br>→&nbsp;
+          <input id="qleqEnd" type="date" value="${safe(line.periodEnd)}" style="width:105px;font-size:12px;" />
+          ${isShortTermQ ? `<input id="qleqReturn" type="time" value="${safe(line.returnTime||"")}" style="width:75px;font-size:12px;margin-left:2px;" />` : ""}
         </td>
-        <td id="qleqDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:4px;"><input id="qleqRate"    type="number" step="0.01" min="0" value="${safe(line.rate||0)}"   placeholder="HT/j"  style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qleqRateTtc" type="number" step="0.01" min="0" value="${safe(line.rateTtc != null ? line.rateTtc : Math.round((line.rate||0)*(1+vatRate())*100)/100)}" placeholder="TTC/j" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qleqHt"  type="number" step="0.01" readonly tabindex="-1" value="${safe((line.amountHt||0).toFixed(2))}"  style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="qleqVat" type="number" step="0.01" readonly tabindex="-1" value="${safe((line.vatAmount||0).toFixed(2))}" style="width:72px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="qleqTtc" type="number" step="0.01" readonly tabindex="-1" value="${safe((line.amountTtc||0).toFixed(2))}" style="width:85px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td id="qleqDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
+        <td style="padding:4px;"><input id="qleqRate" type="number" step="0.01" min="0" value="${safe(line.rate||"")}" placeholder="${rateType === "monthly" ? "HT/mois" : "HT/j"}" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qleqRateTtc" type="number" step="0.01" min="0" value="${initRateTtc}" placeholder="${rateType === "monthly" ? "TTC/mois" : "TTC/j"}" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qleqSubtotal" type="number" step="0.01" min="0" value="${initSubtotal}" style="width:78px;font-size:12px;text-align:right;" /><input id="qleqHt" type="hidden" value="${line.amountHt||""}" /></td>
+        <td style="padding:4px;"><input id="qleqVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qleqDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qleqStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="qleqTtc" type="number" step="0.01" min="0" value="${line.amountTtc||""}" style="width:78px;font-size:12px;text-align:right;" /></td>
         <td style="padding:4px;white-space:nowrap;">
           <button id="qleqSaveBtn" style="padding:3px 10px;font-size:13px;">✓</button>
           <button id="qleqCancelBtn" class="secondary" style="padding:3px 8px;font-size:13px;">✗</button>
@@ -13153,67 +13217,126 @@
         </td>
       `;
       displayTr.replaceWith(editTr);
-      const getDays = () => {
+
+      // ── Recalculs bidirectionnels (identique aux lignes de contrat) ────────
+      const getVatRate = () => Number(state.settings.vatRate || 19);
+      const getDurData = () => {
         const s = byId("qleqStart").value, e = byId("qleqEnd").value;
-        return (s && e && e >= s) ? calcLineDuration(s, e).days : 0;
+        if (!s || !e || e < s) return { days: 0, mult: 1 };
+        const pt = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
+        const rt = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
+        const { days } = calcLineDuration(s, e, pt, rt);
+        const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
+        return { days, mult };
       };
-      const recalc = () => {
-        const rHt  = Number(byId("qleqRate").value    || 0);
-        const rTtc = Number(byId("qleqRateTtc").value || 0);
-        const days = getDays();
-        const isMonthly = (byId("quoteRateType") || {}).value === "monthly";
-        const s = byId("qleqStart").value, e = byId("qleqEnd").value;
-        let aHt, aTtc;
-        if (isMonthly && rHt > 0 && s && e) {
-          aHt  = calcMonthlyAmountJS(rHt, s, e);
-          aTtc = Math.round(aHt * (1 + vatRate()) * 100) / 100;
-        } else {
-          aHt  = Math.round(rHt  * days * 100) / 100;
-          aTtc = Math.round(rTtc * days * 100) / 100;
+      const syncFromHt = (ht, days, mult) => {
+        const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
+        const htRounded = Math.round(ht * 100) / 100;
+        byId("qleqHt").value       = htRounded.toFixed(2);
+        byId("qleqSubtotal").value = (Math.round((htRounded + vatAmount) * 100) / 100).toFixed(2);
+        byId("qleqVat").value      = vatAmount.toFixed(2);
+        byId("qleqDaily").value    = dailyTaxAmount.toFixed(2);
+        byId("qleqStamp").value    = stampAmount.toFixed(2);
+        byId("qleqTtc").value      = amountTtc.toFixed(2);
+        if (htRounded > 0 && mult > 0) {
+          const rate = Math.round(htRounded / mult * 100) / 100;
+          const vr = getVatRate();
+          byId("qleqRate").value    = rate.toFixed(2);
+          byId("qleqRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
         }
-        byId("qleqHt").value  = days ? aHt.toFixed(2)  : "";
-        byId("qleqTtc").value = days ? aTtc.toFixed(2) : "";
-        byId("qleqVat").value = days ? (Math.round((aTtc-aHt)*100)/100).toFixed(2) : "";
-        byId("qleqDur").textContent = days ? `${days}j` : "—";
+      };
+      const recomputeFromRate = () => {
+        const rate = Number(byId("qleqRate").value || 0);
+        if (rate <= 0) return;
+        const vr = getVatRate();
+        const { days, mult } = getDurData();
+        byId("qleqRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const ht = rateType === "monthly"
+          ? calcMonthlyAmountJS(rate, byId("qleqStart").value, byId("qleqEnd").value)
+          : Math.round(rate * mult * 100) / 100;
+        syncFromHt(ht, days, mult);
+      };
+      const recomputeFromRateTtc = () => {
+        const rateTtc = Number(byId("qleqRateTtc").value || 0);
+        if (rateTtc <= 0) return;
+        const vr = getVatRate();
+        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
+        byId("qleqRate").value = rate.toFixed(2);
+        recomputeFromRate();
+      };
+      const recomputeSubtotal = () => {
+        const subtotal = Number(byId("qleqSubtotal").value || 0);
+        const vr = getVatRate();
+        const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
+        const { days, mult } = getDurData();
+        syncFromHt(ht, days, mult);
+      };
+      const recomputeTtc = () => {
+        const { days, mult } = getDurData();
+        const { amountHt } = computeContractLineHt(Number(byId("qleqTtc").value || 0), days);
+        syncFromHt(amountHt, days, mult);
+      };
+      const updateDur = () => {
+        const s = byId("qleqStart").value, e = byId("qleqEnd").value;
+        if (s && e && e >= s) {
+          const pt = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
+          const rt = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
+          const { days } = calcLineDuration(s, e, pt, rt);
+          byId("qleqDur").textContent = days + "j";
+          if (Number(byId("qleqRate").value || 0) > 0) recomputeFromRate();
+        } else { byId("qleqDur").textContent = "—"; }
       };
       const clearQleqError = () => { byId("qleqError").style.display = "none"; };
-      byId("qleqRate").oninput = () => {
-        byId("qleqRateTtc").value = (Math.round(Number(byId("qleqRate").value||0)*(1+vatRate())*100)/100).toFixed(2);
-        recalc(); clearQleqError();
-      };
-      byId("qleqRateTtc").oninput = () => {
-        byId("qleqRate").value = (Math.round(Number(byId("qleqRateTtc").value||0)/(1+vatRate())*100)/100).toFixed(2);
-        recalc(); clearQleqError();
-      };
-      byId("qleqStart").oninput = () => { recalc(); clearQleqError(); };
-      byId("qleqEnd").oninput   = () => { recalc(); clearQleqError(); };
-      byId("qleqCar").onchange  = clearQleqError;
-      recalc(); // init durée
+      byId("qleqRate").oninput      = () => { recomputeFromRate(); clearQleqError(); };
+      byId("qleqRateTtc").oninput   = () => { recomputeFromRateTtc(); clearQleqError(); };
+      byId("qleqSubtotal").onchange = () => { recomputeSubtotal(); clearQleqError(); };
+      byId("qleqTtc").onchange      = () => { recomputeTtc(); clearQleqError(); };
+      byId("qleqStart").oninput = () => { updateDur(); clearQleqError(); };
+      byId("qleqEnd").oninput   = () => { updateDur(); clearQleqError(); };
+      byId("qleqCar").onchange  = () => { clearQleqError(); const sc = state.cars.find(c => c.id === byId("qleqCar").value); if (sc) { const dInput = byId("qleqDesig"); if (dInput && !dInput.dataset.edited) dInput.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); } };
+      byId("qleqDesig")?.addEventListener("input", () => { if (byId("qleqDesig")) byId("qleqDesig").dataset.edited = "1"; });
+      if (isShortTermQ && byId("qleqPickup")) ["input","change"].forEach(ev => byId("qleqPickup").addEventListener(ev, () => { updateDur(); clearQleqError(); }));
+      if (isShortTermQ && byId("qleqReturn")) ["input","change"].forEach(ev => byId("qleqReturn").addEventListener(ev, () => { updateDur(); clearQleqError(); }));
       byId("qleqSaveBtn").onclick   = () => saveEditQuoteLine(quoteId, lineId, editTr);
       byId("qleqCancelBtn").onclick = () => { renderQuoteDetailLines(quoteId); };
+      // Recalcul initial : durée + tous les montants depuis les valeurs stockées
+      updateDur();
+      if (Number(byId("qleqRate").value || 0) > 0) recomputeFromRate();
+      else if (Number(byId("qleqSubtotal").value || 0) > 0) recomputeSubtotal();
+      byId("qleqCar").focus();
     }
 
     async function saveEditQuoteLine(quoteId, lineId, editTr) {
-      const carId    = byId("qleqCar").value;
+      const quote = (state.quotes || []).find(q => q.id === quoteId);
+      const isShortTermQ = !quote || quote.type === "court";
+      const carId       = byId("qleqCar").value;
+      const designation = (byId("qleqDesig") ? byId("qleqDesig").value : "") || "";
       const startStr = byId("qleqStart").value, endStr = byId("qleqEnd").value;
-      const rate     = Number(byId("qleqRate").value    || 0);
-      const rateTtc  = Number(byId("qleqRateTtc").value || 0);
+      const rate      = Number(byId("qleqRate").value    || 0);
+      const rateTtc   = Number(byId("qleqRateTtc").value || 0);
       const amountHt  = Number(byId("qleqHt").value  || 0);
+      const vatAmount = Number(byId("qleqVat").value || 0);
       const amountTtc = Number(byId("qleqTtc").value || 0);
-      const vatAmount = Math.round((amountTtc - amountHt) * 100) / 100;
       const errDiv = byId("qleqError");
       errDiv.style.display = "none";
       if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
       if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
-      if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
-      // Le contrôle de chevauchement est délégué au backend (BR19 + buffer + heures)
+      const subtotalVal = Number(byId("qleqSubtotal")?.value || 0);
+      if (amountHt <= 0 && subtotalVal > 0) {
+        const htDerived = Math.round(subtotalVal / (1 + Number(state.settings.vatRate || 19) / 100) * 100) / 100;
+        byId("qleqHt").value = htDerived.toFixed(2);
+      } else if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; return; }
+      // Le contrôle de chevauchement (BR19) ne s'applique pas aux devis avant validation (BR27)
       const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr);
+      const pickupTime = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
+      const returnTime = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
+      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime);
       const saveBtn = byId("qleqSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
       const result = await apiPutWithError(`/quote-lines/${lineId}`, {
         car_id: carId, car_plate: car ? car.plate : "",
         period_start: startStr, period_end: endStr, days, months,
+        pickup_time: pickupTime, return_time: returnTime,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
       });
@@ -13224,7 +13347,8 @@
       // Mettre à jour l'état local
       const idx = state.quoteLines.findIndex(l => l.id === lineId);
       if (idx >= 0) Object.assign(state.quoteLines[idx], {
-        carId, carPlate: car ? car.plate : "", periodStart: startStr, periodEnd: endStr,
+        carId, carPlate: car ? car.plate : "", designation, periodStart: startStr, periodEnd: endStr,
+        pickupTime: pickupTime || null, returnTime: returnTime || null,
         days, months, rate, rateTtc, amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
       });
       const qIdx = state.quotes.findIndex(q => q.id === quoteId);
@@ -13239,30 +13363,39 @@
     }
 
     async function submitInlineQuoteLine(quoteId, tr) {
-      const carId    = byId("qlCar").value;
+      const carId       = byId("qlCar").value;
+      const designation = (byId("qlDesig") ? byId("qlDesig").value : "") || "";
       const startStr = byId("qlStart").value, endStr = byId("qlEnd").value;
       const rate     = Number(byId("qlRate").value    || 0);
       const rateTtc  = Number(byId("qlRateTtc").value || 0);
-      const amountHt  = Number(byId("qlHt").value  || 0);
-      const amountTtc = Number(byId("qlTtc").value || 0);
-      const vatAmount = Math.round((amountTtc - amountHt) * 100) / 100;
       const errDiv = byId("qlError");
       errDiv.style.display = "none";
-      if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; return; }
-      if (!startStr || !endStr || endStr < startStr) { errDiv.textContent = "Dates invalides"; errDiv.style.display = ""; return; }
-      if (rate <= 0) { errDiv.textContent = "Tarif HT requis"; errDiv.style.display = ""; return; }
-      // Le contrôle de chevauchement est délégué au backend (BR19 + buffer + heures)
-      const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr);
-      const saveBtn = byId("qlSaveBtn");
-      saveBtn.disabled = true; saveBtn.textContent = "…";
+      if (!carId) { errDiv.textContent = "Véhicule requis"; errDiv.style.display = ""; byId("qlCar").focus(); return; }
+      if (!startStr || !endStr) { errDiv.textContent = "Dates requises"; errDiv.style.display = ""; return; }
+      if (endStr < startStr) { errDiv.textContent = "Fin avant début"; errDiv.style.display = ""; return; }
+
       const qlPickupEl = byId("qlPickup");
       const qlReturnEl = byId("qlReturn");
       const qlPickupTime = qlPickupEl ? (qlPickupEl.value || null) : null;
       const qlReturnTime = qlReturnEl ? (qlReturnEl.value || null) : null;
+      const car = state.cars.find(c => c.id === carId);
+      const { days, months } = calcLineDuration(startStr, endStr, qlPickupTime, qlReturnTime);
+
+      let amountHt = Number(byId("qlHt").value || 0);
+      if (amountHt <= 0) {
+        const subtotal = Number(byId("qlSubtotal").value || 0);
+        if (subtotal > 0) amountHt = Math.round(subtotal / (1 + Number(state.settings.vatRate || 19) / 100) * 100) / 100;
+      }
+      if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; byId("qlSubtotal").focus(); return; }
+
+      const { vatAmount, amountTtc } = computeContractLineTtc(amountHt, days);
+
+      const saveBtn = byId("qlSaveBtn");
+      saveBtn.disabled = true; saveBtn.textContent = "…";
 
       const result = await apiPostWithError("/quote-lines", {
         quote_id: quoteId, car_id: carId, car_plate: car ? car.plate : "",
+        designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
         period_start: startStr, period_end: endStr, days, months,
         rate, rate_currency: "TND",
         amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
@@ -13276,6 +13409,7 @@
       const lineData = result.data;
       state.quoteLines.push({
         id: lineData?.id || uid("QL"), quoteId, carId, carPlate: car ? car.plate : "",
+        designation: designation || (car ? (((car.brand||"")+" "+(car.model||"")).trim()||"") : ""),
         periodStart: startStr, periodEnd: endStr,
         pickupTime: qlPickupTime, returnTime: qlReturnTime,
         days, months, rate, rateTtc, rateCurrency: "TND",
@@ -13443,13 +13577,18 @@
       const sumHt  = lines.reduce((s, l) => s + (l.amountHt  || 0), 0);
       const sumVat = lines.reduce((s, l) => s + (l.vatAmount  || 0), 0);
       const sumTtc = lines.reduce((s, l) => s + (l.amountTtc || 0), 0);
+      // Taxe journalière et timbre fiscal : mêmes règles que les lignes de contrat
+      // (computeContractLineTtc) — timbre appliqué par ligne, pas une fois pour tout le devis.
+      const sumDailyTax = lines.reduce((s, l) => s + Math.round((l.days || 0) * Number(settings.dailyTaxTnd || 0) * 100) / 100, 0);
+      const sumStamp = lines.length * Number(settings.stampDutyTnd || 0);
+      const totalLineDays = lines.reduce((s, l) => s + (l.days || 0), 0);
 
       const qp = getQuotePeriod(quoteId);
       const quoteDate = qp.start || q.quoteDate || new Date().toISOString().slice(0, 10);
 
       const lineRowsHtml = lines.map(l => {
         const car = state.cars.find(c => c.plate === l.carPlate);
-        const designation = safe(car ? (((car.brand || "") + " " + (car.model || "")).trim() || "Véhicule") : "Véhicule");
+        const designation = safe(l.designation || (car ? (((car.brand || "") + " " + (car.model || "")).trim() || "Véhicule") : "Véhicule"));
         return `<tr>
         <td style="padding:6px;border:1px solid #c8daf9;">${designation}</td>
         <td style="padding:6px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate || "-")}</td>
@@ -13553,6 +13692,8 @@
         <table width="100%">
           <tr><td style="padding:4px 8px;">Total H.T</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumHt)}</td></tr>
           <tr><td style="padding:4px 8px;">Total TVA (${Number(settings.vatRate || 19)}%)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumVat)}</td></tr>
+          <tr><td style="padding:4px 8px;">Taxe ${Number(settings.dailyTaxTnd || 0)} dt/j (${totalLineDays}j)</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumDailyTax)}</td></tr>
+          <tr><td style="padding:4px 8px;">Timbre fiscal${lines.length > 1 ? ` (${lines.length} lignes)` : ""}</td><td style="padding:4px 8px;text-align:right;">${formatTnd(sumStamp)}</td></tr>
           <tr style="font-weight:bold;border-top:2px solid #0d244a;">
             <td style="padding:6px 8px;">Total T.T.C</td>
             <td style="padding:6px 8px;text-align:right;">${formatTnd(sumTtc)}</td>
@@ -17601,8 +17742,10 @@
         state.contracts = (state.contracts || []).filter(c => c.id !== contractId);
         const lineIds = (state.contractLines || []).filter(l => l.contractId === contractId).map(l => l.id);
         state.contractLines = (state.contractLines || []).filter(l => l.contractId !== contractId);
-        // Les réservations liées voient leur contractLineId mis à null (cascade DB: SET NULL)
-        (state.reservations || []).forEach(r => { if (lineIds.includes(r.contractLineId)) r.contractLineId = null; });
+        // Le backend supprime aussi les réservations liées aux lignes de ce contrat
+        // (elles ne sont pas juste détachées) pour ne pas laisser le calendrier du
+        // véhicule bloqué par une réservation orpheline.
+        state.reservations = (state.reservations || []).filter(r => !lineIds.includes(r.contractLineId));
         state.invoiceSchedule = (state.invoiceSchedule || []).filter(s => s.contractId !== contractId);
         state.invoices = (state.invoices || []).filter(i => i.contractId !== contractId);
         byId("contractDetailModal").style.display = "none";
