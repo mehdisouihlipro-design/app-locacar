@@ -242,14 +242,13 @@
 - [ ] **Persistance** : F5 → devis visible dans la grille
 
 ### UC-QUO-2 : Ajouter des lignes à un devis
-**En tant qu'agent commercial**, je veux que la saisie d'une ligne de devis fonctionne exactement comme une ligne de contrat (BR18), pour ne pas avoir deux logiques de calcul différentes dans l'app.
+**En tant qu'agent commercial**, je veux voir et saisir le tarif journalier ET son équivalent mensuel simultanément sur une ligne de devis, pour pouvoir négocier dans l'unité qui m'arrange sans faire le calcul de tête.
 
-- [ ] **Ajout inline** : "+ Ajouter une ligne" → sélecteur véhicule + désignation (auto, éditable) + dates + tarif → HT/TTC synchronisés (BR18)
-- [ ] **4 champs bidirectionnels** : saisir Tarif HT (jour ou mois selon la négociation du devis), Tarif TTC, Sous-total (HT+TVA), ou Total TTC → les 3 autres se recalculent automatiquement, identique au comportement d'une ligne de contrat (mêmes fonctions `computeContractLineTtc`/`computeContractLineHt`)
-- [ ] **Tarif journalier vs mensuel** : le placeholder et le calcul des champs respectent `quotes.rateType` (Journalier/Mensuel, choisi à la création ou modifiable via "✏ Modifier entête") — y compris dans la modale de détail du devis, pas seulement au moment de la création
-- [ ] **Taxe journalière et timbre fiscal inclus** : le Total TTC affiché et enregistré inclut la taxe journalière (jours × taux paramétré) et le timbre fiscal (par ligne, comme les lignes de contrat) — visibles en colonnes "T/j" et "Tmb" dans le tableau des lignes
-- [ ] **Édition d'une ligne existante** : bouton ✏️ → mêmes 4 champs bidirectionnels pré-remplis, mêmes colonnes T/j et Tmb
-- [ ] **Ordre de saisie indifférent** : saisir le Tarif HT (ou TTC, ou Sous-total) **avant** que les deux dates soient renseignées ne doit **jamais** afficher un Sous-total/Total TTC trompeur (ex. 0/1 — timbre appliqué sur un HT à 0) ; le tarif saisi est mémorisé et le calcul se déclenche automatiquement dès que les deux dates deviennent valides, quel que soit l'ordre de saisie
+- [ ] **Ajout inline** : "+ Ajouter une ligne" → sélecteur véhicule + désignation (auto, éditable) + dates + tarifs → HT/TTC synchronisés
+- [ ] **4 champs toujours visibles et bidirectionnels, indépendants des dates** : Tarif HT/j, Tarif TTC/j, Montant HT/mois, Montant TTC/mois — saisir n'importe lequel recalcule immédiatement les 3 autres (HT/j ⇄ TTC/j via la TVA ; HT/j ⇄ HT/mois via ×30 ; HT/mois ⇄ TTC/mois via la TVA), **sans attendre que les dates soient renseignées**
+- [ ] **Total de ligne calculé séparément** : Sous-total (HT+TVA), TVA, T/j (taxe journalière), Tmb (timbre), Total TTC sont **en lecture seule**, calculés à partir du tarif correspondant à la négociation du devis (`quotes.rateType` : le tarif HT/j si Journalier, le montant HT/mois si Mensuel) appliqué à la période réelle (dates requises pour cette partie uniquement)
+- [ ] **Ordre de saisie totalement indifférent** : saisir un tarif AVANT les dates ne doit jamais afficher de total trompeur (les 4 champs de tarif se calculent immédiatement ; le total de ligne reste vide tant que les dates ne sont pas complètes, puis se calcule automatiquement dès qu'elles le sont — aucune action supplémentaire requise)
+- [ ] **Édition d'une ligne existante** : bouton ✏️ → mêmes 4 champs de tarif pré-remplis (dérivés du tarif stocké selon `rateType`) et même total de ligne en lecture seule
 - [ ] **Aucun contrôle de chevauchement** : ajouter une ligne sur un véhicule/période déjà engagé par un contrat actif → **aucun blocage** (un devis ne réserve pas)
 - [ ] **Aucune réservation créée** : après ajout de la ligne, aucune `reservations` n'apparaît en base pour cette ligne
 - [ ] **Totaux mis à jour** : Total HT et TTC dans l'entête recalculés après chaque ajout/suppression de ligne
