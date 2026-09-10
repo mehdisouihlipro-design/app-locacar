@@ -249,6 +249,7 @@
 - [ ] **Tarif journalier vs mensuel** : le placeholder et le calcul des champs respectent `quotes.rateType` (Journalier/Mensuel, choisi à la création ou modifiable via "✏ Modifier entête") — y compris dans la modale de détail du devis, pas seulement au moment de la création
 - [ ] **Taxe journalière et timbre fiscal inclus** : le Total TTC affiché et enregistré inclut la taxe journalière (jours × taux paramétré) et le timbre fiscal (par ligne, comme les lignes de contrat) — visibles en colonnes "T/j" et "Tmb" dans le tableau des lignes
 - [ ] **Édition d'une ligne existante** : bouton ✏️ → mêmes 4 champs bidirectionnels pré-remplis, mêmes colonnes T/j et Tmb
+- [ ] **Ordre de saisie indifférent** : saisir le Tarif HT (ou TTC, ou Sous-total) **avant** que les deux dates soient renseignées ne doit **jamais** afficher un Sous-total/Total TTC trompeur (ex. 0/1 — timbre appliqué sur un HT à 0) ; le tarif saisi est mémorisé et le calcul se déclenche automatiquement dès que les deux dates deviennent valides, quel que soit l'ordre de saisie
 - [ ] **Aucun contrôle de chevauchement** : ajouter une ligne sur un véhicule/période déjà engagé par un contrat actif → **aucun blocage** (un devis ne réserve pas)
 - [ ] **Aucune réservation créée** : après ajout de la ligne, aucune `reservations` n'apparaît en base pour cette ligne
 - [ ] **Totaux mis à jour** : Total HT et TTC dans l'entête recalculés après chaque ajout/suppression de ligne

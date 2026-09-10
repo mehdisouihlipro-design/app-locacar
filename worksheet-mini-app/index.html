@@ -13120,8 +13120,12 @@
         const rate = Number(byId("qlRate").value || 0);
         if (rate <= 0) return;
         const vr = getVatRate();
-        const { days, mult } = getDurData();
         byId("qlRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const { days, mult } = getDurData();
+        // Dates pas encore renseignées : ne pas calculer un HT/TTC trompeur (0 HT + timbre
+        // quand même appliqué) — le tarif est mémorisé, updateDur() relancera ce calcul dès
+        // que les deux dates seront valides (peu importe l'ordre de saisie).
+        if (days <= 0) return;
         const ht = rateType === "monthly"
           ? calcMonthlyAmountJS(rate, byId("qlStart").value, byId("qlEnd").value)
           : Math.round(rate * mult * 100) / 100;
@@ -13140,10 +13144,12 @@
         const vr = getVatRate();
         const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
         const { days, mult } = getDurData();
+        if (days <= 0) return;
         syncFromHt(ht, days, mult);
       };
       const recomputeTtc = () => {
         const { days, mult } = getDurData();
+        if (days <= 0) return;
         const { amountHt } = computeContractLineHt(Number(byId("qlTtc").value || 0), days);
         syncFromHt(amountHt, days, mult);
       };
@@ -13251,8 +13257,12 @@
         const rate = Number(byId("qleqRate").value || 0);
         if (rate <= 0) return;
         const vr = getVatRate();
-        const { days, mult } = getDurData();
         byId("qleqRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const { days, mult } = getDurData();
+        // Dates pas encore renseignées : ne pas calculer un HT/TTC trompeur (0 HT + timbre
+        // quand même appliqué) — le tarif est mémorisé, updateDur() relancera ce calcul dès
+        // que les deux dates seront valides (peu importe l'ordre de saisie).
+        if (days <= 0) return;
         const ht = rateType === "monthly"
           ? calcMonthlyAmountJS(rate, byId("qleqStart").value, byId("qleqEnd").value)
           : Math.round(rate * mult * 100) / 100;
@@ -13271,10 +13281,12 @@
         const vr = getVatRate();
         const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
         const { days, mult } = getDurData();
+        if (days <= 0) return;
         syncFromHt(ht, days, mult);
       };
       const recomputeTtc = () => {
         const { days, mult } = getDurData();
+        if (days <= 0) return;
         const { amountHt } = computeContractLineHt(Number(byId("qleqTtc").value || 0), days);
         syncFromHt(amountHt, days, mult);
       };
