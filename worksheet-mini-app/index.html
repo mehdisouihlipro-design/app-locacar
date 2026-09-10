@@ -9640,7 +9640,15 @@
       return computeContractLineTtc(ht, days);
     }
     // Calcule { days, months } entre deux dates ISO (bornes incluses)
-    function calcLineDuration(startStr, endStr, pickupTime, returnTime) {
+    // `inclusive` : à réserver aux lignes long terme sans heure de prise en charge/retour
+    // (contrats/devis type "long"). Une période "du 11/09 au 10/10" y est alors comprise
+    // comme incluant les deux bornes (30 jours), cohérent avec calcMonthlyAmountJS qui
+    // applique déjà cette convention pour le prorata mensuel — sinon la durée affichée
+    // (29j) et la taxe journalière (jours × taux) ne correspondent plus au montant mensuel
+    // réellement facturé (calculé sur 30j). Ne JAMAIS passer `inclusive` pour une ligne
+    // court terme : le calcul heure-à-heure (+tolérance) existant reste la référence pour
+    // la facturation journalière, qu'une heure de prise en charge soit renseignée ou non.
+    function calcLineDuration(startStr, endStr, pickupTime, returnTime, inclusive) {
       if (!startStr || !endStr) return { days: 0, months: 0 };
       // Toujours construire des datetimes locaux (évite le mélange UTC/local)
       const sDate = new Date(startStr + "T" + (pickupTime || "00:00") + ":00");
@@ -9648,6 +9656,10 @@
       const ms = eDate - sDate;
       if (ms < 0) return { days: 0, months: 0 };
       const baseDays = Math.floor(ms / 86400000);
+      if (inclusive) {
+        const days = Math.max(1, baseDays + 1);
+        return { days, months: Math.round(days / 30) };
+      }
       const extraHours = (ms - baseDays * 86400000) / 3600000;
       // Appliquer la tolérance : si les heures dépassantes sont <= X, on ne rajoute pas de jour sup
       const tolerance = (typeof state !== "undefined" && state.settings?.rentalToleranceHours != null)
@@ -13109,7 +13121,7 @@
         if (!s || !e || e < s) return { days: 0, mult: 1 };
         const pt = isShortTermQ ? (byId("qlPickup")?.value || null) : null;
         const rt = isShortTermQ ? (byId("qlReturn")?.value || null) : null;
-        const { days } = calcLineDuration(s, e, pt, rt);
+        const { days } = calcLineDuration(s, e, pt, rt, !isShortTermQ);
         const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
         return { days, mult };
       };
@@ -13159,7 +13171,7 @@
         if (s && e && e >= s) {
           const pt = isShortTermQ ? (byId("qlPickup")?.value || null) : null;
           const rt = isShortTermQ ? (byId("qlReturn")?.value || null) : null;
-          const { days } = calcLineDuration(s, e, pt, rt);
+          const { days } = calcLineDuration(s, e, pt, rt, !isShortTermQ);
           byId("qlDur").textContent = days + "j";
         } else { byId("qlDur").textContent = "—"; }
         recomputeLineTotal();
@@ -13240,7 +13252,7 @@
         if (!s || !e || e < s) return { days: 0, mult: 1 };
         const pt = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
         const rt = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
-        const { days } = calcLineDuration(s, e, pt, rt);
+        const { days } = calcLineDuration(s, e, pt, rt, !isShortTermQ);
         const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
         return { days, mult };
       };
@@ -13286,7 +13298,7 @@
         if (s && e && e >= s) {
           const pt = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
           const rt = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
-          const { days } = calcLineDuration(s, e, pt, rt);
+          const { days } = calcLineDuration(s, e, pt, rt, !isShortTermQ);
           byId("qleqDur").textContent = days + "j";
         } else { byId("qleqDur").textContent = "—"; }
         recomputeLineTotal();
@@ -13331,7 +13343,7 @@
       const car = state.cars.find(c => c.id === carId);
       const pickupTime = isShortTermQ ? (byId("qleqPickup")?.value || null) : null;
       const returnTime = isShortTermQ ? (byId("qleqReturn")?.value || null) : null;
-      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime);
+      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime, !isShortTermQ);
       const saveBtn = byId("qleqSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
       const result = await apiPutWithError(`/quote-lines/${lineId}`, {
@@ -13366,6 +13378,7 @@
     async function submitInlineQuoteLine(quoteId, tr) {
       const quote = (state.quotes || []).find(q => q.id === quoteId);
       const rateType = quote?.rateType || "daily";
+      const isShortTermQ = !quote || quote.type === "court";
       const carId       = byId("qlCar").value;
       const designation = (byId("qlDesig") ? byId("qlDesig").value : "") || "";
       const startStr = byId("qlStart").value, endStr = byId("qlEnd").value;
@@ -13386,7 +13399,7 @@
       const qlPickupTime = qlPickupEl ? (qlPickupEl.value || null) : null;
       const qlReturnTime = qlReturnEl ? (qlReturnEl.value || null) : null;
       const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr, qlPickupTime, qlReturnTime);
+      const { days, months } = calcLineDuration(startStr, endStr, qlPickupTime, qlReturnTime, !isShortTermQ);
 
       let amountHt = Number(byId("qlHt").value || 0);
       if (amountHt <= 0) {
