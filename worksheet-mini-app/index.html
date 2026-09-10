@@ -13138,24 +13138,22 @@
       };
       // Les 4 champs journalier/mensuel HT/TTC sont toujours reliés entre eux, sans avoir
       // besoin des dates — seul le total de ligne (ci-dessus) attend une période valide.
-      const syncRatesFromDailyHt = (dailyHt) => {
+      // `sourceId` : le champ que l'utilisateur est en train de taper n'est JAMAIS réécrit
+      // (sinon .value est reformaté à chaque frappe — "1" devient "1.00" et le curseur saute
+      // en fin de champ, empêchant de taper un deuxième chiffre). Seuls les 3 AUTRES champs
+      // sont mis à jour en direct.
+      const applyRates = (dailyHt, monthlyHt, sourceId) => {
         const vr = getVatRate();
         const dHt = Math.max(0, Math.round(dailyHt * 100) / 100);
-        byId("qlDailyHt").value    = dHt.toFixed(2);
-        byId("qlDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
-        byId("qlMonthlyHt").value  = (Math.round(dHt * 30 * 100) / 100).toFixed(2);
-        byId("qlMonthlyTtc").value = (Math.round(dHt * 30 * (1 + vr / 100) * 100) / 100).toFixed(2);
-        recomputeLineTotal();
-      };
-      const syncRatesFromMonthlyHt = (monthlyHt) => {
-        const vr = getVatRate();
         const mHt = Math.max(0, Math.round(monthlyHt * 100) / 100);
-        byId("qlMonthlyHt").value  = mHt.toFixed(2);
-        byId("qlMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
-        byId("qlDailyHt").value    = (Math.round(mHt / 30 * 100) / 100).toFixed(2);
-        byId("qlDailyTtc").value   = (Math.round(mHt / 30 * (1 + vr / 100) * 100) / 100).toFixed(2);
+        if (sourceId !== "qlDailyHt")    byId("qlDailyHt").value    = dHt.toFixed(2);
+        if (sourceId !== "qlDailyTtc")   byId("qlDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        if (sourceId !== "qlMonthlyHt")  byId("qlMonthlyHt").value  = mHt.toFixed(2);
+        if (sourceId !== "qlMonthlyTtc") byId("qlMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
         recomputeLineTotal();
       };
+      const syncRatesFromDailyHt   = (dailyHt, sourceId)   => applyRates(dailyHt, dailyHt * 30, sourceId);
+      const syncRatesFromMonthlyHt = (monthlyHt, sourceId) => applyRates(monthlyHt / 30, monthlyHt, sourceId);
       const updateDur = () => {
         const s = byId("qlStart").value, e = byId("qlEnd").value;
         if (s && e && e >= s) {
@@ -13167,10 +13165,10 @@
         recomputeLineTotal();
       };
       const clearQlError = () => { byId("qlError").style.display = "none"; };
-      byId("qlDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qlDailyHt").value || 0)); clearQlError(); };
-      byId("qlDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qlDailyTtc").value || 0) / (1 + getVatRate() / 100)); clearQlError(); };
-      byId("qlMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyHt").value || 0)); clearQlError(); };
-      byId("qlMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyTtc").value || 0) / (1 + getVatRate() / 100)); clearQlError(); };
+      byId("qlDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qlDailyHt").value || 0), "qlDailyHt"); clearQlError(); };
+      byId("qlDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qlDailyTtc").value || 0) / (1 + getVatRate() / 100), "qlDailyTtc"); clearQlError(); };
+      byId("qlMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyHt").value || 0), "qlMonthlyHt"); clearQlError(); };
+      byId("qlMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qlMonthlyTtc"); clearQlError(); };
       byId("qlStart").oninput = () => { updateDur(); clearQlError(); };
       byId("qlEnd").oninput   = () => { updateDur(); clearQlError(); };
       byId("qlCar").onchange  = () => { clearQlError(); const sc = state.cars.find(c => c.id === byId("qlCar").value); const di = byId("qlDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
@@ -13267,23 +13265,21 @@
         byId("qleqStamp").value    = stampAmount.toFixed(2);
         byId("qleqTtc").value      = amountTtc.toFixed(2);
       };
-      const syncRatesFromDailyHt = (dailyHt) => {
+      // `sourceId` : le champ que l'utilisateur est en train de taper n'est jamais réécrit
+      // (sinon .value est reformaté à chaque frappe et le curseur saute en fin de champ).
+      const applyRates = (dailyHt, monthlyHt, sourceId) => {
         const vr = getVatRate();
         const dHt = Math.max(0, Math.round(dailyHt * 100) / 100);
-        byId("qleqDailyHt").value    = dHt.toFixed(2);
-        byId("qleqDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
-        byId("qleqMonthlyHt").value  = (Math.round(dHt * 30 * 100) / 100).toFixed(2);
-        byId("qleqMonthlyTtc").value = (Math.round(dHt * 30 * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const mHt = Math.max(0, Math.round(monthlyHt * 100) / 100);
+        if (sourceId !== "qleqDailyHt")    byId("qleqDailyHt").value    = dHt.toFixed(2);
+        if (sourceId !== "qleqDailyTtc")   byId("qleqDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        if (sourceId !== "qleqMonthlyHt")  byId("qleqMonthlyHt").value  = mHt.toFixed(2);
+        if (sourceId !== "qleqMonthlyTtc") byId("qleqMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
         recomputeLineTotal();
       };
-      const syncRatesFromMonthlyHt = (monthlyHt) => {
-        const vr = getVatRate();
-        const mHt = Math.max(0, Math.round(monthlyHt * 100) / 100);
-        byId("qleqMonthlyHt").value  = mHt.toFixed(2);
-        byId("qleqMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
-        byId("qleqDailyHt").value    = (Math.round(mHt / 30 * 100) / 100).toFixed(2);
-        byId("qleqDailyTtc").value   = (Math.round(mHt / 30 * (1 + vr / 100) * 100) / 100).toFixed(2);
-        recomputeLineTotal();
+      const syncRatesFromDailyHt   = (dailyHt, sourceId)   => applyRates(dailyHt, dailyHt * 30, sourceId);
+      const syncRatesFromMonthlyHt = (monthlyHt, sourceId) => {
+        applyRates(monthlyHt / 30, monthlyHt, sourceId);
       };
       const updateDur = () => {
         const s = byId("qleqStart").value, e = byId("qleqEnd").value;
@@ -13296,10 +13292,10 @@
         recomputeLineTotal();
       };
       const clearQleqError = () => { byId("qleqError").style.display = "none"; };
-      byId("qleqDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qleqDailyHt").value || 0)); clearQleqError(); };
-      byId("qleqDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qleqDailyTtc").value || 0) / (1 + getVatRate() / 100)); clearQleqError(); };
-      byId("qleqMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyHt").value || 0)); clearQleqError(); };
-      byId("qleqMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyTtc").value || 0) / (1 + getVatRate() / 100)); clearQleqError(); };
+      byId("qleqDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qleqDailyHt").value || 0), "qleqDailyHt"); clearQleqError(); };
+      byId("qleqDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qleqDailyTtc").value || 0) / (1 + getVatRate() / 100), "qleqDailyTtc"); clearQleqError(); };
+      byId("qleqMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyHt").value || 0), "qleqMonthlyHt"); clearQleqError(); };
+      byId("qleqMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qleqMonthlyTtc"); clearQleqError(); };
       byId("qleqStart").oninput = () => { updateDur(); clearQleqError(); };
       byId("qleqEnd").oninput   = () => { updateDur(); clearQleqError(); };
       byId("qleqCar").onchange  = () => { clearQleqError(); const sc = state.cars.find(c => c.id === byId("qleqCar").value); if (sc) { const dInput = byId("qleqDesig"); if (dInput && !dInput.dataset.edited) dInput.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); } };
