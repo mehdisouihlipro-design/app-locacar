@@ -62,9 +62,28 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(422).json({ success: false, message: 'Impossible de supprimer ce contrat : des paiements y sont associés.' });
     }
 
+    // Récupérer les réservations liées aux lignes de ce contrat avant suppression : les
+    // contract_lines sont supprimées en cascade (FK ON DELETE CASCADE), mais
+    // reservations.contract_line_id n'est qu'en ON DELETE SET NULL — sans ce nettoyage
+    // explicite, la réservation survivrait, orpheline, en continuant de bloquer le
+    // calendrier du véhicule sans qu'on puisse plus la relier à quoi que ce soit.
+    const linesRes = await global.db.get(`/contract_lines?contract_id=eq.${req.params.id}&select=reservation_id`);
+    const reservationIds = (linesRes.data || [])
+      .map((l: any) => l.reservation_id)
+      .filter((id: unknown): id is string => Boolean(id));
+
     await global.db.delete(`/contracts?id=eq.${req.params.id}`);
     releaseSequenceOnDelete('contracts').catch(() => {});
-    res.json({ success: true, message: 'Contrat supprimé.' });
+
+    for (const reservationId of reservationIds) {
+      try {
+        await global.db.delete(`/reservations?id=eq.${reservationId}`);
+      } catch (e: any) {
+        console.warn('[contracts] Impossible de supprimer la réservation liée:', reservationId, e?.message);
+      }
+    }
+
+    res.json({ success: true, message: 'Contrat supprimé.', deletedReservationIds: reservationIds });
   } catch (err) { res.status(500).json({ success: false, error: String(err) }); }
 });
 
