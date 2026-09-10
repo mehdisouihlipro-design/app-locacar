@@ -141,8 +141,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const check = await global.db.get(`/quotes?id=eq.${req.params.id}&select=id`);
+    const check = await global.db.get(`/quotes?id=eq.${req.params.id}&select=id,converted_contract_id`);
     if (!check.data?.[0]) return res.status(404).json({ success: false, message: 'Devis introuvable.' });
+    if (check.data[0].converted_contract_id) {
+      return res.status(422).json({ success: false, message: `Impossible de supprimer ce devis : il a déjà été converti en contrat (${check.data[0].converted_contract_id}). Débloquez-le d'abord si vous voulez le revalider, ou supprimez le contrat associé.` });
+    }
     await global.db.delete(`/quotes?id=eq.${req.params.id}`);
     releaseSequenceOnDelete('quotes').catch(() => {});
     res.json({ success: true, message: 'Devis supprimé.' });

@@ -569,7 +569,17 @@
 - [ ] **Titre** : "DEVIS" avec le numéro N° QUO-XXXXX et la date
 - [ ] **Bloc client** : même style que la facture (fond #f5f7ff, bordure bleue)
 - [ ] **Tableau des lignes** : colonnes Désignation, Immatriculation, DU, AU, Nb.j, Prix HT, TVA, Prix TTC
-- [ ] **Totaux** : HT + TVA + TTC (sans taxe journalière ni timbre, propres aux factures)
+- [ ] **Totaux** : HT + TVA + Taxe journalière + Timbre fiscal + TTC (cf. UC-QUO-4 — alignés sur le calcul des lignes de devis, BR18, depuis 2026-09)
+
+### UC-QUO-9 : Supprimer un devis
+**En tant qu'agent**, je veux pouvoir supprimer un devis qui n'est plus pertinent (erreur de saisie, client qui n'a pas donné suite).
+
+- [ ] **Bouton "🗑 Supprimer le devis"** : visible dans le modal de détail (à côté de "Fermer"), sauf si le devis est verrouillé (converti en contrat)
+- [ ] **Confirmation explicite** : clic → boîte de confirmation "opération irréversible" avec le numéro du devis
+- [ ] **Annulation** : annuler la confirmation → aucune suppression
+- [ ] **Suppression réussie** : `DELETE /quotes/:id` → devis et ses lignes disparaissent (cascade DB sur `quote_lines`), modal se ferme, devis absent de la liste après F5
+- [ ] **Devis converti en contrat → suppression refusée** : `422` avec message explicite (le contrat associé n'est pas supprimé automatiquement) ; le bouton est de toute façon masqué dans ce cas côté UI
+- [ ] **Persistance** : F5 après suppression → le devis n'apparaît plus, ni ses lignes
 - [ ] **Montant en lettres** : "Arrêtée le présent devis à la somme de …"
 - [ ] **Blocs signature** : Prestataire + Client (mêmes que le contrat)
 - [ ] **Pied de page** : nom société + adresse + téléphone + matricule fiscal

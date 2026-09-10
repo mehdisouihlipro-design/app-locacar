@@ -1952,8 +1952,10 @@
           </table>
         </div>
         <div id="qdEmptyMsg" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucune ligne — cliquez sur "+ Ajouter une ligne".</div>
+        <div id="qdDeleteError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:13px;"></div>
         <div class="actions" style="margin-top:12px;">
           <button id="qdAddLineBtn">+ Ajouter une ligne</button>
+          <button id="qdDeleteBtn" class="secondary" style="color:#c53030;border-color:#c53030;margin-left:auto;">🗑 Supprimer le devis</button>
           <button id="qdCloseBtn2" class="secondary">Fermer</button>
         </div>
         <div id="qdValidateError" style="display:none;color:#c53030;background:#fff5f5;border:1px solid #fc8181;border-radius:6px;padding:8px;margin-top:8px;font-size:13px;"></div>
@@ -13776,6 +13778,25 @@
       };
       byId("qdCloseBtn").onclick    = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
       byId("qdCloseBtn2").onclick   = () => { byId("quoteDetailModal").style.display = "none"; refreshAndRenderTab("quotes"); };
+
+      // Bouton supprimer
+      byId("qdDeleteError").style.display = "none";
+      byId("qdDeleteBtn").style.display = isQuoteDetailLocked ? "none" : "";
+      byId("qdDeleteBtn").onclick = async () => {
+        if (!confirm(`Supprimer définitivement le devis ${q.quoteNumber || quoteId} ? Cette action est irréversible.`)) return;
+        byId("qdDeleteError").style.display = "none";
+        const res = await apiDeleteWithError(`/quotes/${quoteId}`);
+        if (!res.ok) {
+          byId("qdDeleteError").textContent = res.errorMsg || "Erreur lors de la suppression.";
+          byId("qdDeleteError").style.display = "";
+          return;
+        }
+        state.quotes = (state.quotes || []).filter(x => x.id !== quoteId);
+        state.quoteLines = (state.quoteLines || []).filter(l => l.quoteId !== quoteId);
+        byId("quoteDetailModal").style.display = "none";
+        saveAndRender();
+      };
+
       renderQuoteDetailHeader(quoteId, false);
       renderQuoteDetailLines(quoteId);
       byId("quoteDetailModal").style.display = "flex";
