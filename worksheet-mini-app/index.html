@@ -10158,6 +10158,7 @@
       renderCustomers();
       renderContractOptions();
       renderContracts();
+      renderQuotes();
       renderInvoices();
       renderCollections();
       renderPaymentOptions();
@@ -13451,11 +13452,8 @@
 
     async function deleteQuoteLine(quoteId, lineId) {
       if (!confirm("Supprimer cette ligne ?")) return;
-      const token = localStorage.getItem("locacar-jwt");
-      const res = await fetch(`${API_URL}/quote-lines/${lineId}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) { alert("Erreur lors de la suppression"); return; }
+      const res = await apiDeleteWithError(`/quote-lines/${lineId}`);
+      if (!res.ok) { alert(`Erreur lors de la suppression : ${res.errorMsg}`); return; }
       const idx = state.quoteLines.findIndex(l => l.id === lineId);
       if (idx >= 0) state.quoteLines.splice(idx, 1);
       const qIdx = state.quotes.findIndex(q => q.id === quoteId);
