@@ -161,11 +161,15 @@
 - [ ] **Persistance** : F5 → le contrat entête est bien présent, avec 0 lignes
 
 ### UC-CTR-2 : Ajouter des lignes à un contrat
+**En tant qu'agent**, je veux voir et saisir le tarif journalier ET son équivalent mensuel simultanément sur une ligne de contrat, comme sur un devis, et ne pouvoir modifier que l'unité qui correspond à la négociation du contrat.
+
 - [ ] **Bouton "+ Ajouter une ligne"** : dans le modal de détail, cliquer → ligne de saisie inline apparaît en bas du tableau
-- [ ] **Saisie complète** : Véhicule (sélecteur), Date début, Date fin → durée calculée automatiquement (jours) → saisir Tarif/j → Montant HT calculé automatiquement (jours × tarif)
-- [ ] **HT → TTC automatique** : modifier le montant HT → TTC recalculé en temps réel avec TVA (BR18), sans taxe journalière ni timbre
-- [ ] **TTC → HT automatique** : modifier le TTC → HT recalculé en sens inverse (BR18)
-- [ ] **Enregistrement** : ✓ → `POST /contract-lines` → ligne apparaît dans la grille, totaux entête mis à jour
+- [ ] **4 champs toujours visibles, 2 éditables selon `contracts.rateType`** : Tarif HT/j, Tarif TTC/j, Montant HT/mois, Montant TTC/mois sont tous affichés et recalculés en direct ; seuls les 2 champs correspondant à `rateType` (journalier ou mensuel) sont éditables — les 2 autres sont grisés/lecture seule mais restent mis à jour en temps réel (conversion ×30 / ÷30 + TVA), jamais figés à une valeur périmée
+- [ ] **Bidirectionnel dans l'unité active** : contrat journalier → saisir Tarif HT/j recalcule Tarif TTC/j (TVA, BR18) et les 2 montants mensuels (×30) ; saisir Tarif TTC/j recalcule le HT/j puis les mensuels. Contrat mensuel → saisir Montant HT/mois recalcule TTC/mois (TVA) et les 2 tarifs journaliers (÷30) ; idem depuis TTC/mois
+- [ ] **Ordre de saisie indifférent** : saisir le tarif avant les dates ne doit jamais afficher de total trompeur (le tarif/mensuel se calcule immédiatement ; Sous-total/TVA/T-j/Tmb/Total TTC restent vides tant que les dates ne sont pas complètes, puis se calculent automatiquement dès qu'elles le sont)
+- [ ] **Total de ligne en lecture seule** : Sous-total (HT+TVA), TVA, T/j (taxe journalière, jours × tarif journalier des paramètres), Tmb (timbre fiscal, montant fixe), Total TTC sont calculés automatiquement à partir du tarif de l'unité active (`rateType`) appliqué à la période réelle — jamais saisis directement
+- [ ] **Pas de reset au clavier** : taper un montant à 3+ chiffres (ex. "400") dans un champ actif → la valeur s'accumule correctement chiffre par chiffre, sans revenir à un seul chiffre
+- [ ] **Enregistrement** : ✓ → `POST /contract-lines` avec le tarif de l'unité active → ligne apparaît dans la grille (colonnes Tarif HT/j, Tarif TTC/j, Mens. HT, Mens. TTC toutes renseignées), totaux entête mis à jour
 - [ ] **Persistance** : F5 → la ligne est bien chargée depuis l'API (pas seulement en mémoire)
 
 ### UC-CTR-3 : Chevauchement véhicule (BR19)
@@ -175,14 +179,20 @@
 - [ ] **Lignes résiliées exclues** : une période qui chevauche une ligne `resilie` du même véhicule → aucun conflit
 
 ### UC-CTR-4 : Édition inline d'une ligne
-- [ ] **Bouton ✎ (edit)** : sur une ligne `active` dans le modal de détail → champs deviennent éditables inline
-- [ ] **Tarif → TTC (contrat journalier)** : modifier le tarif/j → HT = tarif × jours, TVA recalculée, TTC mis à jour → ✓ → `PUT /contract-lines/:id` → ligne mise à jour
-- [ ] **Tarif → TTC (contrat mensuel)** : modifier le tarif mensuel → HT calculé via formule mensuelle (mois complets + prorata dernier mois), TVA, TTC mis à jour
-- [ ] **TTC → Tarif** : modifier le TTC directement → HT recalculé (HT = TTC / (1 + TVA)), puis tarif = HT / (jours ou mois selon type de contrat)
-- [ ] **HT → Tarif** : modifier le HT directement → TVA et TTC recalculés, puis tarif = HT / durée
-- [ ] **Dates → recalcul automatique** : modifier la date de début ou fin → durée recalculée, si tarif renseigné → HT/TTC recalculés depuis le tarif
-- [ ] **Unité affichée** : le libellé sous le champ tarif affiche "TND/j" pour contrat journalier et "TND/mois" pour contrat mensuel
+- [ ] **Bouton ✎ (edit)** : sur une ligne `active` dans le modal de détail → les 4 champs de tarif (HT/j, TTC/j, HT/mois, TTC/mois) et les dates deviennent éditables inline, pré-remplis depuis le tarif stocké (dérivé selon `rateType`) ; seuls les 2 champs de l'unité active (`rateType`) sont réellement modifiables, les 2 autres restent grisés/lecture seule
+- [ ] **Tarif → TTC (contrat journalier)** : modifier le tarif HT/j → TTC/j recalculé (TVA, BR18), montants mensuels recalculés (×30), total de ligne (Sous-total/TVA/T-j/Tmb/Total TTC) recalculé depuis HT/j × jours → ✓ → `PUT /contract-lines/:id` → ligne mise à jour
+- [ ] **Tarif → TTC (contrat mensuel)** : modifier le montant HT/mois → TTC/mois recalculé (TVA), tarifs journaliers recalculés (÷30), total de ligne calculé via la formule mensuelle (mois complets + prorata dernier mois)
+- [ ] **Champs grisés non modifiables** : sur un contrat mensuel, tenter de taper dans les champs Tarif HT/j ou TTC/j (lecture seule) → aucune saisie possible, valeur reste synchronisée en lecture seule ; idem pour les champs mensuels sur un contrat journalier
+- [ ] **Dates → recalcul automatique** : modifier la date de début ou fin → durée recalculée, total de ligne recalculé depuis le tarif de l'unité active
+- [ ] **Pas de reset au clavier** : taper un montant à plusieurs chiffres dans le champ actif → la valeur s'accumule correctement, sans revenir à un seul chiffre
 - [ ] **409 sur modification** : modifier les dates d'une ligne de façon à créer un chevauchement → message rouge inline, modification annulée
+
+### UC-CTR-4bis : Durée d'une ligne long terme (sans heures, dernier jour inclus)
+**En tant qu'agent**, je veux que la durée affichée sur une ligne de contrat long terme corresponde au nombre de jours réellement facturés, sans tenir compte des heures.
+
+- [ ] **Heures ignorées** : sur un contrat `type = long`, les champs heure de sortie/retour ne sont pas affichés sur la ligne ; le calcul de durée ignore toute heure éventuellement stockée
+- [ ] **Dernier jour inclus (+1)** : ligne du 11/09 au 10/10 sur un contrat long terme mensuel → durée affichée cohérente avec le montant facturé sur 30 jours (le jour de fin est inclus dans le décompte), pas d'écart entre les jours affichés et le nombre de jours utilisé pour le calcul du montant mensuel/taxe journalière
+- [ ] **Contrat court terme inchangé** : sur un contrat `type = court`, le calcul de durée continue de tenir compte des heures de sortie/retour (aucune régression sur le comportement existant)
 
 ### UC-CTR-5 : Résiliation anticipée d'une ligne (BR26)
 - [ ] **Bouton ⏹ (résilier)** : disponible sur les lignes `active` uniquement → saisie de la date de fin effective
@@ -245,7 +255,7 @@
 **En tant qu'agent commercial**, je veux voir et saisir le tarif journalier ET son équivalent mensuel simultanément sur une ligne de devis, pour pouvoir négocier dans l'unité qui m'arrange sans faire le calcul de tête.
 
 - [ ] **Ajout inline** : "+ Ajouter une ligne" → sélecteur véhicule + désignation (auto, éditable) + dates + tarifs → HT/TTC synchronisés
-- [ ] **4 champs toujours visibles et bidirectionnels, indépendants des dates** : Tarif HT/j, Tarif TTC/j, Montant HT/mois, Montant TTC/mois — saisir n'importe lequel recalcule immédiatement les 3 autres (HT/j ⇄ TTC/j via la TVA ; HT/j ⇄ HT/mois via ×30 ; HT/mois ⇄ TTC/mois via la TVA), **sans attendre que les dates soient renseignées**
+- [ ] **4 champs toujours visibles, 2 éditables selon `quotes.rateType`, indépendants des dates** : Tarif HT/j, Tarif TTC/j, Montant HT/mois, Montant TTC/mois sont tous affichés et recalculés en direct ; seuls les 2 champs correspondant à `rateType` (journalier ou mensuel) sont éditables — les 2 autres sont grisés/lecture seule mais restent mis à jour en temps réel (HT/j ⇄ TTC/j via la TVA ; HT/j ⇄ HT/mois via ×30 ; HT/mois ⇄ TTC/mois via la TVA), **sans attendre que les dates soient renseignées**
 - [ ] **Total de ligne calculé séparément** : Sous-total (HT+TVA), TVA, T/j (taxe journalière), Tmb (timbre), Total TTC sont **en lecture seule**, calculés à partir du tarif correspondant à la négociation du devis (`quotes.rateType` : le tarif HT/j si Journalier, le montant HT/mois si Mensuel) appliqué à la période réelle (dates requises pour cette partie uniquement)
 - [ ] **Ordre de saisie totalement indifférent** : saisir un tarif AVANT les dates ne doit jamais afficher de total trompeur (les 4 champs de tarif se calculent immédiatement ; le total de ligne reste vide tant que les dates ne sont pas complètes, puis se calcule automatiquement dès qu'elles le sont — aucune action supplémentaire requise)
 - [ ] **Édition d'une ligne existante** : bouton ✏️ → mêmes 4 champs de tarif pré-remplis (dérivés du tarif stocké selon `rateType`) et même total de ligne en lecture seule

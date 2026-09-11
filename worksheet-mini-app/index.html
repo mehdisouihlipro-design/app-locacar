@@ -3309,6 +3309,8 @@
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Durée</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif HT/j</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Tarif TTC/j</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Mens. HT</th>
+                <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Mens. TTC</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">Sous-total</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">TVA</th>
                 <th style="text-align:right;padding:6px 8px;background:#f8faff;font-size:11px;text-transform:uppercase;color:var(--muted);">T/j</th>
@@ -13083,6 +13085,8 @@
       const quote = (state.quotes || []).find(q => q.id === quoteId);
       const isShortTermQ = !quote || quote.type === "court";
       const rateType = quote?.rateType || "daily";
+      const isMonthlyMode = rateType === "monthly";
+      const qlGrayStyle = "background:#f1f5f9;color:var(--muted);";
 
       const tr = document.createElement("tr");
       tr.className = "ql-inline-new";
@@ -13098,10 +13102,10 @@
           ${isShortTermQ ? `<input id="qlReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="qlDur" style="text-align:right;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:4px;"><input id="qlDailyHt" type="number" step="0.01" min="0" placeholder="HT/j" style="width:68px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlDailyTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:68px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlMonthlyHt" type="number" step="0.01" min="0" placeholder="HT/mois" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qlMonthlyTtc" type="number" step="0.01" min="0" placeholder="TTC/mois" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qlDailyHt" type="number" step="0.01" min="0" placeholder="HT/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? qlGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qlDailyTtc" type="number" step="0.01" min="0" placeholder="TTC/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? qlGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qlMonthlyHt" type="number" step="0.01" min="0" placeholder="HT/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? qlGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qlMonthlyTtc" type="number" step="0.01" min="0" placeholder="TTC/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? qlGrayStyle : ""}" /></td>
         <td style="padding:4px;"><input id="qlSubtotal" type="number" step="0.01" readonly tabindex="-1" style="width:78px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /><input id="qlHt" type="hidden" value="0" /></td>
         <td style="padding:4px;"><input id="qlVat" type="number" step="0.01" readonly tabindex="-1" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
         <td style="padding:4px;"><input id="qlDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
@@ -13178,10 +13182,13 @@
         recomputeLineTotal();
       };
       const clearQlError = () => { byId("qlError").style.display = "none"; };
-      byId("qlDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qlDailyHt").value || 0), "qlDailyHt"); clearQlError(); };
-      byId("qlDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qlDailyTtc").value || 0) / (1 + getVatRate() / 100), "qlDailyTtc"); clearQlError(); };
-      byId("qlMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyHt").value || 0), "qlMonthlyHt"); clearQlError(); };
-      byId("qlMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qlMonthlyTtc"); clearQlError(); };
+      if (!isMonthlyMode) {
+        byId("qlDailyHt").oninput  = () => { syncRatesFromDailyHt(Number(byId("qlDailyHt").value || 0), "qlDailyHt"); clearQlError(); };
+        byId("qlDailyTtc").oninput = () => { syncRatesFromDailyHt(Number(byId("qlDailyTtc").value || 0) / (1 + getVatRate() / 100), "qlDailyTtc"); clearQlError(); };
+      } else {
+        byId("qlMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyHt").value || 0), "qlMonthlyHt"); clearQlError(); };
+        byId("qlMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qlMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qlMonthlyTtc"); clearQlError(); };
+      }
       byId("qlStart").oninput = () => { updateDur(); clearQlError(); };
       byId("qlEnd").oninput   = () => { updateDur(); clearQlError(); };
       byId("qlCar").onchange  = () => { clearQlError(); const sc = state.cars.find(c => c.id === byId("qlCar").value); const di = byId("qlDesig"); if (sc && di && !di.dataset.edited) di.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); };
@@ -13201,6 +13208,8 @@
       const quote = (state.quotes || []).find(q => q.id === quoteId);
       const rateType = quote?.rateType || "daily";
       const isShortTermQ = !quote || quote.type === "court";
+      const isMonthlyMode = rateType === "monthly";
+      const qleqGrayStyle = "background:#f1f5f9;color:var(--muted);";
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand||c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
@@ -13229,10 +13238,10 @@
           ${isShortTermQ ? `<input id="qleqReturn" type="time" value="${safe(line.returnTime||"")}" style="width:75px;font-size:12px;margin-left:2px;" />` : ""}
         </td>
         <td id="qleqDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
-        <td style="padding:4px;"><input id="qleqDailyHt" type="number" step="0.01" min="0" value="${initDailyHt || ""}" placeholder="HT/j" style="width:68px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qleqDailyTtc" type="number" step="0.01" min="0" value="${initDailyHt ? initDailyTtc : ""}" placeholder="TTC/j" style="width:68px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qleqMonthlyHt" type="number" step="0.01" min="0" value="${initMonthlyHt || ""}" placeholder="HT/mois" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="qleqMonthlyTtc" type="number" step="0.01" min="0" value="${initMonthlyHt ? initMonthlyTtc : ""}" placeholder="TTC/mois" style="width:72px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="qleqDailyHt" type="number" step="0.01" min="0" value="${initDailyHt || ""}" placeholder="HT/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? qleqGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qleqDailyTtc" type="number" step="0.01" min="0" value="${initDailyHt ? initDailyTtc : ""}" placeholder="TTC/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? qleqGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qleqMonthlyHt" type="number" step="0.01" min="0" value="${initMonthlyHt || ""}" placeholder="HT/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? qleqGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="qleqMonthlyTtc" type="number" step="0.01" min="0" value="${initMonthlyHt ? initMonthlyTtc : ""}" placeholder="TTC/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? qleqGrayStyle : ""}" /></td>
         <td style="padding:4px;"><input id="qleqSubtotal" type="number" step="0.01" readonly tabindex="-1" value="${initSubtotal}" style="width:78px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /><input id="qleqHt" type="hidden" value="${line.amountHt||""}" /></td>
         <td style="padding:4px;"><input id="qleqVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
         <td style="padding:4px;"><input id="qleqDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
@@ -13305,10 +13314,13 @@
         recomputeLineTotal();
       };
       const clearQleqError = () => { byId("qleqError").style.display = "none"; };
-      byId("qleqDailyHt").oninput    = () => { syncRatesFromDailyHt(Number(byId("qleqDailyHt").value || 0), "qleqDailyHt"); clearQleqError(); };
-      byId("qleqDailyTtc").oninput   = () => { syncRatesFromDailyHt(Number(byId("qleqDailyTtc").value || 0) / (1 + getVatRate() / 100), "qleqDailyTtc"); clearQleqError(); };
-      byId("qleqMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyHt").value || 0), "qleqMonthlyHt"); clearQleqError(); };
-      byId("qleqMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qleqMonthlyTtc"); clearQleqError(); };
+      if (!isMonthlyMode) {
+        byId("qleqDailyHt").oninput  = () => { syncRatesFromDailyHt(Number(byId("qleqDailyHt").value || 0), "qleqDailyHt"); clearQleqError(); };
+        byId("qleqDailyTtc").oninput = () => { syncRatesFromDailyHt(Number(byId("qleqDailyTtc").value || 0) / (1 + getVatRate() / 100), "qleqDailyTtc"); clearQleqError(); };
+      } else {
+        byId("qleqMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyHt").value || 0), "qleqMonthlyHt"); clearQleqError(); };
+        byId("qleqMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(byId("qleqMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "qleqMonthlyTtc"); clearQleqError(); };
+      }
       byId("qleqStart").oninput = () => { updateDur(); clearQleqError(); };
       byId("qleqEnd").oninput   = () => { updateDur(); clearQleqError(); };
       byId("qleqCar").onchange  = () => { clearQleqError(); const sc = state.cars.find(c => c.id === byId("qleqCar").value); if (sc) { const dInput = byId("qleqDesig"); if (dInput && !dInput.dataset.edited) dInput.value = (((sc.brand||"")+" "+(sc.model||"")).trim()); } };
@@ -16799,15 +16811,23 @@
         const isContractLockedForLine = contractForLock ? isContractFactured(contractId) : false;
         const canEdit      = !isContractLockedForLine && displayStatus !== "annule" && displayStatus !== "resilie";
         const canTerminate = !isContractLockedForLine && displayStatus === "active";
-        const lRateTtc = l.rate ? Math.round(l.rate * (1 + linesVatRate/100) * 100) / 100 : 0;
+        // La ligne stocke un seul tarif (rate), au sens journalier ou mensuel selon
+        // contracts.rateType — on dérive l'autre unité (÷30 / ×30) pour affichage,
+        // comme dans le formulaire d'ajout/édition (les 4 valeurs sont toujours visibles).
+        const lDailyHt   = linesRateType === "monthly" ? Math.round((l.rate || 0) / 30 * 100) / 100 : (l.rate || 0);
+        const lMonthlyHt = linesRateType === "monthly" ? (l.rate || 0) : Math.round((l.rate || 0) * 30 * 100) / 100;
+        const lRateTtc     = Math.round(lDailyHt   * (1 + linesVatRate/100) * 100) / 100;
+        const lMonthlyTtc  = Math.round(lMonthlyHt * (1 + linesVatRate/100) * 100) / 100;
         const lDailyTaxAmt = Math.round((l.days || 0) * linesDailyTax * 100) / 100;
         tr.innerHTML = `
           <td><a class="xref" data-goto-tab="cars" data-goto-query="${safe(l.carPlate)}">${safe(l.carPlate || "-")}</a></td>
           <td style="color:var(--muted);font-size:12px;">${(() => { const lcar = state.cars.find(c => c.id === l.carId); return safe(l.designation || (lcar ? (((lcar.brand||"")+" "+(lcar.model||"")).trim()||"") : "")); })()}</td>
           <td style="white-space:nowrap;">${periodLabel}</td>
           <td style="text-align:right;">${dur}</td>
-          <td style="text-align:right;">${(l.rate || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
+          <td style="text-align:right;">${lDailyHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
           <td style="text-align:right;">${lRateTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
+          <td style="text-align:right;">${lMonthlyHt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
+          <td style="text-align:right;">${lMonthlyTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
           <td style="text-align:right;">${((l.amountHt || 0) + (l.vatAmount || 0)).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
           <td style="text-align:right;">${(l.vatAmount || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
           <td style="text-align:right;">${lDailyTaxAmt.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
@@ -16835,7 +16855,7 @@
       const tfoot = byId("cdlLinesFoot");
       if (tfoot) {
         tfoot.innerHTML = lines.length
-          ? `<tr><td colspan="4" style="padding:6px 8px;"><strong>Total</strong></td><td></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${(sumHt + sumVat).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></td><td style="text-align:right;padding:6px 8px;color:var(--muted);font-size:12px;">${sumVat.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td><td></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></td><td></td><td></td><td></td></tr>`
+          ? `<tr><td colspan="6" style="padding:6px 8px;"><strong>Total</strong></td><td></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${(sumHt + sumVat).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></td><td style="text-align:right;padding:6px 8px;color:var(--muted);font-size:12px;">${sumVat.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td><td></td><td></td><td style="text-align:right;padding:6px 8px;"><strong>${sumTtc.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></td><td></td><td></td><td></td></tr>`
           : "";
       }
     }
@@ -16847,7 +16867,9 @@
       if (!line) return;
       const ctr = state.contracts.find(c => c.id === contractId);
       const rateType = ctr?.rateType || "daily";
-      const rateUnit = rateType === "monthly" ? "TND/mois" : "TND/j";
+      const isMonthlyMode = rateType === "monthly";
+      const isShortTerm = !ctr || ctr.type === "court";
+      const grayStyle = "background:#f1f5f9;color:var(--muted);";
       const carOptions = state.cars.map(c =>
         `<option value="${safe(c.id)}"${c.id === line.carId ? " selected" : ""}>${safe(c.plate)}${(c.brand || c.model) ? ` — ${safe(((c.brand||"")+" "+(c.model||"")).trim())}` : ""}</option>`
       ).join("");
@@ -16856,12 +16878,12 @@
       const stampCle    = Number(state.settings.stampDutyTnd || 0);
       const initDailyAmt = ((line.days || 0) * dailyTaxCle).toFixed(2);
       const initStampAmt = stampCle.toFixed(2);
-      const initRateTtc = line.rate
-        ? (Math.round(line.rate * (1 + vatRateCle / 100) * 100) / 100).toFixed(2)
-        : "";
-      const initSubtotal = line.amountHt
-        ? (Math.round(line.amountHt * (1 + vatRateCle / 100) * 100) / 100).toFixed(2)
-        : "";
+      const initSubtotal = line.amountHt ? (Math.round(line.amountHt * (1 + vatRateCle / 100) * 100) / 100).toFixed(2) : "";
+      // line.rate est au sens journalier ou mensuel selon rateType — dériver les 4 champs.
+      const initDailyHt   = isMonthlyMode ? Math.round((line.rate || 0) / 30 * 100) / 100 : (line.rate || 0);
+      const initMonthlyHt = isMonthlyMode ? (line.rate || 0) : Math.round((line.rate || 0) * 30 * 100) / 100;
+      const initDailyTtc   = Math.round(initDailyHt   * (1 + vatRateCle / 100) * 100) / 100;
+      const initMonthlyTtc = Math.round(initMonthlyHt * (1 + vatRateCle / 100) * 100) / 100;
       tr.style.cssText = "background:#f0f7ff;border-top:2px solid #2f6bff;";
       tr.innerHTML = `
         <td style="padding:4px;"><select id="cleCar" style="width:100%;min-width:100px;font-size:12px;">${carOptions}</select></td>
@@ -16874,13 +16896,15 @@
           <input id="cleReturnTime" type="time" value="${line.returnTime||""}" style="width:75px;font-size:12px;margin-left:2px;" />
         </td>
         <td id="cleDur" style="text-align:right;font-size:12px;color:var(--muted);">${line.days > 0 ? line.days+"j" : "-"}</td>
-        <td style="padding:4px;"><input id="cleRate" type="number" step="0.01" value="${line.rate||""}" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="cleRateTtc" type="number" step="0.01" value="${initRateTtc}" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="cleSubtotal" type="number" step="0.01" value="${initSubtotal}" style="width:78px;font-size:12px;text-align:right;" /><input id="cleHt" type="hidden" value="${line.amountHt||""}" /></td>
-        <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="cleDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="cleStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" value="${line.amountTtc||""}" style="width:78px;font-size:12px;text-align:right;" /></td>
+        <td style="padding:4px;"><input id="cleDailyHt" type="number" step="0.01" min="0" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} value="${initDailyHt || ""}" style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? grayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="cleDailyTtc" type="number" step="0.01" min="0" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} value="${initDailyHt ? initDailyTtc : ""}" style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? grayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="cleMonthlyHt" type="number" step="0.01" min="0" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} value="${initMonthlyHt || ""}" style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? grayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="cleMonthlyTtc" type="number" step="0.01" min="0" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} value="${initMonthlyHt ? initMonthlyTtc : ""}" style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? grayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="cleSubtotal" type="number" step="0.01" readonly tabindex="-1" value="${initSubtotal}" style="width:78px;font-size:12px;text-align:right;${grayStyle}" /><input id="cleHt" type="hidden" value="${line.amountHt||""}" /></td>
+        <td style="padding:4px;"><input id="cleVat" type="number" step="0.01" readonly tabindex="-1" value="${line.vatAmount||""}" style="width:62px;font-size:12px;text-align:right;${grayStyle}" /></td>
+        <td style="padding:4px;"><input id="cleDaily" type="number" step="0.01" readonly tabindex="-1" value="${initDailyAmt}" style="width:52px;font-size:12px;text-align:right;${grayStyle}" /></td>
+        <td style="padding:4px;"><input id="cleStamp" type="number" step="0.01" readonly tabindex="-1" value="${initStampAmt}" style="width:52px;font-size:12px;text-align:right;${grayStyle}" /></td>
+        <td style="padding:4px;"><input id="cleTtc" type="number" step="0.01" readonly tabindex="-1" value="${line.amountTtc||""}" style="width:78px;font-size:12px;text-align:right;${grayStyle}" /></td>
         <td colspan="2"></td>
         <td style="padding:4px;white-space:nowrap;">
           <button id="cleSaveBtn" style="padding:2px 8px;font-size:13px;">✓</button>
@@ -16888,20 +16912,31 @@
           <div id="cleError" style="display:none;color:#c53030;font-size:11px;margin-top:2px;"></div>
         </td>
       `;
-      // ── Recalculs bidirectionnels ────────────────────────────────────
+      // ── Journalier ⇄ Mensuel (indépendant des dates) + total de ligne (dates requises) ─
+      // Seule l'unité active selon la négociation du contrat (rateType) est éditable ;
+      // l'autre reste grisée, mise à jour en direct à titre indicatif seulement.
       const getVatRate = () => Number(state.settings.vatRate || 19);
       const getDurData = () => {
         const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
         if (!s || !e || e < s) return { days: 0, mult: 1 };
-        const pt = tr.querySelector("#clePickupTime")?.value || null;
-        const rt = tr.querySelector("#cleReturnTime")?.value || null;
-        const { days } = calcLineDuration(s, e, pt, rt);
-        const mult = rateType === "monthly" ? calcMonthlyAmountJS(1, s, e) : days;
+        const pt = isShortTerm ? (tr.querySelector("#clePickupTime")?.value || null) : null;
+        const rt = isShortTerm ? (tr.querySelector("#cleReturnTime")?.value || null) : null;
+        const { days } = calcLineDuration(s, e, pt, rt, !isShortTerm);
+        const mult = isMonthlyMode ? calcMonthlyAmountJS(1, s, e) : days;
         return { days, mult };
       };
-      const getDailyTax = () => Number(state.settings.dailyTaxTnd || 0);
-      // Helper : sync tous les champs depuis ht + résultat de computeContractLineTtc
-      const syncFromHt = (ht, days, mult) => {
+      const recomputeLineTotal = () => {
+        const { days, mult } = getDurData();
+        if (days <= 0) {
+          tr.querySelector("#cleHt").value = "0"; tr.querySelector("#cleSubtotal").value = ""; tr.querySelector("#cleVat").value = "";
+          tr.querySelector("#cleDaily").value = "0.00"; tr.querySelector("#cleStamp").value = "0.00"; tr.querySelector("#cleTtc").value = "";
+          return;
+        }
+        const rate = isMonthlyMode ? Number(tr.querySelector("#cleMonthlyHt").value || 0) : Number(tr.querySelector("#cleDailyHt").value || 0);
+        if (rate <= 0) return;
+        const ht = isMonthlyMode
+          ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value)
+          : Math.round(rate * mult * 100) / 100;
         const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
         const htRounded = Math.round(ht * 100) / 100;
         tr.querySelector("#cleHt").value       = htRounded.toFixed(2);
@@ -16910,64 +16945,39 @@
         tr.querySelector("#cleDaily").value    = dailyTaxAmount.toFixed(2);
         tr.querySelector("#cleStamp").value    = stampAmount.toFixed(2);
         tr.querySelector("#cleTtc").value      = amountTtc.toFixed(2);
-        if (htRounded > 0 && mult > 0) {
-          const rate = Math.round(htRounded / mult * 100) / 100;
-          const vr = getVatRate(); const dailyTax = getDailyTax();
-          tr.querySelector("#cleRate").value = rate.toFixed(2);
-          tr.querySelector("#cleRateTtc").value = Math.round(rate * (1 + vr / 100) * 100 / 100).toFixed(2);
-        }
       };
-      // Tarif HT → tous
-      const recomputeFromRate = () => {
-        const rate = Number(tr.querySelector("#cleRate").value || 0);
-        if (rate <= 0) return;
-        const vr = getVatRate(); const dailyTax = getDailyTax();
-        const { days, mult } = getDurData();
-        tr.querySelector("#cleRateTtc").value = Math.round(rate * (1 + vr / 100) * 100 / 100).toFixed(2);
-        const ht = rateType === "monthly"
-          ? calcMonthlyAmountJS(rate, tr.querySelector("#cleStart").value, tr.querySelector("#cleEnd").value)
-          : Math.round(rate * mult * 100) / 100;
-        syncFromHt(ht, days, mult);
-      };
-      // Tarif TTC → Tarif HT → tous
-      const recomputeFromRateTtc = () => {
-        const rateTtc = Number(tr.querySelector("#cleRateTtc").value || 0);
-        if (rateTtc <= 0) return;
-        const vr = getVatRate(); const dailyTax = getDailyTax();
-        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
-        tr.querySelector("#cleRate").value = rate.toFixed(2);
-        recomputeFromRate();
-      };
-      // Montant HT+TVA (cleSubtotal) → tous
-      const recomputeSubtotal = () => {
-        const subtotal = Number(tr.querySelector("#cleSubtotal").value || 0);
+      // `sourceId` : le champ en cours de frappe n'est jamais réécrit (sinon .value est
+      // reformaté à chaque frappe et le curseur saute en fin de champ).
+      const applyRates = (dailyHt, monthlyHt, sourceId) => {
         const vr = getVatRate();
-        const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
-        const { days, mult } = getDurData();
-        syncFromHt(ht, days, mult);
+        const dHt = Math.max(0, Math.round(dailyHt * 100) / 100);
+        const mHt = Math.max(0, Math.round(monthlyHt * 100) / 100);
+        if (sourceId !== "cleDailyHt")    tr.querySelector("#cleDailyHt").value    = dHt.toFixed(2);
+        if (sourceId !== "cleDailyTtc")   tr.querySelector("#cleDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        if (sourceId !== "cleMonthlyHt")  tr.querySelector("#cleMonthlyHt").value  = mHt.toFixed(2);
+        if (sourceId !== "cleMonthlyTtc") tr.querySelector("#cleMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        recomputeLineTotal();
       };
-      // Total TTC → tous
-      const recomputeTtc = () => {
-        const { days, mult } = getDurData();
-        const { amountHt } = computeContractLineHt(Number(tr.querySelector("#cleTtc").value || 0), days);
-        syncFromHt(amountHt, days, mult);
-      };
-      // Dates changées → MAJ durée, recalcul depuis tarif si renseigné
+      const syncRatesFromDailyHt   = (dailyHt, sourceId)   => applyRates(dailyHt, dailyHt * 30, sourceId);
+      const syncRatesFromMonthlyHt = (monthlyHt, sourceId) => applyRates(monthlyHt / 30, monthlyHt, sourceId);
       const updateDur = () => {
         const s = tr.querySelector("#cleStart").value, e = tr.querySelector("#cleEnd").value;
         if (s && e && e >= s) {
-          const pt = tr.querySelector("#clePickupTime")?.value || null;
-          const rt = tr.querySelector("#cleReturnTime")?.value || null;
-          const { days } = calcLineDuration(s, e, pt, rt);
+          const pt = isShortTerm ? (tr.querySelector("#clePickupTime")?.value || null) : null;
+          const rt = isShortTerm ? (tr.querySelector("#cleReturnTime")?.value || null) : null;
+          const { days } = calcLineDuration(s, e, pt, rt, !isShortTerm);
           tr.querySelector("#cleDur").textContent = days + "j";
-          if (Number(tr.querySelector("#cleRate").value || 0) > 0) recomputeFromRate();
         } else { tr.querySelector("#cleDur").textContent = "—"; }
+        recomputeLineTotal();
       };
       const clearCleError = () => { tr.querySelector("#cleError").style.display = "none"; };
-      tr.querySelector("#cleRate").oninput       = () => { recomputeFromRate(); clearCleError(); };
-      tr.querySelector("#cleRateTtc").oninput    = () => { recomputeFromRateTtc(); clearCleError(); };
-      tr.querySelector("#cleSubtotal").onchange   = () => { recomputeSubtotal(); clearCleError(); };
-      tr.querySelector("#cleTtc").onchange        = () => { recomputeTtc(); clearCleError(); };
+      if (!isMonthlyMode) {
+        tr.querySelector("#cleDailyHt").oninput  = () => { syncRatesFromDailyHt(Number(tr.querySelector("#cleDailyHt").value || 0), "cleDailyHt"); clearCleError(); };
+        tr.querySelector("#cleDailyTtc").oninput = () => { syncRatesFromDailyHt(Number(tr.querySelector("#cleDailyTtc").value || 0) / (1 + getVatRate() / 100), "cleDailyTtc"); clearCleError(); };
+      } else {
+        tr.querySelector("#cleMonthlyHt").oninput  = () => { syncRatesFromMonthlyHt(Number(tr.querySelector("#cleMonthlyHt").value || 0), "cleMonthlyHt"); clearCleError(); };
+        tr.querySelector("#cleMonthlyTtc").oninput = () => { syncRatesFromMonthlyHt(Number(tr.querySelector("#cleMonthlyTtc").value || 0) / (1 + getVatRate() / 100), "cleMonthlyTtc"); clearCleError(); };
+      }
       tr.querySelector("#cleStart").oninput      = () => { updateDur(); clearCleError(); };
       tr.querySelector("#cleEnd").oninput        = () => { updateDur(); clearCleError(); };
       ["input","change"].forEach(ev => {
@@ -16978,10 +16988,8 @@
       tr.querySelector("#cleDesig")?.addEventListener("input", () => { if (tr.querySelector("#cleDesig")) tr.querySelector("#cleDesig").dataset.edited = "1"; });
       tr.querySelector("#cleSaveBtn").onclick   = () => saveContractLineEdit(contractId, lineId, tr);
       tr.querySelector("#cleCancelBtn").onclick = () => renderContractDetailLines(contractId);
-      // Recalcul initial : durée + tous les montants depuis les valeurs stockées
+      // Recalcul initial : durée + total de ligne depuis les valeurs stockées
       updateDur();
-      if (Number(tr.querySelector("#cleRate").value || 0) > 0) recomputeFromRate();
-      else if (Number(tr.querySelector("#cleSubtotal").value || 0) > 0) recomputeSubtotal();
       tr.querySelector("#cleCar").focus();
     }
 
@@ -16990,26 +16998,23 @@
       const designation = (tr.querySelector("#cleDesig") ? tr.querySelector("#cleDesig").value : "") || "";
       const periodStart = tr.querySelector("#cleStart").value;
       const periodEnd   = tr.querySelector("#cleEnd").value;
-      const rate        = Number(tr.querySelector("#cleRate").value || 0);
+      const ctrForEdit = state.contracts.find(c => c.id === contractId);
+      const isMonthlyModeEdit = (ctrForEdit?.rateType || "daily") === "monthly";
+      const isShortTermEdit = !ctrForEdit || ctrForEdit.type === "court";
+      const rate        = isMonthlyModeEdit ? Number(tr.querySelector("#cleMonthlyHt")?.value || 0) : Number(tr.querySelector("#cleDailyHt")?.value || 0);
       const amountHt    = Number(tr.querySelector("#cleHt").value || 0);
       const vatAmount   = Number(tr.querySelector("#cleVat").value || 0);
       const amountTtc   = Number(tr.querySelector("#cleTtc").value || 0);
       const errDiv = tr.querySelector("#cleError");
       errDiv.style.display = "none";
       if (!carId || !periodStart || !periodEnd) { errDiv.textContent = "Champs requis"; errDiv.style.display = ""; return; }
-      const subtotalVal = Number(tr.querySelector("#cleSubtotal")?.value || 0);
-      if (amountHt <= 0 && subtotalVal > 0) {
-        // cleHt non encore calculé : déclencher le calcul maintenant
-        const vr2 = Number(state.settings.vatRate || 19);
-        const htDerived = Math.round(subtotalVal / (1 + vr2 / 100) * 100) / 100;
-        tr.querySelector("#cleHt").value = htDerived.toFixed(2);
-      } else if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; return; }
+      if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; return; }
       const saveBtn = tr.querySelector("#cleSaveBtn");
       saveBtn.disabled = true; saveBtn.textContent = "…";
       const car = state.cars.find(c => c.id === carId);
       const pickupTime = tr.querySelector("#clePickupTime")?.value || null;
       const returnTime = tr.querySelector("#cleReturnTime")?.value || null;
-      const { days, months } = calcLineDuration(periodStart, periodEnd, pickupTime, returnTime);
+      const { days, months } = calcLineDuration(periodStart, periodEnd, pickupTime, returnTime, !isShortTermEdit);
       const result = await apiPutWithError(`/contract-lines/${lineId}`, {
         car_id: carId, car_plate: car ? car.plate : "",
         period_start: periodStart, period_end: periodEnd, days, months,
@@ -17139,6 +17144,9 @@
 
       const contract = state.contracts.find(c => c.id === contractId);
       const isShortTerm = !contract || contract.type === "court";
+      const rateType = contract?.rateType || "daily";
+      const isMonthlyMode = rateType === "monthly";
+      const ilGrayStyle = "background:#f1f5f9;color:var(--muted);";
 
       // Réservations orphelines disponibles pour lien direct (Option B)
       const orphanRsvs = (state.reservations || []).filter(r =>
@@ -17159,7 +17167,7 @@
         trPicker.className = "inline-rsv-picker";
         trPicker.style.cssText = "background:#fffbeb;border-top:2px solid #2f6bff;";
         trPicker.innerHTML = `
-          <td colspan="14" style="padding:5px 8px;">
+          <td colspan="16" style="padding:5px 8px;">
             <span style="font-size:11px;font-weight:600;color:#92400e;margin-right:6px;">🔗 Lier une réservation :</span>
             <select id="ilRsvPicker" style="font-size:12px;max-width:460px;border:1px solid #d97706;border-radius:4px;padding:2px 4px;">
               <option value="">— aucune (créer automatiquement) —</option>
@@ -17190,14 +17198,16 @@
           ${isShortTerm ? `<input id="ilReturn" type="time" style="width:80px;font-size:11px;margin-left:2px;" title="Heure de retour" />` : ""}
         </td>
         <td id="ilDur" style="text-align:right;padding:6px 4px;font-size:12px;color:var(--muted);">—</td>
-        <td style="padding:4px;"><input id="ilRate" type="number" step="0.01" min="0" placeholder="HT/j" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="ilRateTtc" type="number" step="0.01" min="0" placeholder="TTC/j" style="width:72px;font-size:12px;text-align:right;" /></td>
-        <td style="padding:4px;"><input id="ilSubtotal" type="number" step="0.01" min="0" placeholder="HT+TVA" style="width:78px;font-size:12px;text-align:right;" /><input id="ilHt" type="hidden" value="0" /></td>
-        <td style="padding:4px;"><input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:62px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="ilDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
-        <td style="padding:4px;"><input id="ilStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;background:#f1f5f9;color:var(--muted);" /></td>
+        <td style="padding:4px;"><input id="ilDailyHt" type="number" step="0.01" min="0" placeholder="HT/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? ilGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="ilDailyTtc" type="number" step="0.01" min="0" placeholder="TTC/j" ${isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:68px;font-size:12px;text-align:right;${isMonthlyMode ? ilGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="ilMonthlyHt" type="number" step="0.01" min="0" placeholder="HT/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? ilGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="ilMonthlyTtc" type="number" step="0.01" min="0" placeholder="TTC/mois" ${!isMonthlyMode ? 'readonly tabindex="-1"' : ""} style="width:72px;font-size:12px;text-align:right;${!isMonthlyMode ? ilGrayStyle : ""}" /></td>
+        <td style="padding:4px;"><input id="ilSubtotal" type="number" step="0.01" readonly tabindex="-1" style="width:78px;font-size:12px;text-align:right;${ilGrayStyle}" /><input id="ilHt" type="hidden" value="0" /></td>
+        <td style="padding:4px;"><input id="ilVat" type="number" step="0.01" readonly tabindex="-1" style="width:62px;font-size:12px;text-align:right;${ilGrayStyle}" /></td>
+        <td style="padding:4px;"><input id="ilDaily" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;${ilGrayStyle}" /></td>
+        <td style="padding:4px;"><input id="ilStamp" type="number" step="0.01" readonly tabindex="-1" value="0" style="width:52px;font-size:12px;text-align:right;${ilGrayStyle}" /></td>
         <td style="padding:6px 4px;text-align:right;">
-          <input id="ilAmtTtc" type="number" step="0.01" min="0" placeholder="0" style="width:85px;font-size:12px;text-align:right;" />
+          <input id="ilAmtTtc" type="number" step="0.01" readonly tabindex="-1" placeholder="0" style="width:85px;font-size:12px;text-align:right;${ilGrayStyle}" />
         </td>
         <td></td>
         <td></td>
@@ -17209,15 +17219,32 @@
       `;
       tbody.appendChild(tr);
 
-      // Helpers inline form
+      // Helpers inline form — journalier ⇄ mensuel + total de ligne (mêmes règles que les devis).
+      // Contrat long terme (isShortTerm=false) : pas d'heures, dernier jour inclus (+1).
       function ilGetDays() {
         const s = byId("ilStart").value, e = byId("ilEnd").value;
         if (!s || !e || e < s) return 0;
         const pt = isShortTerm ? (byId("ilPickup")?.value || null) : null;
         const rt = isShortTerm ? (byId("ilReturn")?.value || null) : null;
-        return calcLineDuration(s, e, pt, rt).days;
+        return calcLineDuration(s, e, pt, rt, !isShortTerm).days;
       }
-      function ilSyncFromHt(ht, days) {
+      function ilGetMult() {
+        const s = byId("ilStart").value, e = byId("ilEnd").value;
+        if (!s || !e || e < s) return 0;
+        return isMonthlyMode ? calcMonthlyAmountJS(1, s, e) : ilGetDays();
+      }
+      function ilRecomputeLineTotal() {
+        const days = ilGetDays();
+        if (days <= 0) {
+          byId("ilHt").value = "0"; byId("ilSubtotal").value = ""; byId("ilVat").value = "";
+          byId("ilDaily").value = "0.00"; byId("ilStamp").value = "0.00"; byId("ilAmtTtc").value = "";
+          return;
+        }
+        const rate = isMonthlyMode ? Number(byId("ilMonthlyHt").value || 0) : Number(byId("ilDailyHt").value || 0);
+        if (rate <= 0) return;
+        const ht = isMonthlyMode
+          ? calcMonthlyAmountJS(rate, byId("ilStart").value, byId("ilEnd").value)
+          : Math.round(rate * days * 100) / 100;
         const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(ht, days);
         const htR = Math.round(ht * 100) / 100;
         byId("ilHt").value       = htR.toFixed(2);
@@ -17227,23 +17254,27 @@
         byId("ilStamp").value    = stampAmount.toFixed(2);
         byId("ilAmtTtc").value   = amountTtc.toFixed(2);
       }
-      function ilRateFromHt(ht, days) {
-        if (days <= 0 || ht <= 0) return;
+      // sourceId : le champ en cours de frappe n'est jamais réécrit (évite le reset au clavier).
+      function ilApplyRates(dailyHt, monthlyHt, sourceId) {
         const vr = Number(state.settings.vatRate || 19);
-        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
-        const rate = Math.round(ht / days * 100) / 100;
-        byId("ilRate").value    = rate.toFixed(2);
-        byId("ilRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
+        const dHt = Math.max(0, Math.round(dailyHt * 100) / 100);
+        const mHt = Math.max(0, Math.round(monthlyHt * 100) / 100);
+        if (sourceId !== "ilDailyHt")    byId("ilDailyHt").value    = dHt.toFixed(2);
+        if (sourceId !== "ilDailyTtc")   byId("ilDailyTtc").value   = (Math.round(dHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        if (sourceId !== "ilMonthlyHt")  byId("ilMonthlyHt").value  = mHt.toFixed(2);
+        if (sourceId !== "ilMonthlyTtc") byId("ilMonthlyTtc").value = (Math.round(mHt * (1 + vr / 100) * 100) / 100).toFixed(2);
+        ilRecomputeLineTotal();
       }
+      function ilSyncFromDailyHt(dailyHt, sourceId)   { ilApplyRates(dailyHt, dailyHt * 30, sourceId); }
+      function ilSyncFromMonthlyHt(monthlyHt, sourceId) { ilApplyRates(monthlyHt / 30, monthlyHt, sourceId); }
 
       function updateDuration() {
         const s = byId("ilStart").value, e = byId("ilEnd").value;
         if (s && e && e >= s) {
           const days = ilGetDays();
           byId("ilDur").textContent = `${days}j`;
-          const rate = Number(byId("ilRate").value || 0);
-          if (rate > 0 && days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
         } else { byId("ilDur").textContent = "—"; }
+        ilRecomputeLineTotal();
         updateCarConflicts();
       }
 
@@ -17296,44 +17327,13 @@
       if (isShortTerm && byId("ilReturn")) {
         ["input","change"].forEach(ev => byId("ilReturn").addEventListener(ev, () => { updateDuration(); clearIlError(); }));
       }
-      byId("ilRate").oninput = () => {
-        const rate = Number(byId("ilRate").value || 0);
-        const days = ilGetDays();
-        if (rate > 0 && days > 0) {
-          ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
-          const vr = Number(state.settings.vatRate || 19);
-          const dailyTax = Number(state.settings.dailyTaxTnd || 0);
-          byId("ilRateTtc").value = (Math.round(rate * (1 + vr / 100) * 100) / 100).toFixed(2);
-        }
-        clearIlError();
-      };
-      byId("ilRateTtc").oninput = () => {
-        const rateTtc = Number(byId("ilRateTtc").value || 0);
-        if (rateTtc <= 0) { clearIlError(); return; }
-        const vr = Number(state.settings.vatRate || 19);
-        const dailyTax = Number(state.settings.dailyTaxTnd || 0);
-        const rate = Math.round(rateTtc / (1 + vr / 100) * 100) / 100;
-        byId("ilRate").value = rate.toFixed(2);
-        const days = ilGetDays();
-        if (days > 0) ilSyncFromHt(Math.round(rate * days * 100) / 100, days);
-        clearIlError();
-      };
-      byId("ilSubtotal").onchange = () => {
-        const subtotal = Number(byId("ilSubtotal").value || 0);
-        const vr = Number(state.settings.vatRate || 19);
-        const ht = Math.round(subtotal / (1 + vr / 100) * 100) / 100;
-        const days = ilGetDays();
-        ilSyncFromHt(ht, days);
-        ilRateFromHt(ht, days);
-        clearIlError();
-      };
-      byId("ilAmtTtc").onchange = () => {
-        const days = ilGetDays();
-        const { amountHt } = computeContractLineHt(Number(byId("ilAmtTtc").value || 0), days);
-        ilSyncFromHt(amountHt, days);
-        ilRateFromHt(amountHt, days);
-        clearIlError();
-      };
+      if (!isMonthlyMode) {
+        byId("ilDailyHt").oninput  = () => { ilSyncFromDailyHt(Number(byId("ilDailyHt").value || 0), "ilDailyHt"); clearIlError(); };
+        byId("ilDailyTtc").oninput = () => { ilSyncFromDailyHt(Number(byId("ilDailyTtc").value || 0) / (1 + Number(state.settings.vatRate || 19) / 100), "ilDailyTtc"); clearIlError(); };
+      } else {
+        byId("ilMonthlyHt").oninput  = () => { ilSyncFromMonthlyHt(Number(byId("ilMonthlyHt").value || 0), "ilMonthlyHt"); clearIlError(); };
+        byId("ilMonthlyTtc").oninput = () => { ilSyncFromMonthlyHt(Number(byId("ilMonthlyTtc").value || 0) / (1 + Number(state.settings.vatRate || 19) / 100), "ilMonthlyTtc"); clearIlError(); };
+      }
 
       const removeInlineForms = () => {
         tr.remove();
@@ -17354,7 +17354,10 @@
       const designation = (byId("ilDesig") ? byId("ilDesig").value : "") || "";
       const startStr = byId("ilStart").value;
       const endStr = byId("ilEnd").value;
-      const rate = Number(byId("ilRate").value || 0);
+      const parentContractForRate = state.contracts.find(c => c.id === contractId);
+      const isMonthlyModeSubmit = (parentContractForRate?.rateType || "daily") === "monthly";
+      const isShortTermSubmit = !parentContractForRate || parentContractForRate.type === "court";
+      const rate = isMonthlyModeSubmit ? Number(byId("ilMonthlyHt").value || 0) : Number(byId("ilDailyHt").value || 0);
       const errDiv = byId("ilError");
       errDiv.style.display = "none";
       tr.style.outline = "";
@@ -17366,14 +17369,14 @@
       const pickupTime = byId("ilPickup") ? (byId("ilPickup").value || null) : null;
       const returnTime = byId("ilReturn") ? (byId("ilReturn").value || null) : null;
       const car = state.cars.find(c => c.id === carId);
-      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime);
+      const { days, months } = calcLineDuration(startStr, endStr, pickupTime, returnTime, !isShortTermSubmit);
 
       let amountHt = Number(byId("ilHt").value || 0);
       if (amountHt <= 0) {
         const subtotal = Number(byId("ilSubtotal").value || 0);
         if (subtotal > 0) amountHt = Math.round(subtotal / (1 + Number(state.settings.vatRate || 19) / 100) * 100) / 100;
       }
-      if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; byId("ilSubtotal").focus(); return; }
+      if (amountHt <= 0) { errDiv.textContent = "Montant requis (> 0)"; errDiv.style.display = ""; byId("ilDailyHt").focus(); return; }
 
       const { vatAmount, dailyTaxAmount, stampAmount, amountTtc } = computeContractLineTtc(amountHt, days);
 
