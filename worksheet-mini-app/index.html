@@ -1519,6 +1519,28 @@
           <div id="occupancyBars" style="position:relative;height:220px;"></div>
         </div>
 
+        <div id="homeCardVehicleOccupancy" class="chart-card dash-span-2" data-card-id="chartVehicleOccupancy" data-default-span="2" data-label="Occupation par véhicule">
+          <div class="card-toolbar">
+            <button class="cbt cbt-hide" title="Masquer">✕</button>
+            <button class="cbt cbt-shrink" title="Rétrécir">◂</button>
+            <button class="cbt cbt-expand" title="Élargir">▸</button>
+            <span class="drag-handle" title="Déplacer">⠿</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <h4 style="margin:0;">Taux d'occupation par véhicule</h4>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <select id="vehicleOccPeriodMode" style="font-size:12px;padding:2px 6px;">
+                <option value="month">Par mois</option>
+                <option value="year">Par année</option>
+              </select>
+              <input id="vehicleOccMonthPicker" type="month" style="font-size:12px;padding:2px 6px;" />
+              <input id="vehicleOccYearPicker" type="number" min="2000" max="2100" style="font-size:12px;padding:2px 6px;width:70px;display:none;" />
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pourcentage de jours occupés (réservations + lignes de contrat actives) sur la période sélectionnée, véhicule par véhicule.</div>
+          <div id="vehicleOccupancyBars" style="position:relative;height:340px;"></div>
+        </div>
+
         <div class="chart-card dash-span-3" data-card-id="cardForecast" data-default-span="3" data-label="Prévision trésorerie 365j">
           <div class="card-toolbar">
             <button class="cbt cbt-hide" title="Masquer">✕</button>
@@ -4123,6 +4145,25 @@
         renderHomeGantt();
       });
     }
+
+    // Occupation par véhicule — sélecteur de période (mois/année)
+    (function initVehicleOccupancyControls() {
+      const modeSel = byId("vehicleOccPeriodMode");
+      const monthInput = byId("vehicleOccMonthPicker");
+      const yearInput = byId("vehicleOccYearPicker");
+      if (!modeSel || !monthInput || !yearInput) return;
+      const now = new Date();
+      monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      yearInput.value = String(now.getFullYear());
+      modeSel.addEventListener("change", () => {
+        const isYear = modeSel.value === "year";
+        monthInput.style.display = isYear ? "none" : "";
+        yearInput.style.display = isYear ? "" : "none";
+        renderVehicleOccupancyChart();
+      });
+      monthInput.addEventListener("change", renderVehicleOccupancyChart);
+      yearInput.addEventListener("change", renderVehicleOccupancyChart);
+    })();
 
     function openTab(tabId) {
       const tab = Array.from(tabs).find((t) => t.dataset.tab === tabId);
@@ -10203,11 +10244,11 @@
 
     // ── Chart.js helpers ───────────────────────────────────────────────
     const _cjsInstances = {};
-    function cjsCanvas(id, parentId) {
+    function cjsCanvas(id, parentId, maxHeightPx) {
       const parent = byId(parentId);
       if (!parent) return null;
       let canvas = parent.querySelector("canvas#" + id);
-      if (!canvas) { parent.innerHTML = ""; canvas = document.createElement("canvas"); canvas.id = id; canvas.style.maxHeight = "200px"; parent.appendChild(canvas); }
+      if (!canvas) { parent.innerHTML = ""; canvas = document.createElement("canvas"); canvas.id = id; canvas.style.maxHeight = (maxHeightPx || 200) + "px"; parent.appendChild(canvas); }
       if (_cjsInstances[id]) { _cjsInstances[id].destroy(); delete _cjsInstances[id]; }
       return canvas;
     }
@@ -10309,7 +10350,7 @@
       _dashLayoutLoadedForUser = userId;
     }
 
-    const DASH_DEFAULT_ORDER = ['kpiAvailCars','kpiActiveRsv','kpiAlerts','kpiTreasuryNow','kpiTreasury1y','kpiTreasuryMin','chartRevenue','chartFleet','chartAlerts','chartTreasury','chartProfitability','chartQuotes','chartOccupancy','cardForecast'];
+    const DASH_DEFAULT_ORDER = ['kpiAvailCars','kpiActiveRsv','kpiAlerts','kpiTreasuryNow','kpiTreasury1y','kpiTreasuryMin','chartRevenue','chartFleet','chartAlerts','chartTreasury','chartProfitability','chartQuotes','chartOccupancy','chartVehicleOccupancy','cardForecast'];
 
     async function resetDashboardLayout() {
       const grid = byId('dashboardGrid');
@@ -10595,6 +10636,8 @@
           byId("homeOccupancyKpi").textContent = `${cur.rate}% ce mois (${cur.occupiedCount}/${cur.totalCars} véhicules)`;
           byId("homeOccupancyKpi").style.color = cur.rate >= 80 ? "#dc2626" : cur.rate >= 50 ? "#f97316" : "#16a34a";
         }
+
+        renderVehicleOccupancyChart();
 
       } else {
         renderBarChart("revenueBars", getRevenueSeries());
@@ -11034,6 +11077,114 @@
         series.push({ label, monthStart, monthEnd, occupiedCount, totalCars, rate });
       }
       return series;
+    }
+
+    // Taux d'occupation par véhicule sur une période donnée (mois ou année) :
+    // pourcentage de jours de la période où le véhicule était engagé (réservation
+    // non annulée/terminée, ou ligne de contrat active), un jour n'étant compté
+    // qu'une fois même s'il chevauche réservation ET contrat.
+    function getVehicleOccupancySeries(periodStart, periodEnd) {
+      const totalDays = Math.round((new Date(periodEnd + "T00:00:00") - new Date(periodStart + "T00:00:00")) / 86400000) + 1;
+      if (totalDays <= 0) return [];
+      const addRange = (occupiedDates, s, e) => {
+        if (!s || !e) return;
+        const from = s < periodStart ? periodStart : s;
+        const to   = e > periodEnd   ? periodEnd   : e;
+        if (from > to) return;
+        const cur = new Date(from + "T00:00:00");
+        const last = new Date(to + "T00:00:00");
+        while (cur <= last) {
+          occupiedDates.add(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+      };
+      return (state.cars || [])
+        .map((car) => {
+          const occupiedDates = new Set();
+          for (const r of (state.reservations || [])) {
+            if (String(r.carId) !== String(car.id)) continue;
+            if (["annulee", "terminee"].includes(r.status)) continue;
+            addRange(occupiedDates, r.startDate || r.start_date || "", r.endDate || r.end_date || "");
+          }
+          for (const cl of (state.contractLines || [])) {
+            if (String(cl.carId) !== String(car.id)) continue;
+            if (cl.status !== "active") continue;
+            addRange(occupiedDates, cl.periodStart || "", cl.periodEnd || "");
+          }
+          const occupiedDays = occupiedDates.size;
+          const rate = Math.round(occupiedDays / totalDays * 100);
+          return { label: car.plate, carId: car.id, occupiedDays, totalDays, rate };
+        })
+        .sort((a, b) => b.rate - a.rate);
+    }
+
+    function getVehicleOccupancyPeriod() {
+      const pad = n => String(n).padStart(2, "0");
+      const today = new Date();
+      const mode = byId("vehicleOccPeriodMode")?.value || "month";
+      if (mode === "year") {
+        const year = parseInt(byId("vehicleOccYearPicker")?.value, 10) || today.getFullYear();
+        return { periodStart: `${year}-01-01`, periodEnd: `${year}-12-31`, label: String(year) };
+      }
+      const raw = byId("vehicleOccMonthPicker")?.value || `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
+      const [y, m] = raw.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      const FR_MONTHS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+      return { periodStart: `${y}-${pad(m)}-01`, periodEnd: `${y}-${pad(m)}-${lastDay}`, label: `${FR_MONTHS_FULL[m - 1]} ${y}` };
+    }
+
+    function renderVehicleOccupancyChart() {
+      if (typeof Chart === "undefined") return;
+      const container = byId("vehicleOccupancyBars");
+      if (!container) return;
+      const { periodStart, periodEnd, label } = getVehicleOccupancyPeriod();
+      const series = getVehicleOccupancySeries(periodStart, periodEnd);
+      if (!series.length) { container.innerHTML = '<div class="small">Aucun véhicule.</div>'; return; }
+      const heightPx = Math.min(600, Math.max(220, series.length * 26));
+      container.style.height = heightPx + "px";
+      const canvas = cjsCanvas("cjsVehicleOcc", "vehicleOccupancyBars", heightPx);
+      if (!canvas) return;
+      cjsSave("cjsVehicleOcc", new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: series.map(s => s.label),
+          datasets: [{
+            label: `Occupation — ${label}`,
+            data: series.map(s => s.rate),
+            backgroundColor: series.map(s =>
+              s.rate >= 80 ? "rgba(220,38,38,.75)" :
+              s.rate >= 50 ? "rgba(249,115,22,.75)" :
+                             "rgba(22,163,74,.65)"
+            ),
+            borderRadius: 6, borderSkipped: false,
+          }]
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: ctx => {
+                const s = series[ctx.dataIndex];
+                return `${s.occupiedDays} / ${s.totalDays} jours — ${s.rate}%`;
+              }
+            }}
+          },
+          scales: {
+            x: { beginAtZero: true, max: 100, grid: { color: "#f0f0f0" }, ticks: { callback: v => v + "%" } },
+            y: { grid: { display: false } }
+          },
+          onHover(e) { e.native.target.style.cursor = e.active?.length ? "pointer" : "default"; },
+          onClick(_, elements) {
+            if (!elements.length) return;
+            const s = series[elements[0].index];
+            if (!s) return;
+            history.pushState({ tab: "rentabilite" }, "", "#rentabilite");
+            switchToTab("rentabilite");
+            openCarFinanceDetail(s.carId);
+          }
+        }
+      }));
     }
 
     function renderReservationOptions() {

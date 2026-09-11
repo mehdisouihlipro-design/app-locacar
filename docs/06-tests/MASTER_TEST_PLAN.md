@@ -506,6 +506,19 @@
 - [ ] **Véhicules indisponibles exclus** : `status='indisponible'` non comptabilisés dans le total
 - [ ] **Persistance** : F5 → recalcul depuis API (pas de données figées)
 
+### UC-DASH-4bis : Taux d'occupation par véhicule — vue détaillée
+**En tant que directeur**, je veux comparer le taux d'occupation véhicule par véhicule sur un mois ou une année donnée, pour repérer les véhicules sous-utilisés.
+
+- [ ] **Scénario nominal** : une barre horizontale par véhicule (immatriculation en label), triée par taux décroissant ; taux = jours occupés (réservations non annulées/terminées + lignes de contrat actives, dédupliqués si chevauchement) / nombre de jours de la période, en %
+- [ ] **Sélecteur Mois/Année** : sélecteur "Par mois" (défaut, mois courant) / "Par année" (défaut, année courante) ; changer de mode bascule l'input correspondant (`<input type=month>` ↔ `<input type=number>`) sans recharger la page
+- [ ] **Changement de période** : modifier le mois ou l'année → graphique recalculé immédiatement avec le nouveau taux par véhicule, sans appel serveur (recalcul depuis `state` déjà chargé)
+- [ ] **Tooltip** : survoler une barre → `N / M jours — X%`
+- [ ] **Couleur par seuil** : barres colorées vert / orange / rouge selon les mêmes seuils que le graphique flotte (50 % / 80 %)
+- [ ] **Navigation** : cliquer sur une barre → onglet Rentabilité, détail financier du véhicule cliqué ouvert
+- [ ] **Hauteur adaptative** : le graphique s'agrandit avec le nombre de véhicules (jusqu'à une hauteur maximale), sans jamais couper une barre
+- [ ] **Flotte vide** : aucun véhicule → message "Aucun véhicule.", pas d'erreur JS
+- [ ] **Persistance** : F5 → carte présente dans la grille personnalisable (déplaçable/redimensionnable/masquable comme les autres), recalcul depuis l'API
+
 ### UC-DASH-5 : Dashboard personnalisable — déplacement, redimensionnement, masquage (§9.15)
 **En tant qu'utilisateur**, je veux déplacer, redimensionner et masquer les cartes du dashboard, et retrouver ma configuration à chaque connexion.
 
