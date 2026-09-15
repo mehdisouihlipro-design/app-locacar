@@ -555,12 +555,12 @@
 ### UC-CTR-8 : PDF du contrat (§9.16)
 **En tant qu'agent**, je veux générer un PDF imprimable du contrat à remettre au client.
 
-- [ ] **Scénario nominal** : ouvrir le modal de détail d'un contrat avec au moins une ligne → cliquer "🖨 PDF" → une fenêtre d'impression s'ouvre avec le contrat formaté (en-tête agence, infos client, tableau des lignes, totaux, blocs de signatures)
-- [ ] **Contenu complet** : le PDF affiche l'ID contrat, le type, la date, le nom client, les lignes (immatriculation, modèle, période, jours, tarif, montant HT, TVA, TTC), les totaux HT/TVA/TTC, le montant en lettres, les blocs de signature
-- [ ] **Contrat sans lignes** : ouvrir un contrat à 0 lignes → PDF s'ouvre avec message "Aucune ligne" dans le tableau
+- [ ] **Scénario nominal (court terme)** : ouvrir le modal de détail d'un contrat `type = court` avec une ligne → cliquer "🖨 PDF" → une fenêtre d'impression s'ouvre avec le modèle officiel bilingue FR/AR (bandeau agence, identification locataire, identification véhicule remplie depuis la première ligne, période/tarifs, totaux HT/TVA/TTC, montant en lettres, blocs de signature, verso conditions générales, copie client + copie agence)
 - [ ] **Popup bloquée** : si le navigateur bloque la popup → message d'avertissement affiché à l'utilisateur
-- [ ] **Contrat long terme multi-lignes** : un contrat `type = long` avec 2 lignes ou plus (plusieurs véhicules) → PDF générique (`generateContractPdfGeneric`) s'ouvre avec une ligne par véhicule dans le tableau, sans erreur JS (régression corrigée : la fonction utilisait un helper de formatage de date non défini localement, ce qui bloquait systématiquement la génération dès qu'il y avait au moins une ligne)
-- [ ] **Ligne sans véhicule assigné** : une ligne de contrat long terme sans `carId`/`carPlate`/dates renseignés → le PDF se génère quand même, la ligne correspondante affiche des tirets ("-") à la place des infos véhicule/dates plutôt que de bloquer la génération
+- [ ] **Contrat long terme — même modèle, véhicule vide** : un contrat `type = long` (avec 1 ou plusieurs lignes/véhicules) → cliquer "🖨 PDF" → le même modèle officiel s'ouvre (pas de template distinct), sans erreur JS ; le bloc "IV- IDENTIFICATION DU VEHICULE" (Modèle, Immatriculation, Type de carburant) est laissé vide — aucun véhicule ne peut être désigné par défaut quand le contrat en couvre potentiellement plusieurs — alors que le reste (identité locataire, dates, durée) reste rempli normalement
+- [ ] **Totaux agrégés sur toutes les lignes** : pour un contrat long terme à 2 lignes ou plus, "Location H.T." et "Total Location T.T.C." affichent la somme de toutes les lignes du contrat (pas seulement la première)
+- [ ] **Contrat sans lignes** : ouvrir un contrat à 0 lignes → PDF s'ouvre quand même (champs véhicule/période vides), aucune erreur JS
+- [ ] **Régression corrigée** : avant cette correction, les contrats long terme utilisaient un template générique séparé qui plantait (`fd is not defined`) dès qu'il y avait au moins une ligne — ce template générique a été supprimé, les deux types de contrat partagent maintenant le même code de génération
 
 ### UC-CTR-9 : Créer une facture depuis un contrat (§9.16)
 **En tant qu'agent**, je veux créer rapidement une facture liée à un contrat sans naviguer manuellement.

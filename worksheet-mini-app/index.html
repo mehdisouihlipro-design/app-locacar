@@ -7179,8 +7179,10 @@
       const contract = state.contracts.find(c => String(c.id) === String(contractId));
       if (!contract) { alert("Contrat introuvable."); return; }
 
-      // Contrats long terme → PDF générique (pas le template officiel court terme)
-      if (contract.type !== "court") { return generateContractPdfGeneric(contractId); }
+      // Contrats long terme : même modèle officiel que le court terme, mais l'identification
+      // du véhicule (modèle/immatriculation/carburant) est laissée vide — un contrat long
+      // terme peut porter plusieurs lignes/véhicules, aucun ne peut être désigné par défaut.
+      const isLongTermContract = contract.type !== "court";
 
       let branding = {};
       try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
@@ -7340,15 +7342,15 @@
 
         <div class="section-title" style="margin-top:6px;">IV- IDENTIFICATION DU VEHICULE<br><span style="font-size:7px;">نوعية السيارة</span></div>
         <table style="width:100%;margin-top:2px;">
-          ${field("Modèle / النوع", firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||""))}
-          ${field("Immatriculation / الرقم", safe(firstLine.carPlate||""))}
+          ${field("Modèle / النوع", isLongTermContract ? "" : (firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||"")))}
+          ${field("Immatriculation / الرقم", isLongTermContract ? "" : safe(firstLine.carPlate||""))}
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم دخول — Kms départ</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null?contract.mileageStart:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم رجوع — Kms retour</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageEnd!=null?contract.mileageEnd:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">الفارق — Kms parcours</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null&&contract.mileageEnd!=null?Number(contract.mileageEnd)-Number(contract.mileageStart):""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;font-weight:bold;">Changement de Voiture :</div></td></tr>
           ${field("Modèle", f(contract.replacementCarModel))}
           ${field("Matricule", f(contract.replacementCarPlate))}
-          ${field("Type de carburant", firstCar ? safe(firstCar.fuelType||"") : "")}
+          ${field("Type de carburant", isLongTermContract ? "" : (firstCar ? safe(firstCar.fuelType||"") : ""))}
           <tr><td style="padding:2px 3px;">
             <div class="field-label">Niv. de carburant Départ / البنزين عند الخروج</div>
             <table style="margin-top:2px;width:auto;"><tr>${fuelBar(contract.fuelLevelStart)}</tr></table>
@@ -7548,70 +7550,6 @@
 <\/script>
 </body>
 </html>`);
-      win.document.close();
-    }
-
-    // PDF générique (contrats long terme ou autre type)
-    function generateContractPdfGeneric(contractId) {
-      const contract = state.contracts.find(c => String(c.id) === String(contractId));
-      if (!contract) { alert("Contrat introuvable."); return; }
-      let branding = {};
-      try { branding = JSON.parse(localStorage.getItem("locacar-branding") || "{}"); } catch (_) {}
-      const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
-      const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
-      const settings = state.settings || {};
-      const fd = v => v ? safe(fmtDate(String(v))) : "";
-      const customer = state.customers.find(c => String(c.id) === String(contract.customerId));
-      const contractLines = (state.contractLines || []).filter(l => String(l.contractId) === String(contractId));
-      const totalHt = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
-      const totalVat = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
-      const totalTtc = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
-      const lineRowsHtml = contractLines.length > 0
-        ? contractLines.map(l => {
-            const lcar = state.cars.find(c => String(c.id) === String(l.carId));
-            return `<tr>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${safe(l.carPlate||"-")}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;">${safe(l.designation||(lcar?(((lcar.brand||"")+" "+(lcar.model||"")).trim()||"-"):"-"))}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${fd(l.periodStart)||"-"}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${fd(l.periodEnd)||"-"}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:center;">${l.days||"-"}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.rate)}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountHt)}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.vatAmount)}</td>
-              <td style="padding:5px;border:1px solid #c8daf9;text-align:right;">${formatTnd(l.amountTtc)}</td>
-            </tr>`;
-          }).join("")
-        : `<tr><td colspan="9" style="padding:10px;text-align:center;color:#888;">Aucune ligne</td></tr>`;
-      const win = window.open("", "_blank");
-      if (!win) { alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur."); return; }
-      win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-<title>Contrat ${safe(contract.contractNumber||contractId)}</title>
-<style>*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#0d244a;margin:0;padding:24px 30px;}table{border-collapse:collapse;}.print-btn{text-align:right;margin-bottom:12px;}.print-btn button{background:#0d244a;color:#fff;border:none;padding:7px 18px;border-radius:4px;cursor:pointer;}@media print{@page{margin:12mm;size:A4;}.print-btn{display:none;}}</style>
-</head><body>
-<div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
-<table width="100%" style="margin-bottom:12px;border-bottom:2px solid #0d244a;padding-bottom:8px;"><tr>
-  <td><img src="${safe(logoUrl)}" style="max-height:60px;margin-right:10px;vertical-align:middle;"><strong style="font-size:14px;">${safe(companyName)}</strong>${settings.companyPhone?`<br><span style="font-size:9px;">Tél: ${safe(settings.companyPhone)}</span>`:""}${settings.companyTaxId?`<br><span style="font-size:9px;">MF: ${safe(settings.companyTaxId)}</span>`:""}
-  </td>
-  <td style="text-align:right;"><h2 style="font-size:14px;">CONTRAT DE LOCATION</h2><p>N° <strong>${safe(contract.contractNumber||contractId)}</strong> — ${safe(contract.contractDate||"")} — ${safe(contract.type||"")}</p><p>Client : <strong>${safe(contract.customerName||"-")}</strong></p></td>
-</tr></table>
-<table width="100%" style="font-size:9px;margin-bottom:12px;"><thead><tr style="background:#0d244a;color:#fff;">
-  <th style="padding:5px;border:1px solid #0d244a;">Immatriculation</th><th style="padding:5px;border:1px solid #0d244a;">Modèle</th>
-  <th style="padding:5px;border:1px solid #0d244a;">Du</th><th style="padding:5px;border:1px solid #0d244a;">Au</th>
-  <th style="padding:5px;border:1px solid #0d244a;">Jours</th><th style="padding:5px;border:1px solid #0d244a;">Tarif HT</th>
-  <th style="padding:5px;border:1px solid #0d244a;">Montant HT</th><th style="padding:5px;border:1px solid #0d244a;">TVA</th>
-  <th style="padding:5px;border:1px solid #0d244a;">TTC</th>
-</tr></thead><tbody>${lineRowsHtml}</tbody></table>
-<table style="width:260px;margin-left:auto;font-size:10px;">
-  <tr><td style="padding:3px 6px;">Total H.T.</td><td style="padding:3px 6px;text-align:right;">${formatTnd(totalHt)}</td></tr>
-  <tr><td style="padding:3px 6px;">TVA (${Number(settings.vatRate||0)}%)</td><td style="padding:3px 6px;text-align:right;">${formatTnd(totalVat)}</td></tr>
-  <tr style="font-weight:bold;border-top:2px solid #0d244a;"><td style="padding:5px 6px;">Total T.T.C.</td><td style="padding:5px 6px;text-align:right;">${formatTnd(totalTtc)}</td></tr>
-</table>
-<div style="margin-top:8px;font-size:10px;font-style:italic;">Arrêté à : <strong>${amountToFrenchWords(totalTtc)}</strong></div>
-<div style="margin-top:40px;display:flex;justify-content:space-between;font-size:10px;">
-  <div style="text-align:center;width:200px;"><div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:5px;">Signature du loueur</div></div>
-  <div style="text-align:center;width:200px;"><div style="border-top:1px solid #0d244a;margin-top:50px;padding-top:5px;">Signature du locataire</div></div>
-</div>
-</body></html>`);
       win.document.close();
     }
 
