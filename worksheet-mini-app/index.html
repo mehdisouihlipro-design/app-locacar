@@ -7560,6 +7560,7 @@
       const companyName = branding.companyName || window._COMPANY_NAME || "E-Drive";
       const logoUrl = branding.logoUrl || window._LOGO_URL || "/1000095084.jpg";
       const settings = state.settings || {};
+      const fd = v => v ? safe(fmtDate(String(v))) : "";
       const customer = state.customers.find(c => String(c.id) === String(contract.customerId));
       const contractLines = (state.contractLines || []).filter(l => String(l.contractId) === String(contractId));
       const totalHt = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);

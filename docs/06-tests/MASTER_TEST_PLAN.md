@@ -559,6 +559,8 @@
 - [ ] **Contenu complet** : le PDF affiche l'ID contrat, le type, la date, le nom client, les lignes (immatriculation, modèle, période, jours, tarif, montant HT, TVA, TTC), les totaux HT/TVA/TTC, le montant en lettres, les blocs de signature
 - [ ] **Contrat sans lignes** : ouvrir un contrat à 0 lignes → PDF s'ouvre avec message "Aucune ligne" dans le tableau
 - [ ] **Popup bloquée** : si le navigateur bloque la popup → message d'avertissement affiché à l'utilisateur
+- [ ] **Contrat long terme multi-lignes** : un contrat `type = long` avec 2 lignes ou plus (plusieurs véhicules) → PDF générique (`generateContractPdfGeneric`) s'ouvre avec une ligne par véhicule dans le tableau, sans erreur JS (régression corrigée : la fonction utilisait un helper de formatage de date non défini localement, ce qui bloquait systématiquement la génération dès qu'il y avait au moins une ligne)
+- [ ] **Ligne sans véhicule assigné** : une ligne de contrat long terme sans `carId`/`carPlate`/dates renseignés → le PDF se génère quand même, la ligne correspondante affiche des tirets ("-") à la place des infos véhicule/dates plutôt que de bloquer la génération
 
 ### UC-CTR-9 : Créer une facture depuis un contrat (§9.16)
 **En tant qu'agent**, je veux créer rapidement une facture liée à un contrat sans naviguer manuellement.
