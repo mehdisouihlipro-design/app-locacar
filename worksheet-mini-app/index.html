@@ -7195,12 +7195,14 @@
       const firstLine = contractLines[0] || {};
       const firstCar  = firstLine.carId ? state.cars.find(c => String(c.id) === String(firstLine.carId)) : null;
 
-      const totalHt       = contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0);
-      const totalVat      = contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0);
-      const totalTtc      = contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0);
       const dailyTaxRate  = Number(settings.dailyTaxTnd || 0);
-      const totalDailyTax = contractLines.reduce((s, l) => s + Math.round((l.days || 0) * dailyTaxRate * 1000) / 1000, 0);
       const stampVal      = Number(settings.stampDutyTnd || settings.stampDuty || settings.stamp || 0);
+
+      // Contrat long terme à plusieurs lignes (plusieurs véhicules) : un jeu de pages
+      // (recto + copie agence) par ligne, chacune avec SON véhicule et SON montant —
+      // jamais un total agrégé sous un seul véhicule. Sinon (court terme, ou long terme
+      // à 0/1 ligne), une seule page comme avant.
+      const multiLineLongTerm = isLongTermContract && contractLines.length > 1;
 
       // Helpers
       const f = v => safe(v || "");
@@ -7233,28 +7235,11 @@
       const win = window.open("", "_blank");
       if (!win) { alert("Impossible d'ouvrir la fenêtre d'impression.\nAutorisez les popups pour ce site dans votre navigateur."); return; }
 
-      win.document.write(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Contrat ${safe(contract.contractNumber || contractId)}</title>
-  <style>
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:Arial,Helvetica,sans-serif; font-size:8.5px; color:#111; background:#fff; }
-    table { border-collapse:collapse; width:100%; }
-    td { vertical-align:top; }
-    .page { width:210mm; min-height:297mm; padding:6mm 6mm 4mm 6mm; }
-    .section-title { font-size:8px; font-weight:bold; text-align:center; background:#ddd; padding:2px; border:1px solid #333; margin-bottom:0; }
-    .field-label { font-size:7px; color:#444; }
-    .field-value { font-size:8.5px; border-bottom:1px solid #555; min-height:12px; padding-bottom:1px; margin-bottom:3px; }
-    .print-btn { text-align:right; padding:6px 10px; background:#f5f5f5; border-bottom:1px solid #ccc; }
-    .print-btn button { background:#0d244a; color:#fff; border:none; padding:6px 18px; border-radius:3px; cursor:pointer; font-size:12px; }
-    @media print { @page { margin:5mm; size:A4 portrait; } .print-btn { display:none; } .page { padding:3mm; } }
-  </style>
-</head>
-<body>
-<div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
-<div class="page" id="contractMainPage">
+      // Page "recto" du contrat, paramétrée par véhicule/période/montants — appelée une
+      // seule fois (agrégat) normalement, ou une fois PAR LIGNE pour un contrat long terme
+      // à plusieurs véhicules (chaque page porte alors SON véhicule et SON propre montant).
+      const buildMainPageHtml = (p) => `
+<div class="page contract-main-page"${p.pageIndex > 0 ? ' style="page-break-before:always;"' : ""}>
 
   <!-- ══ BANNIÈRE SOCIÉTÉ (logo + coordonnées + nom) ══════════════════ -->
   <table style="margin-bottom:3px;border-bottom:1px solid #333;padding-bottom:3px;">
@@ -7288,7 +7273,7 @@
         <div style="font-size:15px;font-weight:900;letter-spacing:1px;">CONTRAT DE LOCATION</div>
         <div style="font-size:12px;font-weight:bold;">عـقـد كـراء</div>
         <div style="font-size:14px;font-weight:bold;margin-top:3px;">N&deg;&nbsp;${safe(contract.contractNumber || contractId)}</div>
-        <div id="contractCopyLabel" style="font-size:10px;font-weight:900;color:#b00;border:1px solid #b00;display:inline-block;padding:1px 10px;margin-top:3px;letter-spacing:1px;">COPIE CLIENT</div>
+        <div class="contract-copy-label" style="font-size:10px;font-weight:900;color:#b00;border:1px solid #b00;display:inline-block;padding:1px 10px;margin-top:3px;letter-spacing:1px;">COPIE CLIENT</div>
       </td>
       <td style="width:120px;text-align:right;vertical-align:top;direction:rtl;font-size:7px;line-height:1.5;">
         <strong>هـام</strong><br>
@@ -7342,15 +7327,15 @@
 
         <div class="section-title" style="margin-top:6px;">IV- IDENTIFICATION DU VEHICULE<br><span style="font-size:7px;">نوعية السيارة</span></div>
         <table style="width:100%;margin-top:2px;">
-          ${field("Modèle / النوع", isLongTermContract ? "" : (firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||"")))}
-          ${field("Immatriculation / الرقم", isLongTermContract ? "" : safe(firstLine.carPlate||""))}
+          ${field("Modèle / النوع", p.carModelText)}
+          ${field("Immatriculation / الرقم", p.plateText)}
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم دخول — Kms départ</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null?contract.mileageStart:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">كلم رجوع — Kms retour</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageEnd!=null?contract.mileageEnd:""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;color:#444;">الفارق — Kms parcours</div><div style="font-size:8.5px;border-bottom:1px solid #555;min-height:12px;">${contract.mileageStart!=null&&contract.mileageEnd!=null?Number(contract.mileageEnd)-Number(contract.mileageStart):""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div style="font-size:7.5px;font-weight:bold;">Changement de Voiture :</div></td></tr>
           ${field("Modèle", f(contract.replacementCarModel))}
           ${field("Matricule", f(contract.replacementCarPlate))}
-          ${field("Type de carburant", isLongTermContract ? "" : (firstCar ? safe(firstCar.fuelType||"") : ""))}
+          ${field("Type de carburant", p.fuelText)}
           <tr><td style="padding:2px 3px;">
             <div class="field-label">Niv. de carburant Départ / البنزين عند الخروج</div>
             <table style="margin-top:2px;width:auto;"><tr>${fuelBar(contract.fuelLevelStart)}</tr></table>
@@ -7366,10 +7351,10 @@
       <td style="width:33%;padding:3px;vertical-align:top;">
         <div class="section-title">III- RENSEIGNEMENT SUR LA LOCATION<br><span style="font-size:7px;">مدة الكراء</span></div>
         <table style="width:100%;margin-top:2px;">
-          ${field("Date de départ / تاريخ الخروج", fd(firstLine.periodStart||contract.contractDate))}
-          ${field("Heure / الساعة", firstLine.pickupTime||"")}
-          ${field("Date de Retour / تاريخ الدخول", fd(firstLine.periodEnd||""))}
-          ${field("Heure / الساعة", firstLine.returnTime||"")}
+          ${field("Date de départ / تاريخ الخروج", fd(p.periodStart))}
+          ${field("Heure / الساعة", p.pickupTime||"")}
+          ${field("Date de Retour / تاريخ الدخول", fd(p.periodEnd))}
+          ${field("Heure / الساعة", p.returnTime||"")}
         </table>
         <div style="border:1px solid #333;padding:2px;margin:3px 0;">
           <div style="font-size:7.5px;font-weight:bold;text-align:center;">PROLONGATIONS / الإضافات</div>
@@ -7381,15 +7366,15 @@
           </table>
         </div>
         <table style="width:100%;margin-top:2px;">
-          <tr><td style="padding:1px 3px;"><div class="field-label">Durée de la Location / مـدة الكـراء</div><div class="field-value">${firstLine.days||contract.days||""} jour(s)</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${totalHt > 0 ? totalHt.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Durée de la Location / مـدة الكـراء</div><div class="field-value">${p.days||""} jour(s)</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Location H.T. / مبلغ الإيجار</div><div class="field-value">${p.locationHt > 0 ? p.locationHt.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Assurance R.C.</div><div class="field-value">${contract.insuranceRcAmount!=null?Number(contract.insuranceRcAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Assurance (pers. Transportées)</div><div class="field-value">${contract.insurancePassengersAmount!=null?Number(contract.insurancePassengersAmount).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND":""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(totalHt + totalVat).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A (${Number(settings.vatRate||19)}%)</div><div class="field-value">${totalVat > 0 ? totalVat.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label">Taxe Locative / الأداء على الإيجار (${dailyTaxRate > 0 ? dailyTaxRate.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND/j" : ""})</div><div class="field-value">${totalDailyTax > 0 ? totalDailyTax.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Total location</div><div class="field-value" style="font-weight:bold;">${(p.locationHt + p.vatAmountVal).toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})} TND</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">T.V.A (${Number(settings.vatRate||19)}%)</div><div class="field-value">${p.vatAmountVal > 0 ? p.vatAmountVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label">Taxe Locative / الأداء على الإيجار (${dailyTaxRate > 0 ? dailyTaxRate.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND/j" : ""})</div><div class="field-value">${p.dailyTaxAmountVal > 0 ? p.dailyTaxAmountVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
           <tr><td style="padding:1px 3px;"><div class="field-label">Timbre payé sur Etat</div><div class="field-value">${stampVal > 0 ? stampVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
-          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${totalTtc > 0 ? totalTtc.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
+          <tr><td style="padding:1px 3px;"><div class="field-label" style="font-weight:bold;">Total Location T.T.C.</div><div class="field-value" style="font-weight:bold;font-size:10px;">${p.amountTtcVal > 0 ? p.amountTtcVal.toLocaleString("fr-FR",{minimumFractionDigits:3,maximumFractionDigits:3})+" TND" : ""}</div></td></tr>
         </table>
       </td>
     </tr>
@@ -7453,7 +7438,66 @@
     </tr>
   </table>
 
-</div>
+</div>`;
+
+      // Construit les paramètres d'une page à partir d'une ligne de contrat donnée
+      // (véhicule + montants propres à cette ligne), ou de l'agrégat (0/1 ligne).
+      const pageParamsFromLine = (line, pageIndex) => {
+        const car = line.carId ? state.cars.find(c => String(c.id) === String(line.carId)) : null;
+        const days = line.days || 0;
+        return {
+          pageIndex,
+          carModelText: car ? safe(((car.brand||"")+" "+(car.model||"")).trim()) : safe(line.carPlate||""),
+          plateText: safe(line.carPlate||""),
+          fuelText: car ? safe(car.fuelType||"") : "",
+          periodStart: line.periodStart||contract.contractDate, periodEnd: line.periodEnd||"",
+          pickupTime: line.pickupTime||"", returnTime: line.returnTime||"",
+          days,
+          locationHt: Number(line.amountHt||0),
+          vatAmountVal: Number(line.vatAmount||0),
+          dailyTaxAmountVal: Math.round(days * dailyTaxRate * 1000) / 1000,
+          amountTtcVal: Number(line.amountTtc||0),
+        };
+      };
+
+      const mainPagesHtml = multiLineLongTerm
+        ? contractLines.map((line, i) => buildMainPageHtml(pageParamsFromLine(line, i))).join("")
+        : buildMainPageHtml({
+            pageIndex: 0,
+            carModelText: isLongTermContract ? "" : (firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||"")),
+            plateText: isLongTermContract ? "" : safe(firstLine.carPlate||""),
+            fuelText: isLongTermContract ? "" : (firstCar ? safe(firstCar.fuelType||"") : ""),
+            periodStart: firstLine.periodStart||contract.contractDate, periodEnd: firstLine.periodEnd||"",
+            pickupTime: firstLine.pickupTime||"", returnTime: firstLine.returnTime||"",
+            days: firstLine.days||contract.days||0,
+            locationHt: contractLines.reduce((s, l) => s + Number(l.amountHt || 0), 0),
+            vatAmountVal: contractLines.reduce((s, l) => s + Number(l.vatAmount || 0), 0),
+            dailyTaxAmountVal: contractLines.reduce((s, l) => s + Math.round((l.days || 0) * dailyTaxRate * 1000) / 1000, 0),
+            amountTtcVal: contractLines.reduce((s, l) => s + Number(l.amountTtc || 0), 0),
+          });
+
+      win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Contrat ${safe(contract.contractNumber || contractId)}</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:Arial,Helvetica,sans-serif; font-size:8.5px; color:#111; background:#fff; }
+    table { border-collapse:collapse; width:100%; }
+    td { vertical-align:top; }
+    .page { width:210mm; min-height:297mm; padding:6mm 6mm 4mm 6mm; }
+    .section-title { font-size:8px; font-weight:bold; text-align:center; background:#ddd; padding:2px; border:1px solid #333; margin-bottom:0; }
+    .field-label { font-size:7px; color:#444; }
+    .field-value { font-size:8.5px; border-bottom:1px solid #555; min-height:12px; padding-bottom:1px; margin-bottom:3px; }
+    .print-btn { text-align:right; padding:6px 10px; background:#f5f5f5; border-bottom:1px solid #ccc; }
+    .print-btn button { background:#0d244a; color:#fff; border:none; padding:6px 18px; border-radius:3px; cursor:pointer; font-size:12px; }
+    @media print { @page { margin:5mm; size:A4 portrait; } .print-btn { display:none; } .page { padding:3mm; } }
+  </style>
+</head>
+<body>
+<div class="print-btn"><button onclick="window.print()">🖨 Imprimer / PDF</button></div>
+${mainPagesHtml}
 
 <!-- ══ PAGE 2 : VERSO — CONDITIONS GÉNÉRALES ══════════════════════════ -->
 <div class="page" id="contractConditionsPage" style="page-break-before:always;">
@@ -7535,17 +7579,19 @@
 
 </div>
 <script>
-  // Clone la page contrat pour générer COPIE AGENCE (insérée avant les conditions)
+  // Clone chaque page contrat (une par véhicule si contrat long terme multi-lignes) pour
+  // générer sa COPIE AGENCE, insérée juste après l'original (client puis agence, par véhicule).
   (function() {
-    var main = document.getElementById("contractMainPage");
+    var mains = document.querySelectorAll(".contract-main-page");
     var cond = document.getElementById("contractConditionsPage");
-    if (!main || !cond) return;
-    var clone = main.cloneNode(true);
-    clone.style.pageBreakBefore = "always";
-    clone.removeAttribute("id");
-    var lbl = clone.querySelector("#contractCopyLabel");
-    if (lbl) { lbl.removeAttribute("id"); lbl.textContent = "COPIE AGENCE"; }
-    cond.parentNode.insertBefore(clone, cond);
+    if (!mains.length || !cond) return;
+    mains.forEach(function(main) {
+      var clone = main.cloneNode(true);
+      clone.style.pageBreakBefore = "always";
+      var lbl = clone.querySelector(".contract-copy-label");
+      if (lbl) lbl.textContent = "COPIE AGENCE";
+      main.parentNode.insertBefore(clone, main.nextSibling);
+    });
   })();
 <\/script>
 </body>
