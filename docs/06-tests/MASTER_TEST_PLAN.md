@@ -562,6 +562,7 @@
 - [ ] **Pas de mélange entre lignes** : pour un contrat à 2 lignes de montants différents, les 2 jeux de pages affichent chacun le bon couple véhicule/montant (pas le montant de l'autre ligne, pas le total des deux)
 - [ ] **Contrat sans lignes** : ouvrir un contrat à 0 lignes → PDF s'ouvre quand même (champs véhicule/période vides), aucune erreur JS
 - [ ] **Régression corrigée** : les contrats long terme utilisaient un template générique séparé qui plantait (`fd is not defined`) dès qu'il y avait au moins une ligne ; ce template a été supprimé et les deux types de contrat partagent maintenant le même générateur, avec un jeu de pages par ligne pour le long terme multi-véhicules plutôt qu'un agrégat trompeur sous un seul véhicule
+- [ ] **Modèle avec caractère spécial** : un véhicule dont le modèle contient un caractère HTML spécial (ex. `LYNK&CO 01`) → le bloc "IV- IDENTIFICATION DU VEHICULE" affiche `LYNK&CO 01` tel quel, jamais `LYNK&amp;CO 01` (régression de double-échappement HTML corrigée : `carModelText`/`plateText`/`fuelText` ne doivent plus être pré-échappés avec `safe()` avant d'être passés à `field()`, qui échappe déjà)
 
 ### UC-CTR-9 : Créer une facture depuis un contrat (§9.16)
 **En tant qu'agent**, je veux créer rapidement une facture liée à un contrat sans naviguer manuellement.

@@ -7447,9 +7447,9 @@
         const days = line.days || 0;
         return {
           pageIndex,
-          carModelText: car ? safe(((car.brand||"")+" "+(car.model||"")).trim()) : safe(line.carPlate||""),
-          plateText: safe(line.carPlate||""),
-          fuelText: car ? safe(car.fuelType||"") : "",
+          carModelText: car ? ((car.brand||"")+" "+(car.model||"")).trim() : (line.carPlate||""),
+          plateText: line.carPlate||"",
+          fuelText: car ? (car.fuelType||"") : "",
           periodStart: line.periodStart||contract.contractDate, periodEnd: line.periodEnd||"",
           pickupTime: line.pickupTime||"", returnTime: line.returnTime||"",
           days,
@@ -7464,9 +7464,9 @@
         ? contractLines.map((line, i) => buildMainPageHtml(pageParamsFromLine(line, i))).join("")
         : buildMainPageHtml({
             pageIndex: 0,
-            carModelText: isLongTermContract ? "" : (firstCar ? safe(((firstCar.brand||"")+" "+(firstCar.model||"")).trim()) : safe(firstLine.carPlate||"")),
-            plateText: isLongTermContract ? "" : safe(firstLine.carPlate||""),
-            fuelText: isLongTermContract ? "" : (firstCar ? safe(firstCar.fuelType||"") : ""),
+            carModelText: isLongTermContract ? "" : (firstCar ? ((firstCar.brand||"")+" "+(firstCar.model||"")).trim() : (firstLine.carPlate||"")),
+            plateText: isLongTermContract ? "" : (firstLine.carPlate||""),
+            fuelText: isLongTermContract ? "" : (firstCar ? (firstCar.fuelType||"") : ""),
             periodStart: firstLine.periodStart||contract.contractDate, periodEnd: firstLine.periodEnd||"",
             pickupTime: firstLine.pickupTime||"", returnTime: firstLine.returnTime||"",
             days: firstLine.days||contract.days||0,
