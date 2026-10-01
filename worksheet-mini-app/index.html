@@ -6050,7 +6050,7 @@
       if (contracts) state.contracts = contracts.map(c => ({
         id: c.id, contractNumber: c.contract_number || null, customerId: c.customer_id, carId: c.car_id,
         customerName: c.customer_name || "", carPlate: c.car_plate || "",
-        contractDate: c.contract_date, type: c.type || "court", rateType: c.rate_type || "daily",
+        contractDate: c.contract_date, endDate: c.end_date || "", type: c.type || "court", rateType: c.rate_type || "daily",
         days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rateCurrency: c.rate_currency || "TND",
         quotient: c.quotient || 0, quotientCurrency: c.quotient_currency || "TND",
@@ -9237,7 +9237,7 @@ ${mainPagesHtml}
         id: c.id,
         customer_id: c.customerId, car_id: c.carId,
         customer_name: c.customerName || "", car_plate: c.carPlate || "",
-        contract_date: c.contractDate || today,
+        contract_date: c.contractDate || today, end_date: c.endDate || null,
         type: c.type || "court",
         days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rate_currency: c.rateCurrency || "TND",
@@ -9547,7 +9547,7 @@ ${mainPagesHtml}
       return {
         customer_id: c.customerId, car_id: c.carId,
         customer_name: c.customerName || "", car_plate: c.carPlate || "",
-        contract_date: c.contractDate || today,
+        contract_date: c.contractDate || today, end_date: c.endDate || null,
         type: c.type || "court",
         days: c.days || 0, months: c.months || 0,
         rate: c.rate || 0, rate_currency: c.rateCurrency || "TND",
@@ -16438,6 +16438,7 @@ ${mainPagesHtml}
         "cars.sitePriceDay": "number",
         "invoices.dueDate": "date",
         "invoices.lastReminderAt": "date",
+        "contracts.endDate": "date",
         "reservations.startDate": "date",
         "reservations.endDate": "date",
         "reservations.startTime": "time",
@@ -16643,6 +16644,8 @@ ${mainPagesHtml}
           <div><span class="label-small">Client</span><br><strong>${safe(contract.customerName || "-")}</strong></div>
           <div><span class="label-small">Type</span><br>${safe(contract.type || "-")}</div>
           <div><span class="label-small">Négociation</span><br>${contract.rateType === "monthly" ? "Mensuel (fixe)" : "Journalier"}</div>
+          <div><span class="label-small">Date signature</span><br>${contract.contractDate ? fmtDate(contract.contractDate) : "-"}</div>
+          <div><span class="label-small">Date de fin</span><br>${contract.endDate ? fmtDate(contract.endDate) : "-"}</div>
           <div><span class="label-small">Période</span><br>${periodLabel}</div>
           <div><span class="label-small">Paiement</span><br>${safe(contract.paymentMoment || "-")}</div>
           <div><span class="label-small">Statut</span><br><span style="${statusStyle}">${isBrouillon ? "⚠ brouillon" : safe(contract.status || "-")}</span></div>
@@ -16717,6 +16720,10 @@ ${mainPagesHtml}
           <div>
             <label class="label-small">Date signature</label>
             <input id="cdlEDate" type="date" value="${contract.contractDate || ""}" style="width:100%;" />
+          </div>
+          <div>
+            <label class="label-small">Date de fin</label>
+            <input id="cdlEEndDate" type="date" value="${contract.endDate || ""}" style="width:100%;" />
           </div>
           <div>
             <label class="label-small">Paiement</label>
@@ -16825,6 +16832,7 @@ ${mainPagesHtml}
           const customerId = byId("cdlEClient").value;
           const type = byId("cdlEType").value;
           const contractDate = byId("cdlEDate").value;
+          const endDate = byId("cdlEEndDate").value;
           const paymentMoment = byId("cdlEPayment").value;
           const status = byId("cdlEStatus").value;
           const rateType = byId("cdlERateType").value || "daily";
@@ -16837,11 +16845,18 @@ ${mainPagesHtml}
           const v = id => byId(id)?.value || null;
           const vn = id => { const val = byId(id)?.value; return val !== "" && val != null ? Number(val) : null; };
           const vb = id => byId(id)?.checked || false;
+          const errElPre = byId("cdlHeaderError");
+          if (endDate && contractDate && endDate < contractDate) {
+            if (errElPre) { errElPre.textContent = "❌ La date de fin ne peut pas être antérieure à la date signature."; errElPre.style.display = ""; }
+            return;
+          }
+          const oldContractDate = contract.contractDate;
+          const oldEndDate = contract.endDate;
           const prevEditBtnText = editBtn.textContent;
           editBtn.disabled = true; editBtn.textContent = "…";
           const saveResult = await apiPutWithError(`/contracts/${contractId}`, {
             customer_id: customerId, customer_name: customer ? customer.name : contract.customerName,
-            type, rate_type: rateType, contract_date: contractDate,
+            type, rate_type: rateType, contract_date: contractDate, end_date: endDate || null,
             payment_moment: paymentMoment, payment_plan: paymentPlan, status,
             quotient, quotient_currency: quotientCurrency, quotient_tnd: quotientTnd,
             // Groupe 2 — financier
@@ -16881,7 +16896,7 @@ ${mainPagesHtml}
           if (idx >= 0) {
             Object.assign(state.contracts[idx], {
               customerId, customerName: customer ? customer.name : contract.customerName,
-              type, rateType, contractDate, paymentMoment, paymentPlan, status,
+              type, rateType, contractDate, endDate, paymentMoment, paymentPlan, status,
               quotient, quotientCurrency, quotientTnd,
               franchiseAmount: vn("cdlEFranchise"), insuranceRcAmount: vn("cdlEInsRc"), insurancePassengersAmount: vn("cdlEInsPax"),
               mileageStart: vn("cdlEKmStart"), mileageEnd: vn("cdlEKmEnd"),
@@ -16903,6 +16918,14 @@ ${mainPagesHtml}
               replacementCarModel: v("cdlEReplModel")||"", replacementCarPlate: v("cdlEReplPlate")||"",
             });
           }
+          const datesChanged = contractDate !== oldContractDate || endDate !== oldEndDate;
+          if (datesChanged && contractDate && endDate) {
+            const { failedPlates } = await cascadeContractDatesToLines(contractId, contractDate, endDate);
+            if (failedPlates.length > 0) {
+              alert(`⚠ Dates d'entête enregistrées, mais ${failedPlates.length} ligne(s) n'ont pas pu être alignées automatiquement (${failedPlates.join(", ")}). Modifiez-les manuellement si nécessaire.`);
+            }
+          }
+          renderContractDetailLines(contractId);
           renderContractDetailHeader(contractId, false);
           renderContracts();
         };
@@ -17181,6 +17204,54 @@ ${mainPagesHtml}
       renderContractDetailLines(contractId);
       renderContractDetailHeader(contractId, false);
       renderContracts();
+    }
+
+    // Quand la date de début (signature) ou la date de fin de l'entête change, toutes
+    // les lignes actives/brouillon du contrat sont réalignées sur cette même période
+    // (period_start/period_end identiques à l'entête) — jours/mois et montants HT/TVA/TTC
+    // recalculés avec le tarif déjà en place sur chaque ligne, même formule que l'édition
+    // manuelle d'une ligne (saveContractLineEdit). Retourne les lignes en échec (ex.
+    // chevauchement BR19) pour affichage d'un avertissement, sans bloquer la sauvegarde
+    // de l'entête déjà effectuée.
+    async function cascadeContractDatesToLines(contractId, newStart, newEnd) {
+      if (!newStart || !newEnd || newEnd < newStart) return { updated: 0, failedPlates: [] };
+      const contract = state.contracts.find(c => c.id === contractId);
+      const isMonthlyMode = (contract?.rateType || "daily") === "monthly";
+      const isShortTerm = !contract || contract.type === "court";
+      const lines = (state.contractLines || []).filter(l =>
+        l.contractId === contractId && (l.status === "active" || l.status === "brouillon")
+      );
+      let updated = 0;
+      const failedPlates = [];
+      for (const line of lines) {
+        const pickupTime = isShortTerm ? (line.pickupTime || null) : null;
+        const returnTime = isShortTerm ? (line.returnTime || null) : null;
+        const { days, months } = calcLineDuration(newStart, newEnd, pickupTime, returnTime, !isShortTerm);
+        if (days <= 0) { failedPlates.push(line.carPlate || line.id); continue; }
+        const amountHt = isMonthlyMode
+          ? calcMonthlyAmountJS(line.rate || 0, newStart, newEnd)
+          : Math.round((line.rate || 0) * days * 100) / 100;
+        const { vatAmount, amountTtc } = computeContractLineTtc(amountHt, days);
+        const result = await apiPutWithError(`/contract-lines/${line.id}`, {
+          period_start: newStart, period_end: newEnd, days, months,
+          amount_ht: amountHt, vat_amount: vatAmount, amount_ttc: amountTtc, amount_tnd: amountTtc,
+        });
+        if (!result.ok) { failedPlates.push(line.carPlate || line.id); continue; }
+        const idx = state.contractLines.findIndex(l => l.id === line.id);
+        if (idx >= 0) {
+          const prevLine = state.contractLines[idx];
+          Object.assign(state.contractLines[idx], {
+            periodStart: newStart, periodEnd: newEnd, days, months,
+            amountHt, vatAmount, amountTtc, amountTnd: amountTtc,
+          });
+          if (prevLine.reservationId) {
+            const rsvIdx = (state.reservations || []).findIndex(r => r.id === prevLine.reservationId);
+            if (rsvIdx >= 0) { state.reservations[rsvIdx].startDate = newStart; state.reservations[rsvIdx].endDate = newEnd; }
+          }
+        }
+        updated++;
+      }
+      return { updated, failedPlates };
     }
 
     function terminateContractLine(contractId, lineId, tr) {
@@ -18175,6 +18246,8 @@ ${mainPagesHtml}
       if (!record) return;
 
       const oldId = record.id;
+      const oldContractDate = entity === "contracts" ? record.contractDate : null;
+      const oldEndDate = entity === "contracts" ? record.endDate : null;
 
       const fields = byId("recordEditorBody").querySelectorAll("[data-field-key]");
       fields.forEach((field) => {
@@ -18282,6 +18355,13 @@ ${mainPagesHtml}
             alert(`Erreur lors de l'enregistrement : ${res.errorMsg}`);
             return;
           }
+        }
+      }
+
+      if (entity === "contracts" && (record.contractDate !== oldContractDate || record.endDate !== oldEndDate) && record.contractDate && record.endDate) {
+        const { failedPlates } = await cascadeContractDatesToLines(record.id, record.contractDate, record.endDate);
+        if (failedPlates.length > 0) {
+          alert(`⚠ Dates d'entête enregistrées, mais ${failedPlates.length} ligne(s) n'ont pas pu être alignées automatiquement (${failedPlates.join(", ")}). Modifiez-les manuellement si nécessaire.`);
         }
       }
 

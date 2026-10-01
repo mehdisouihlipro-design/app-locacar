@@ -921,13 +921,19 @@
 - [ ] **Erreur : pas de lignes actives** : si toutes les lignes sont annulées → erreur 422 affichée
 
 ### UC-CTR-12 : Modifier l'entête d'un contrat (tous les champs)
-**En tant que gestionnaire**, je veux modifier tous les champs de l'entête d'un contrat (client, type, date signature, paiement, statut, tarif, caution) depuis la modale de détail.
+**En tant que gestionnaire**, je veux modifier tous les champs de l'entête d'un contrat (client, type, date signature, date de fin, paiement, statut, tarif, caution) depuis la modale de détail.
 
 - [ ] **Scénario nominal** : ouvrir fiche contrat → "✏ Modifier entête" → modifier le tarif et la devise → "✓ Enregistrer" → la vue lecture affiche les nouvelles valeurs
-- [ ] **Champs présents** : Client, Type, Date signature, Paiement, Statut, Tarif + Devise, Caution + Devise
-- [ ] **Vue lecture** : affiche Tarif et Caution avec leur devise respective
+- [ ] **Champs présents** : Client, Type, Date signature, Date de fin, Paiement, Statut, Tarif + Devise, Caution + Devise
+- [ ] **Vue lecture** : affiche Date signature, Date de fin, Tarif et Caution avec leur devise respective
 - [ ] **Persistance** : F5 → les valeurs modifiées sont toujours affichées (sauvegardées via `PUT /contracts/:id`)
 - [ ] **Annuler** : cliquer "✗ Annuler" → les anciennes valeurs sont rétablies sans appel API
+- [ ] **Validation — date de fin avant date signature** : saisir une date de fin antérieure à la date signature → "✓ Enregistrer" → erreur inline affichée, aucun appel API, modal reste en édition
+- [ ] **Cascade sur les lignes — nominal** : contrat avec une ou plusieurs lignes actives/brouillon → modifier la date signature et/ou la date de fin de l'entête → "✓ Enregistrer" → toutes les lignes actives/brouillon sont réalignées sur exactement ces nouvelles dates (`period_start`/`period_end`), avec jours/mois et montants HT/TVA/TTC recalculés depuis le tarif déjà en place sur chaque ligne (même résultat qu'une édition manuelle de chaque ligne)
+- [ ] **Cascade multi-lignes (plusieurs véhicules)** : contrat à 2+ lignes (véhicules différents) → changer la période de l'entête → chacune des lignes affiche la même nouvelle période, avec son propre montant recalculé selon son propre tarif (pas de mélange entre lignes)
+- [ ] **Cascade — ligne en conflit** : si une ligne ne peut pas être alignée automatiquement (ex. chevauchement véhicule BR19) → l'entête reste tout de même enregistré, un avertissement liste la/les plaque(s) concernée(s) à corriger manuellement
+- [ ] **Cascade — persistance** : F5 après cascade → les lignes affichent toujours les nouvelles dates/montants (sauvegardées via `PUT /contract-lines/:id`)
+- [ ] **Pas de cascade sans changement de dates** : modifier un autre champ de l'entête (ex. statut) sans toucher aux dates → les lignes ne sont pas ré-écrites (aucun appel `PUT /contract-lines/:id`)
 
 ---
 

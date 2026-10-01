@@ -267,6 +267,8 @@ CREATE TABLE IF NOT EXISTS contracts (
 - `court`: Short-term rental (days)
 - `long`: Long-term rental (months)
 
+> **✅ Migration 030** : `ALTER TABLE contracts ADD COLUMN IF NOT EXISTS end_date DATE;` — à exécuter dans Supabase SQL Editor (`src/backend/migrations/030_contracts_end_date.sql`). Date de fin d'entête, éditable aux côtés de `contract_date` (date signature) depuis la modale de détail contrat. Modifier `contract_date` et/ou `end_date` à l'édition de l'entête réaligne automatiquement `period_start`/`period_end` de toutes les `contract_lines` actives/brouillon du contrat sur ces nouvelles dates (jours/mois et montants HT/TVA/TTC recalculés avec le tarif déjà en place sur chaque ligne).
+
 **Payment Moment**:
 - `advance`: Full payment upfront
 - `departure`: Payment at pickup

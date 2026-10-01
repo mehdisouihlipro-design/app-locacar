@@ -1868,6 +1868,24 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 
 ---
 
+### 9.36 ✅ Implémenté (2026-10) — Date de fin d'entête + cascade automatique sur les lignes
+
+**Besoin** : l'entête de contrat n'avait qu'une date signature (`contract_date`), aucune date de fin propre à l'entête. Modifier la période du contrat obligeait à éditer chaque ligne une par une.
+
+**Implémentation** :
+- Nouvelle colonne `contracts.end_date` (migration `030_contracts_end_date.sql`), éditable dans la modale de détail contrat (champ `Date de fin` à côté de `Date signature`).
+- Validation inline : `end_date < contract_date` → erreur affichée, sauvegarde bloquée.
+- `cascadeContractDatesToLines(contractId, newStart, newEnd)` (`worksheet-mini-app/index.html`) : à la sauvegarde de l'entête, si `contract_date` et/ou `end_date` ont changé, toutes les `contract_lines` actives/brouillon du contrat sont réalignées sur exactement cette même période (`period_start`/`period_end`), avec recalcul des jours/mois (`calcLineDuration`) et des montants HT/TVA/TTC (`computeContractLineTtc`, `calcMonthlyAmountJS`) en conservant le tarif déjà en place sur chaque ligne — même formule que l'édition manuelle d'une ligne (`saveContractLineEdit`).
+- Chaque ligne est persistée via `PUT /contract-lines/:id`, qui synchronise déjà la réservation liée et recalcule les totaux d'entête. Si une ligne est en conflit (BR19) ou échoue, l'entête reste tout de même enregistré et un avertissement liste les véhicules concernés (à corriger manuellement).
+- Même comportement câblé sur l'éditeur générique (`saveRecordEditor`, double-clic sur une ligne de la grille Contrats) pour que la cascade s'applique quel que soit l'écran utilisé pour modifier les dates.
+- Vue lecture de l'entête : affiche désormais `Date signature` et `Date de fin` en plus de `Période` (bornes dérivées des lignes).
+
+**Fichiers modifiés** :
+- `src/backend/migrations/030_contracts_end_date.sql` — nouvelle colonne
+- `worksheet-mini-app/index.html` — `loadDataFromAPI`, `syncStateToAPI`, `mapContractToApi`, `renderContractDetailHeader` (vue lecture + édition + handler save), `cascadeContractDatesToLines` (nouvelle fonction), `saveRecordEditor`, `inputTypeMap`
+
+---
+
 **Document Version**: 1.0  
-**Last Updated**: July 2026  
-**Next Review**: September 2026
+**Last Updated**: October 2026  
+**Next Review**: December 2026
