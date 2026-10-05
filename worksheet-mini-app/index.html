@@ -7580,18 +7580,30 @@ ${mainPagesHtml}
 </div>
 <script>
   // Clone chaque page contrat (une par véhicule si contrat long terme multi-lignes) pour
-  // générer sa COPIE AGENCE, insérée juste après l'original (client puis agence, par véhicule).
+  // générer sa COPIE AGENCE, et fait suivre chaque copie (client comme agence) de son
+  // verso (conditions générales) : recto client, verso, recto agence, verso — pour qu'une
+  // impression recto-verso mette bien chaque verso derrière sa propre copie.
   (function() {
     var mains = document.querySelectorAll(".contract-main-page");
     var cond = document.getElementById("contractConditionsPage");
     if (!mains.length || !cond) return;
+    var newVerso = function() {
+      var v = cond.cloneNode(true);
+      v.removeAttribute("id");
+      return v;
+    };
     mains.forEach(function(main) {
-      var clone = main.cloneNode(true);
-      clone.style.pageBreakBefore = "always";
-      var lbl = clone.querySelector(".contract-copy-label");
+      var parent = main.parentNode;
+      var ref = main.nextSibling;
+      var agency = main.cloneNode(true);
+      agency.style.pageBreakBefore = "always";
+      var lbl = agency.querySelector(".contract-copy-label");
       if (lbl) lbl.textContent = "COPIE AGENCE";
-      main.parentNode.insertBefore(clone, main.nextSibling);
+      parent.insertBefore(newVerso(), ref);
+      parent.insertBefore(agency, ref);
+      parent.insertBefore(newVerso(), ref);
     });
+    cond.parentNode.removeChild(cond);
   })();
 <\/script>
 </body>

@@ -1768,8 +1768,10 @@ Champs obligatoires : Immatriculation + Modèle. Un bouton "Annuler" ferme le fo
 - La première page du contrat reçoit l'identifiant `id="contractMainPage"` et un badge `<div id="contractCopyLabel">COPIE CLIENT</div>` sous le numéro de contrat.
 - La deuxième page (conditions générales) reçoit l'identifiant `id="contractConditionsPage"`.
 - Un script inline injecté avant `</body>` clone `#contractMainPage` via `cloneNode(true)`, change le texte du badge en "COPIE AGENCE" et insère le clone juste avant `#contractConditionsPage`.
-- Résultat : 3 pages imprimées — COPIE CLIENT · COPIE AGENCE · CONDITIONS GÉNÉRALES.
+- Résultat initial : 3 pages imprimées — COPIE CLIENT · COPIE AGENCE · CONDITIONS GÉNÉRALES.
 - Le clone script utilise `<\/script>` pour éviter la fermeture prématurée de la balise script parente dans le template literal.
+
+**Évolution (2026-10) — un verso par copie** : le verso (conditions générales) n'apparaissait qu'une seule fois, en dernière page, donc derrière la copie agence seulement (et à contre-sens pour une impression recto-verso). Le script inline fait désormais, pour chaque page contrat (`.contract-main-page`, une par véhicule pour un contrat long terme multi-lignes) : recto COPIE CLIENT → verso → recto COPIE AGENCE → verso, en clonant le verso (`#contractConditionsPage`, id retiré sur les clones puis original supprimé). Contrat court terme / mono-véhicule : 4 pages (client, verso, agence, verso) ; contrat multi-lignes à N véhicules : 4 × N pages.
 
 **Fichiers modifiés** :
 - `worksheet-mini-app/index.html` — fonction `generateContractPdf` (template HTML PDF)
