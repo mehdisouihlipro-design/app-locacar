@@ -17860,6 +17860,7 @@ ${mainPagesHtml}
         byId("cdlAddLineToggleBtn").style.display = "";
         byId("cdlCreateInvoiceBtn").style.display = "";
         renderContractDetailLines(contractId);
+        renderContractDetailHeader(contractId, false);
       };
       byId("cdlPdfBtn").onclick = () => generateContractPdf(contractId);
       renderContractDetailHeader(contractId, false);

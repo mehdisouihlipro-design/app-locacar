@@ -1057,7 +1057,8 @@
 - [ ] **Bouton visible** : ouvrir le modal d'un contrat qui a au moins une facture non-brouillon → bouton "🔓 Débloquer l'édition" (orange) apparaît
 - [ ] **Confirmation** : cliquer le bouton → une fenêtre de confirmation s'affiche → annuler → contrat reste verrouillé
 - [ ] **Déblocage session** : confirmer → le bouton disparaît, les boutons ✎/⏹/🗑 deviennent visibles sur les lignes, le bouton "+ Ajouter une ligne" réapparaît
-- [ ] **Édition possible** : modifier une ligne → `PUT /contract-lines/:id` réussi, ligne mise à jour
+- [ ] **Entête débloquée immédiatement** : sans fermer/rouvrir le modal, le bouton "🔒 Contrat verrouillé" (désactivé) devient "✏ Modifier entête" (actif) dès la confirmation du déblocage — régression corrigée : `openContractDetail` n'appelait que `renderContractDetailLines` après déblocage, jamais `renderContractDetailHeader`, donc l'entête restait affiché verrouillé jusqu'à fermeture/réouverture du modal
+- [ ] **Édition possible** : modifier une ligne → `PUT /contract-lines/:id` réussi, ligne mise à jour ; modifier l'entête → `PUT /contracts/:id` réussi, entête mis à jour
 - [ ] **Rétablissement au rechargement** : fermer et rouvrir le modal → le contrat est de nouveau verrouillé (le déblocage est uniquement pour la session en cours, non persisté)
 - [ ] **Persistance** : F5 → contrat retrouve son état verrouillé normal
 
